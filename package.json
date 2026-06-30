@@ -1,0 +1,13 @@
+{
+  "name": "ar-prototype",
+  "version": "1.0.0",
+  "description": "MindAR image tracking + Rive UI prototype",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@rive-app/canvas-lite": "^2.38.3",
+    "express": "^5.2.1"
+  }
+}
