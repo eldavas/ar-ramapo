@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AR Prototype</title>
+  <link rel="icon" href="data:,">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { overflow: hidden; background: #000; }
+    #ar-container { width: 100vw; height: 100vh; position: relative; }
+  </style>
+</head>
+<body>
+  <div id="ar-container"></div>
+  <!-- Vite-built bundle (three, mind-ar, and @rive-app/canvas-lite are
+       bundled npm dependencies now, not CDN imports — see vite.config.ts).
+       This single stable filename is produced by both `vite build` and
+       `vite build --watch`, so this tag never needs to change between dev
+       and production. -->
+  <script type="module" src="/dist/main.js"></script>
+</body>
+</html>
