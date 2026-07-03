@@ -34,43 +34,21 @@ async function main(): Promise<void> {
     throw new Error(`Experience "${experience.targetId}" has no mindTargetUrl declared in the manifest.`);
   }
 
-  const rive = new RiveController(experience.riveUrl, STATE_MACHINE_NAME);
-
   const session = new ARSessionManager(container, experience.mindTargetUrl);
   const { renderer, scene, camera, anchor } = await session.start(0);
 
-  const riveTexture = new THREE.CanvasTexture(rive.canvas);
-  riveTexture.generateMipmaps = false;
-  riveTexture.minFilter = THREE.LinearFilter;
-
-  const plane = new THREE.Mesh(
-    new THREE.PlaneGeometry(1, 1),
-    new THREE.MeshBasicMaterial({
-      map: riveTexture,
-      transparent: true,
-      side: THREE.DoubleSide,
-    })
-  );
-
-  // Stand the card upright above the target surface. Increase position.z to
-  // float it higher above the marker.
-  plane.rotation.x = Math.PI / 2;
-  plane.position.z = 0.5;
-  anchor.group.add(plane);
-
-  const inputBridge = new InputBridge(renderer, camera, plane, rive);
-  inputBridge.attach();
-
   const renderEngine = new RenderEngine(renderer, scene, camera);
-  renderEngine.onFrame(() => {
-    riveTexture.needsUpdate = true;
-  });
 
-  // Spatial pipeline (Phase 3, AR_SYSTEM.md §G): experiences that declare a
-  // baked scene mesh get it mounted on the anchor with the §F glue
-  // transform applied, plus screen-space hotspot cards pinned by per-frame
-  // projection.
+  // These two branches are mutually exclusive by design: a spatial
+  // experience (modelUrl declared) is driven entirely by hotspot_* nodes
+  // discovered in its baked scene — it must never also mount the legacy
+  // single plane below, or a second, uncontrolled card ends up floating
+  // directly over the tracking target/origin (that origin is a reference
+  // point, not a hotspot — see AR_SYSTEM.md §A).
   if (experience.modelUrl !== undefined) {
+    // Spatial pipeline (Phase 3, AR_SYSTEM.md §G): the baked scene mesh is
+    // mounted on the anchor with the §F glue transform applied, and
+    // hotspot_* nodes get screen-space cards pinned by per-frame projection.
     if (experience.physicalTargetWidthMeters === undefined) {
       // ManifestResolver already enforces this pairing; the recheck exists
       // for type narrowing and to keep the invariant local and loud.
@@ -93,8 +71,39 @@ async function main(): Promise<void> {
       // fire with three r160, so anchor visibility is the tracking signal.
       () => anchor.group.visible
     );
+    renderEngine.onFrame((deltaMs) => {
+      overlay.update(projector.project(), deltaMs);
+    });
+  } else {
+    // Legacy single-card experience (pre-Phase-3, e.g. "proxy-target"): one
+    // Rive-textured plane anchored directly above the tracked target,
+    // driven by InputBridge's document-level touch raycast.
+    const rive = new RiveController(experience.riveUrl, STATE_MACHINE_NAME);
+
+    const riveTexture = new THREE.CanvasTexture(rive.canvas);
+    riveTexture.generateMipmaps = false;
+    riveTexture.minFilter = THREE.LinearFilter;
+
+    const plane = new THREE.Mesh(
+      new THREE.PlaneGeometry(1, 1),
+      new THREE.MeshBasicMaterial({
+        map: riveTexture,
+        transparent: true,
+        side: THREE.DoubleSide,
+      })
+    );
+
+    // Stand the card upright above the target surface. Increase position.z
+    // to float it higher above the marker.
+    plane.rotation.x = Math.PI / 2;
+    plane.position.z = 0.5;
+    anchor.group.add(plane);
+
+    const inputBridge = new InputBridge(renderer, camera, plane, rive);
+    inputBridge.attach();
+
     renderEngine.onFrame(() => {
-      overlay.update(projector.project());
+      riveTexture.needsUpdate = true;
     });
   }
 

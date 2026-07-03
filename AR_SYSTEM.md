@@ -410,4 +410,57 @@ schema above.
   (pre-rotation) extents with the 90° applied as object rotation, and all
   measured Z values were read as heights above the box-cover top surface.
 
+  **Progress (2026-07-03): on-device iPhone testing surfaced four
+  stabilization/correctness bugs in the runtime scope, all fixed; phase
+  still blocks on the pass-criteria measurement pass above.**
+
+  - **Frame-rate-dependent smoothing.** `HotspotOverlay`'s screen-position
+    Lerp and tracking-loss hysteresis were fixed per-frame constants (a
+    fraction-per-tick factor, a frame count) — correct only at a constant
+    60fps. iPhone tracking is exactly the scenario where frame time is
+    least stable (thermal throttling under camera + tracking + WASM load),
+    so smoothing and hide behavior ran faster or slower than tuned
+    depending on device load. Fixed by threading real elapsed time through
+    the render loop: `RenderEngine.onFrame` now reports `deltaMs` (it
+    previously passed the raw, unused `requestAnimationFrame` timestamp);
+    `HotspotOverlay` converts the tuned 60fps-reference Lerp factor into a
+    time-compensated one and expresses the hysteresis grace period in
+    milliseconds rather than a frame count. Verified numerically: the
+    compensated factor returns the original tuned value exactly at 60fps,
+    scales up correctly at lower rates, and approaches a direct
+    snap-to-target after a long stall (e.g. a backgrounded tab) instead of
+    an oddly slow partial lerp.
+  - **Silent lookup failure.** `HotspotOverlay.update()` silently skipped
+    any projection whose `Hotspot` object wasn't found in its internal
+    maps — a real invariant (object-identity keys, stable only because
+    `SceneGraphLoader` builds the hotspot list once) with no enforcement
+    or signal if ever violated, contradicting §C's no-silent-failure rule.
+    Now warns once per hotspot, naming exactly which one and why, instead
+    of failing invisibly.
+  - **Duplicate UI mount.** `main.ts` unconditionally created the
+    pre-Phase-3 single Rive-textured plane (anchored directly above the
+    tracking target) for every experience, *in addition to* the Phase 3
+    spatial pipeline whenever `modelUrl` was declared. For `bench-test`
+    this rendered an extra, unintended card directly over the QR
+    origin — the origin is a reference point, not a hotspot (§A) — and
+    that leftover plane was the only thing actually receiving touch
+    input, because its input path (`InputBridge`, a document-level 3D
+    raycast) doesn't depend on DOM hit-testing the way the hotspot cards
+    do. The two paths are now mutually exclusive on
+    `experience.modelUrl`: spatial experiences get only the hotspot
+    pipeline, non-spatial ones keep the legacy plane.
+  - **Touch target too small.** With the duplicate mount removed, the
+    hotspot cards' own unresponsiveness became visible: their
+    `pointerdown`/`pointerup` listeners were attached only to the inner
+    96×96px Rive canvas, not the full visible card (label text + padded
+    pill background), so most of what looked tappable wasn't. Listeners
+    now attach to the whole card; a tap landing outside the inner canvas
+    clamps to the nearest valid canvas coordinate before mapping into
+    artboard space.
+
+  Verified by strict typecheck and a clean production build after each
+  fix; on-device confirmation of touch response and single-card rendering
+  is the next step, ahead of the pass-criteria measurement pass still
+  blocking phase close.
+
   No iOS work. No WebXR work.

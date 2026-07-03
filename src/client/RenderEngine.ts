@@ -1,6 +1,6 @@
 import type { WebGLRenderer, Scene, PerspectiveCamera } from 'three';
 
-export type FrameCallback = (timestamp: number) => void;
+export type FrameCallback = (deltaMs: number) => void;
 
 /**
  * Drives the Three.js render loop against handles created elsewhere
@@ -16,6 +16,11 @@ export type FrameCallback = (timestamp: number) => void;
  */
 export class RenderEngine {
   private readonly frameCallbacks: FrameCallback[] = [];
+  // null until the first tick after start() — lets callbacks distinguish
+  // "no time has passed yet" (deltaMs === 0) from a real elapsed duration,
+  // and stops a stale timestamp from a previous run producing one huge
+  // deltaMs spike on restart (see stop()).
+  private lastTimestamp: number | null = null;
 
   constructor(
     private readonly renderer: WebGLRenderer,
@@ -29,8 +34,11 @@ export class RenderEngine {
 
   start(): void {
     this.renderer.setAnimationLoop((timestamp: number) => {
+      const deltaMs = this.lastTimestamp === null ? 0 : timestamp - this.lastTimestamp;
+      this.lastTimestamp = timestamp;
+
       for (const callback of this.frameCallbacks) {
-        callback(timestamp);
+        callback(deltaMs);
       }
       this.renderer.render(this.scene, this.camera);
     });
@@ -38,5 +46,6 @@ export class RenderEngine {
 
   stop(): void {
     this.renderer.setAnimationLoop(null);
+    this.lastTimestamp = null;
   }
 }
