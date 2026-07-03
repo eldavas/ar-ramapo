@@ -4,19 +4,33 @@
 decision that contradicts it is either a bug or a reason to update this file
 first — never the other way around silently.
 
-Status: Phase 2 (Cloud Deployment Readiness & Edge TLS Verification)
-complete. See §G for phase history.
+Status: Phase 3 (Spatial Bench-Test & Coordinate System Lockdown) open.
+See §G for phase history.
 
 ---
 
 ## A. Project vision
 
-**What this is:** a production-grade, cross-platform AR product built around
-image-target tracking, with a Rive-driven UI layer composited into a 3D scene.
-The web layer (MindAR + Three.js + Rive) is the primary delivery mechanism
-today and the permanent delivery mechanism for Android. iOS gets a native
+**What this is:** a production-grade, cross-platform AR experience that
+accompanies a **physical, 3D-printed architectural site model**. Scanning a
+printed QR plaque opens a digital storytelling layer — interactive 3D
+graphics, site timelines, and Rive-driven information cards — overlaid
+directly on the physical structures, with no app-store install. The web
+layer (MindAR + Three.js + Rive) is the primary delivery mechanism today and
+the permanent delivery mechanism for Android. iOS gets a native
 ARKit/RealityKit App Clip once that workstream starts — not a WebXR
 experience, because WebXR AR sessions do not exist in Safari.
+
+Two spatial invariants anchor the entire content pipeline:
+
+- **The digital twin ships as a lightweight 3D mesh baked out of the source
+  architectural CAD drawings.** Heavy, unoptimized CAD files never ship to
+  the runtime — the deliverable asset is always a WebGL-optimized bake
+  (glTF/GLB for web, USDZ for iOS), derived from CAD, not CAD itself.
+- **The exact center of the QR plaque is the absolute origin (0, 0, 0) of
+  the scene graph.** All model geometry, offsets, and interaction nodes are
+  authored relative to that origin so the tracking engine's computed world
+  coordinate system and the authored scene coincide by construction.
 
 **What this is NOT:**
 - Not a WebXR-first product. WebXR is an optional enhancement path that may
@@ -97,7 +111,9 @@ experience, because WebXR AR sessions do not exist in Safari.
   `/public`.
 - **No exposure of server internals.** `server/` is never inside the served
   directory tree. If it needs to be reachable, it needs to be an explicit
-  route, not a side effect of static serving.
+  route, not a side effect of static serving. `GET /api/manifest` (§E) is
+  the canonical example: the manifest is exposed through a declared route
+  with a specified response shape — never by making `packages/` reachable.
 - **All assets must be explicitly declared in a manifest.** No AR experience
   may reference an asset path that isn't declared in the experience manifest
   (§E). This is a scaffold in Phase 0 (types only, no enforcement) and
@@ -123,6 +139,54 @@ experience, because WebXR AR sessions do not exist in Safari.
   unknown or a URL is malformed. `src/client/main.ts` calls this at startup;
   no asset path is written as a string literal in application code.
 
+### Manifest schema (Phase 3 extension)
+
+The manifest entry carries **global physical constraints and asset-path
+routing, nothing else**:
+
+- `targetId: string` — the experience key.
+- `riveUrl: string` — the Rive UI asset.
+- `modelUrl?: string` — the baked 3D mesh (glTF/GLB) for the web runtime.
+- `usdzUrl?: string` — the USDZ variant of the same baked mesh, consumed by
+  the future iOS App Clip. Same source scene, different export — never a
+  separately authored asset.
+- `mindTargetUrl?: string` — the compiled MindAR tracking target.
+- `physicalTargetWidthMeters?: number` — the printed physical width of the
+  tracking target. Optional in the type, but **required on any entry that
+  declares `modelUrl`**: it is the sole scale bridge between meter-authored
+  content and the tracking engines (MindAR anchor space is measured in
+  marker-widths and needs the ×(1/width) conversion; ARKit sizes its
+  `ARReferenceImage` from the same number).
+- `version: string` — bumped on any asset change, never silently replaced.
+
+### Manifest exposure: `GET /api/manifest`
+
+Native clients (the future iOS App Clip) must resolve assets through the
+same manifest as the web client (§F: platforms share creative assets and
+the manifest *schema*, never code). The server exposes the **full versioned
+manifest array — the exact `manifest.ts` shape, no more, no less** — at the
+explicit route `GET /api/manifest`. Clients resolve their `targetId`
+locally, mirroring `ManifestResolver`; the server never resolves on the
+client's behalf, and the response never carries fields that are not in the
+schema above.
+
+### Golden Rule: zero UI/hotspot coupling in governance schemas
+
+- The manifest schema, the `/api/manifest` response, and every table in this
+  document are **forbidden** from carrying UI interaction attributes — Rive
+  artboard bindings, state-machine keys, input names, card copy strings, or
+  any per-node behavior matrix.
+- All node-level interaction behavior is **encapsulated inside the asset
+  file itself**: authored as Blender custom properties on the scene-graph
+  nodes, exported as glTF `extras` (and the USD equivalent), surfacing at
+  runtime as `object.userData`.
+- The render engine **discovers** interaction nodes dynamically by tree
+  traversal (the `hotspot_` name prefix), never by reading node lists,
+  bindings, or copy from a configuration payload.
+- Consequence: changing what a hotspot does, says, or triggers is an **asset
+  edit and a manifest version bump** — it must never require touching this
+  file, the schema, the API, or application code.
+
 ---
 
 ## F. AR constraints
@@ -137,6 +201,15 @@ experience, because WebXR AR sessions do not exist in Safari.
   workstream starts, it is a separate native project that shares creative
   assets and the manifest schema, not rendering code (see the architecture
   review preceding this document for the full Option A/B analysis).
+- **Axis conventions are locked per engine, as named constants in code.**
+  Authoring is Blender Z-up in meters; the glTF exporter converts to Y-up
+  (authored north/+Y becomes runtime −Z). Each tracking engine frames the
+  flat plaque differently: MindAR anchor space is X-east / Y-north / Z-up in
+  **marker-width units**; ARKit `ARImageAnchor` is X-east / Y-up / Z-south
+  in meters. The rotation/scale glue transform between authored space and
+  each engine's anchor space is a named constant in the runtime that
+  consumes it, validated by the Phase 3 bench-test, and never derived ad hoc
+  at call sites.
 
 ---
 
@@ -247,3 +320,53 @@ experience, because WebXR AR sessions do not exist in Safari.
 
   No iOS work. No WebXR work. No changes to AR tracking, the Rive
   interaction bridge, or the manifest payload schema.
+
+- **Phase 3 — Spatial Bench-Test & Coordinate System Lockdown. (OPEN)**
+  Goal: prove the authored-space → tracked-space pipeline end to end with a
+  low-fidelity mock scene before any architectural mesh exists, and lock
+  the per-engine axis conventions (§F) permanently.
+
+  **Governance scope (this document, done first):** manifest schema
+  extension (`physicalTargetWidthMeters`, `usdzUrl` — §E), the
+  `GET /api/manifest` route specification (§D, §E), and the Golden Rule on
+  UI/hotspot decoupling (§E).
+
+  **Physical rig:** a 5×5 cm printed QR plaque, taped dead flat, as the
+  physical (0,0,0); a board-game box as the baseboard stand-in, its offset
+  from the plaque center ruler-measured on all three axes (including the
+  box height — proxies sit on top of it); **four dominos** as proxy
+  buildings; a deliberate asymmetry tell in the arrangement so any axis
+  flip is visible at a glance.
+
+  **Authoring scope:** a Blender mock scene in meters mirroring the rig —
+  `AR_World_Origin` empty at origin, `QR_Plaque_Proxy` plane at (0,0,0), a
+  `Physical_Model_Offset_Group` translated by the measured offsets holding
+  the baseboard and domino proxies, and `hotspot_*` empties inside the
+  proxies carrying their interaction data as Blender custom properties
+  (per the Golden Rule, §E). Exported as `.glb` for this phase and `.usdz`
+  from the same scene for the future iOS workstream.
+
+  **Runtime scope:** a `bench-test` manifest entry (first consumer of
+  `modelUrl` + `physicalTargetWidthMeters`); three new `src/client`
+  modules honoring §B separation — `SceneGraphLoader.ts` (loads the mesh,
+  applies the §F glue transform, discovers `hotspot_*` nodes by
+  traversal), `HotspotProjector.ts` (per-frame world→screen projection
+  with frustum check, occlusion raycast, and hide-on-target-lost), and
+  `HotspotOverlay.ts` (screen-space Rive cards pinned at projected
+  coordinates); `main.ts` switches the active target. No changes to
+  `ARSessionManager`, `InputBridge`, or the server beyond the declared
+  route.
+
+  **Pass criteria:** virtual baseboard within ~5 mm of the physical box
+  edges at 0.5 m viewing distance from multiple angles; hotspot pins
+  visually locked to their dominos (within a few pixels) while orbiting;
+  behavior reproducible across re-detections; occlusion and frustum
+  handling verified. **Deliverables:** the locked §F glue-transform
+  constants and measured accuracy numbers (including the small-marker
+  lever-arm error) recorded here on phase close.
+
+  Exit condition: production content becomes a pure asset swap — the
+  CAD-baked mesh replaces the proxies in the same hierarchy under the same
+  origin convention, with zero application-code change.
+
+  No iOS work. No WebXR work.
