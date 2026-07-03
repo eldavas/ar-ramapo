@@ -4,8 +4,8 @@
 decision that contradicts it is either a bug or a reason to update this file
 first — never the other way around silently.
 
-Status: Phase 1 (Core Web Refactor & Runtime Type Safety) complete. See §G
-for phase history.
+Status: Phase 2 (Cloud Deployment Readiness & Edge TLS Verification)
+complete. See §G for phase history.
 
 ---
 
@@ -195,3 +195,55 @@ experience, because WebXR AR sessions do not exist in Safari.
     compiled output is.
 
   No iOS work. No WebXR work. No new UI features or tracking targets.
+
+- **Phase 1.5 — TLS Termination Isolation & Environment-Agnostic Config.**
+  `server/config.ts`'s `HTTPS_KEY_PATH`/`HTTPS_CERT_PATH` (renamed from
+  `SSL_KEY`/`SSL_CERT`) now default to `""` — no hardcoded local file-path
+  fallback survives onto a machine that never had that path. `PORT` parsing
+  hardened against non-numeric input. `server/startServer.ts`'s orchestration
+  collapsed to one rule: development with both cert paths present on disk →
+  `https.createServer`; production, or missing certs for any reason → plain
+  `http.createServer`, with startup logs stating `[SECURE HTTPS PORT]` or
+  `[HTTP PROXY MODE]` explicitly. `fs.existsSync()` always gates
+  `fs.readFileSync()` — a missing `.pem` can no longer throw an unhandled
+  `ENOENT`. Verified booting cleanly with no `.env` at all, with dev certs
+  present, and with `NODE_ENV=production` overriding certs that do exist.
+
+- **Phase 2 — Cloud Deployment Readiness & Edge TLS Verification.** Split
+  the build/run lifecycle to match how a PaaS actually deploys a container:
+  `pnpm build` (`tsc && vite build`) compiles both the server (`/dist`) and
+  the client (`/public/dist`) once, ahead of time; `pnpm start` now runs only
+  `node dist/server.js` — no compiler, no Vite, no on-the-fly transpilation
+  inside the running container (previously `start` re-ran `tsc` and `vite
+  build` on every boot, which is fine for a laptop but wrong for a platform
+  that should boot the same immutable artifact on every restart). Host
+  binding and port injection were verified, not just asserted: booting with
+  `env -i PATH="$PATH" NODE_ENV=production PORT=8080 node dist/server.js` —
+  stripping the shell environment down to exactly what a fresh container
+  provides — bound `0.0.0.0:8080` (confirmed via `netstat`, not just assumed
+  from reading the code) and served `/health` and the built client bundle
+  with zero exceptions. Reference environment-variable values for a host
+  platform's dashboard are documented in `docs/deployment-spec.md`. No
+  provider-specific CI/CD config (e.g. `render.yaml`) was added — the repo
+  stays platform-agnostic.
+
+  **Cloud network topology:**
+  ```
+  Phone / browser                Cloud platform edge              Node.js container
+  ─────────────────              ────────────────────              ──────────────────
+  https://ar.example.com  ──▶   Managed TLS termination    ──▶    http://0.0.0.0:$PORT
+  (public HTTPS, camera-        (provider's certificate,           (server/startServer.ts,
+   grade secure context)         handles the TLS handshake          [HTTP PROXY MODE] —
+                                 transparently)                     plain HTTP internally)
+  ```
+  The browser's secure context requirement (mandatory for MindAR/WebXR
+  camera access — see §A) is satisfied entirely at the edge. The Node
+  process never holds a certificate in production and never needs to; it
+  only ever speaks HTTP inside the platform's private network, which is
+  exactly what Phase 1.5's orchestration rule already forces whenever
+  `NODE_ENV=production`. This is the intended, permanent production
+  topology — not a stand-in for local `.pem` certs, which remain
+  development-only (§C, §F).
+
+  No iOS work. No WebXR work. No changes to AR tracking, the Rive
+  interaction bridge, or the manifest payload schema.

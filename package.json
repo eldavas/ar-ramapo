@@ -13,7 +13,7 @@
     "build": "tsc && vite build",
     "dev:client": "vite build --watch",
     "typecheck": "tsc --noEmit && tsc --noEmit -p src/client/tsconfig.json",
-    "start": "tsc && vite build && node dist/server.js"
+    "start": "node dist/server.js"
   },
   "dependencies": {
     "@rive-app/canvas-lite": "^2.38.3",
