@@ -380,11 +380,34 @@ schema above.
   guards), `HotspotOverlay.ts` (cards driven exclusively by asset
   `userData`, per the Golden Rule) — wired in `main.ts` behind the
   `modelUrl` declaration. Strict typecheck and production build clean; the
-  `bench-test` manifest entry is registered. The active experience remains
-  `proxy-target` until `bench-scene.glb` (Blender export) and
-  `bench-target.mind` (compiled plaque) land in `/public/assets`;
-  activation is that asset drop plus the one-constant flip in `main.ts`.
-  Remaining before phase close: physical rig assembly, Blender authoring,
-  and on-device validation against the pass criteria.
+  `bench-test` manifest entry is registered.
+
+  **Progress (2026-07-03): bench-test is live; phase blocks on on-device
+  validation.** All Phase 3 assets are authored, deployed, and active:
+
+  - `tools/build_bench_scene.py` (headless Blender) authors the mock scene
+    from the ruler-measured rig coordinates — plaque printed-face center at
+    world (0,0,0) per §A, measurements preserved verbatim inside
+    `Physical_Model_Offset_Group`, `hotspot_*` **empties** (not meshes — a
+    co-located hotspot mesh would occlude itself in `HotspotProjector`)
+    carrying `label`/`riveStateMachine` custom properties per the Golden
+    Rule. Exports `bench-scene.glb` + `bench-scene.usdz` from one scene.
+  - `tools/build_plaque.py` generates the single-source plaque artwork (QR
+    to the live experience, asymmetry tell, +Y north arrow) and a print
+    sheet with a 100 mm calibration bar; `tools/compile_mind_target.mjs`
+    compiles `bench-target.mind` from that same PNG with mind-ar 1.2.5's
+    own `Compiler` (headless Chrome harness). Printed plaque, tracking
+    data, and digital twin are pixel-identical by construction.
+  - The physical rig is printed and assembled; `ACTIVE_TARGET_ID` is
+    flipped to `bench-test` (manifest entry at version 0.2.0 — all four
+    hotspots now declare `riveStateMachine`); deployed and smoke-tested
+    (manifest, model, target, and Rive assets all serving).
+
+  **The single remaining step before phase close:** on-device validation
+  against the pass criteria above, then recording the validated §F glue
+  constants and measured accuracy numbers here. Two authoring assumptions
+  to check explicitly on device: domino 1/4 dims were taken as local
+  (pre-rotation) extents with the 90° applied as object rotation, and all
+  measured Z values were read as heights above the box-cover top surface.
 
   No iOS work. No WebXR work.
