@@ -55,6 +55,8 @@ export const experienceManifest: ExperienceManifest[] = [
     modelUrl: '/assets/bench-scene.glb',
     mindTargetUrl: '/assets/bench-target.mind',
     physicalTargetWidthMeters: 0.05,
-    version: '0.1.0',
+    // 0.2.0: all four hotspot_* nodes in bench-scene.glb now declare
+    // riveStateMachine (was two of four).
+    version: '0.2.0',
   },
 ];

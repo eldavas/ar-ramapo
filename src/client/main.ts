@@ -17,11 +17,11 @@ const STATE_MACHINE_NAME = 'State Machine 1';
 // architecture review's routing-structure finding. Selecting *which*
 // experience loads is a later phase.
 //
-// Phase 3: flip to 'bench-test' once the Blender export (bench-scene.glb)
-// and the compiled bench QR target (bench-target.mind) land in
-// /public/assets — the spatial pipeline below activates on any experience
-// that declares modelUrl, so the switch is this one constant.
-const ACTIVE_TARGET_ID = 'proxy-target';
+// Phase 3: bench-test is live — its assets (bench-scene.glb,
+// bench-target.mind) are in /public/assets and the spatial pipeline below
+// activates on any experience that declares modelUrl. Flip back to
+// 'proxy-target' to run the pre-Phase-3 anchored-plane experience.
+const ACTIVE_TARGET_ID = 'bench-test';
 
 async function main(): Promise<void> {
   const container = document.querySelector<HTMLDivElement>('#ar-container');

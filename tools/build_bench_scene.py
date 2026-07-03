@@ -58,8 +58,9 @@ PLAQUE_CENTER_XY = Vector((0.18, 0.04))
 
 # Dominoes: dims are LOCAL (pre-rotation) extents; rot_z_deg is applied as
 # the object's Z rotation, per the measurement sheet's own convention.
-# riveStateMachine is set on two of the four so the bench-test exercises
-# both HotspotOverlay card variants (label-only and label+Rive).
+# All four hotspots declare riveStateMachine so every card runs the
+# interactive Rive canvas during the bench-test (set to None for a
+# label-only card).
 DOMINOES = [
     dict(
         name="domino_1",
@@ -76,7 +77,7 @@ DOMINOES = [
         location=(0.296, 0.1865, 0.005),
         rot_z_deg=0.0,
         label="Domino 2 · lying flat",
-        rive_state_machine=None,
+        rive_state_machine="State Machine 1",
         color=(0.15, 0.60, 0.20, 1.0),
     ),
     dict(
@@ -85,7 +86,7 @@ DOMINOES = [
         location=(0.155, 0.128, 0.0125),
         rot_z_deg=0.0,
         label="Domino 3 · on long side",
-        rive_state_machine=None,
+        rive_state_machine="State Machine 1",
         color=(0.15, 0.30, 0.80, 1.0),
     ),
     dict(
