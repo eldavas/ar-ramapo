@@ -369,4 +369,22 @@ schema above.
   CAD-baked mesh replaces the proxies in the same hierarchy under the same
   origin convention, with zero application-code change.
 
+  **Progress (2026-07-02):** governance and runtime scope are implemented
+  and verified. Manifest schema extended (`physicalTargetWidthMeters`,
+  `usdzUrl`) with resolver enforcement (declaring `modelUrl` without a
+  positive `physicalTargetWidthMeters` throws at resolution);
+  `GET /api/manifest` serves the exact manifest array, verified against
+  the compiled production build; the three client modules landed —
+  `SceneGraphLoader.ts` (owns the §F glue constants), `HotspotProjector.ts`
+  (frustum, occlusion-with-ancestor-exclusion, and polled tracking-loss
+  guards), `HotspotOverlay.ts` (cards driven exclusively by asset
+  `userData`, per the Golden Rule) — wired in `main.ts` behind the
+  `modelUrl` declaration. Strict typecheck and production build clean; the
+  `bench-test` manifest entry is registered. The active experience remains
+  `proxy-target` until `bench-scene.glb` (Blender export) and
+  `bench-target.mind` (compiled plaque) land in `/public/assets`;
+  activation is that asset drop plus the one-constant flip in `main.ts`.
+  Remaining before phase close: physical rig assembly, Blender authoring,
+  and on-device validation against the pass criteria.
+
   No iOS work. No WebXR work.

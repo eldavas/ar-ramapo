@@ -48,8 +48,26 @@ export function resolveExperience(targetId: string): ExperienceManifest {
   if (entry.modelUrl !== undefined) {
     assertValidAssetUrl(entry.targetId, 'modelUrl', entry.modelUrl);
   }
+  if (entry.usdzUrl !== undefined) {
+    assertValidAssetUrl(entry.targetId, 'usdzUrl', entry.usdzUrl);
+  }
   if (entry.mindTargetUrl !== undefined) {
     assertValidAssetUrl(entry.targetId, 'mindTargetUrl', entry.mindTargetUrl);
+  }
+
+  // physicalTargetWidthMeters is the sole scale bridge between
+  // meter-authored content and the tracking engines (AR_SYSTEM.md §E/§F) —
+  // an entry that declares spatial content without it would render at a
+  // meaningless scale, so fail resolution instead.
+  if (entry.modelUrl !== undefined) {
+    const width = entry.physicalTargetWidthMeters;
+    if (width === undefined || !Number.isFinite(width) || width <= 0) {
+      throw new ManifestResolutionError(
+        `experience-manifest entry "${entry.targetId}" declares modelUrl but has an invalid ` +
+          `physicalTargetWidthMeters: ${JSON.stringify(width)}. Entries with spatial content must ` +
+          'declare the printed tracking-target width as a positive number of meters (AR_SYSTEM.md §E).'
+      );
+    }
   }
 
   return entry;

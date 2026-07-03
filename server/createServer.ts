@@ -3,6 +3,7 @@ import express, { type Express } from 'express';
 import * as config from './config.js';
 import { createCorsMiddleware } from './cors.js';
 import { healthHandler } from './health.js';
+import { manifestHandler } from './manifest.js';
 
 // process.cwd() (the repo root — the app is always started from there), not
 // __dirname: after compilation this module runs from dist/server/, one
@@ -20,6 +21,7 @@ export function createApp(): Express {
   app.use(createCorsMiddleware(config.CORS_ORIGIN));
 
   app.get('/health', healthHandler);
+  app.get('/api/manifest', manifestHandler);
 
   app.use(express.static(PUBLIC_DIR));
   app.use('/rive', express.static(path.join(PROJECT_ROOT, 'node_modules/@rive-app/canvas-lite')));

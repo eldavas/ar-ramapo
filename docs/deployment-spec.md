@@ -56,7 +56,17 @@ tcp4  0  0  *.8080  *.*  LISTEN        # bound to all interfaces, not just loopb
 
 $ curl http://localhost:8080/health
 {"status":"ok","env":"production"}
+
+$ curl http://localhost:8080/api/manifest
+[{"targetId":"proxy-target",...},{"targetId":"bench-test",...}]
 ```
+
+## Post-deploy smoke test
+
+Three requests confirm a healthy deploy: `/health` (server up, correct
+env), `/api/manifest` (the full experience-manifest array — the explicit
+route native clients depend on, AR_SYSTEM.md §D/§E), and `/` (the built
+client bundle is being served). All three must return 200.
 
 `env -i` strips the shell's entire environment before setting only
 `PATH`/`NODE_ENV`/`PORT` — the closest local approximation of what a fresh
