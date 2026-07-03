@@ -1,4 +1,5 @@
 import { RiveController } from './RiveController.js';
+import { OneEuroFilter1D } from './OneEuroFilter.js';
 import type { Hotspot } from './SceneGraphLoader.js';
 import type { ProjectedHotspot } from './HotspotProjector.js';
 
@@ -7,36 +8,28 @@ const USERDATA_STATE_MACHINE_KEY = 'riveStateMachine';
 
 const CARD_RIVE_SIZE_PX = 96;
 
-// --- CONSTANTES DE ESTABILIZACIÓN PARA MÓVIL ---
+// --- ESTABILIZACIÓN HÍBRIDA DE TARJETAS (pantalla, no pose) ---
 //
-// Ambas constantes están calibradas asumiendo 60fps, pero el tracking en
-// iPhone es exactamente el escenario donde el frame rate NO es estable
-// (cae bajo carga térmica / cómputo de tracking). Por eso update() no usa
-// estos valores directamente por-frame — los convierte usando deltaMs real
-// (ver frameLerpFactor() más abajo) para que la velocidad de suavizado y la
-// duración de la ventana de gracia sean las mismas en el tiempo real,
-// sin importar el framerate del dispositivo.
-const REFERENCE_FRAME_MS = 1000 / 60;
-const LERP_FACTOR = 0.2; // fracción de la distancia restante cubierta cada REFERENCE_FRAME_MS
-const HYSTERESIS_WINDOW_MS = 250; // ~15 frames a 60fps — tiempo de gracia antes de ocultar
+// La pose 3D corre SIN amortiguar (TRACKING_PROFILE_RIGID_ANCHOR) para que
+// la escena quede rígida al modelo físico; el precio es que el ruido de
+// alta frecuencia del estimador de pose llega crudo a la proyección 2D.
+// Ese temblor se absorbe aquí, en la última etapa, con un filtro One Euro
+// por eje y por tarjeta: a baja velocidad el cutoff mínimo aplasta el
+// micro-temblor; al panear rápido el cutoff sube con la velocidad y la
+// tarjeta sigue la proyección casi sin rezago. Valores iniciales = los
+// defaults canónicos del paper (Casiez et al.) para pointing en pantalla;
+// calibrar en dispositivo: si aún tiembla en reposo, bajar MIN_CUTOFF_HZ
+// (p. ej. 0.5); si se siente "arrastre" al mover rápido, subir BETA.
+const CARD_FILTER_MIN_CUTOFF_HZ = 1.0;
+const CARD_FILTER_BETA = 0.007;
+const CARD_FILTER_DERIVATIVE_CUTOFF_HZ = 1.0;
+
+const HYSTERESIS_WINDOW_MS = 250; // tiempo de gracia real antes de ocultar por pérdida de tracking
 
 interface TrackingState {
-  currentX: number;
-  currentY: number;
+  filterX: OneEuroFilter1D;
+  filterY: OneEuroFilter1D;
   lostTimeMs: number;
-  isFirstFrame: boolean;
-}
-
-/**
- * Exponential-smoothing factor compensado por delta de tiempo real.
- * A deltaMs === REFERENCE_FRAME_MS, devuelve exactamente LERP_FACTOR (el
- * valor con el que fue calibrado). A un deltaMs mayor (frame lento/tab en
- * background) se acerca a 1 — es decir, si pasó mucho tiempo real, es
- * correcto que la tarjeta salte más cerca del destino en vez de arrastrar
- * el mismo 20% fijo que arrastraría un frame rápido.
- */
-function frameLerpFactor(deltaMs: number): number {
-  return 1 - Math.pow(1 - LERP_FACTOR, deltaMs / REFERENCE_FRAME_MS);
 }
 
 export class HotspotOverlay {
@@ -64,10 +57,17 @@ export class HotspotOverlay {
       
       // Inicializar el estado de tracking para el suavizado
       this.trackingStates.set(hotspot, {
-        currentX: 0,
-        currentY: 0,
+        filterX: new OneEuroFilter1D(
+          CARD_FILTER_MIN_CUTOFF_HZ,
+          CARD_FILTER_BETA,
+          CARD_FILTER_DERIVATIVE_CUTOFF_HZ
+        ),
+        filterY: new OneEuroFilter1D(
+          CARD_FILTER_MIN_CUTOFF_HZ,
+          CARD_FILTER_BETA,
+          CARD_FILTER_DERIVATIVE_CUTOFF_HZ
+        ),
         lostTimeMs: 0,
-        isFirstFrame: true,
       });
     }
   }
@@ -102,22 +102,17 @@ export class HotspotOverlay {
         // Reiniciar el tiempo de gracia ya que el tracking es válido
         state.lostTimeMs = 0;
 
-        // Si es el primer frame detectado, saltamos directo a la posición para evitar un "desplazamiento fantasma"
-        if (state.isFirstFrame) {
-          state.currentX = projection.screenX;
-          state.currentY = projection.screenY;
-          state.isFirstFrame = false;
-        } else {
-          // Filtro Lerp compensado por deltaMs: Posición = actual + (destino - actual) * factor
-          const factor = frameLerpFactor(deltaMs);
-          state.currentX += (projection.screenX - state.currentX) * factor;
-          state.currentY += (projection.screenY - state.currentY) * factor;
-        }
+        // One Euro por eje: aplasta el micro-temblor del tracking en reposo
+        // sin introducir rezago perceptible durante movimiento rápido. En
+        // el primer frame tras un reset() el filtro ancla directo al valor
+        // de entrada, así que no hay "desplazamiento fantasma" desde (0,0).
+        const dtSeconds = deltaMs / 1000;
+        const smoothedX = state.filterX.filter(projection.screenX, dtSeconds);
+        const smoothedY = state.filterY.filter(projection.screenY, dtSeconds);
 
-        // Renderizar con coordenadas suavizadas
         card.style.display = 'block';
-        card.style.left = `${state.currentX}px`;
-        card.style.top = `${state.currentY}px`;
+        card.style.left = `${smoothedX}px`;
+        card.style.top = `${smoothedY}px`;
         card.style.opacity = projection.occluded ? '0.25' : '1';
 
       } else {
@@ -125,9 +120,12 @@ export class HotspotOverlay {
         state.lostTimeMs += deltaMs;
 
         if (state.lostTimeMs >= HYSTERESIS_WINDOW_MS) {
-          // Expiró el tiempo de gracia, ocultamos físicamente la tarjeta del DOM
+          // Expiró el tiempo de gracia: ocultamos la tarjeta y olvidamos el
+          // historial del filtro para que la próxima re-detección ancle
+          // directo a la nueva posición en vez de deslizarse desde la vieja.
           card.style.display = 'none';
-          state.isFirstFrame = true; // Reiniciar para la próxima re-detección
+          state.filterX.reset();
+          state.filterY.reset();
         } else {
           // Mientras esté en tiempo de gracia, la mantenemos en su última posición conocida pero la atenuamos
           card.style.opacity = '0.15';

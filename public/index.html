@@ -13,14 +13,24 @@
        which reads as the scene "rotating/adjusting" on stray taps. */
     html, body {
       overflow: hidden;
-      background: #000;
       touch-action: none;
       overscroll-behavior: none;
       -webkit-user-select: none;
       user-select: none;
       -webkit-touch-callout: none;
     }
-    #ar-container { width: 100vw; height: 100vh; position: relative; }
+    /* The page background must live on body ONLY — never on html. MindAR
+       injects its camera <video> with z-index:-2; while html has no
+       background of its own, body's background propagates to the root
+       canvas and paints behind everything, so the video stays visible.
+       Setting a background on html stops that propagation, and body's
+       black then paints ABOVE negative-z-index descendants — a fully
+       black screen with the camera feed hidden behind it. */
+    body { background: #000; }
+    /* isolation traps MindAR's negative-z-index video inside this
+       container's own stacking context, so no page-level background can
+       ever paint over it again regardless of future CSS changes. */
+    #ar-container { width: 100vw; height: 100vh; position: relative; isolation: isolate; }
   </style>
 </head>
 <body>

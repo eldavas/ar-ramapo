@@ -463,4 +463,45 @@ schema above.
   is the next step, ahead of the pass-criteria measurement pass still
   blocking phase close.
 
+  **Progress (2026-07-03, second on-device pass): Rive input and proxy
+  contrast confirmed working on iPhone; that pass surfaced one regression
+  and one calibration bug, both fixed.**
+
+  - **Black-screen regression (camera feed invisible).** Root cause was a
+    CSS painting-order subtlety introduced by the previous fix round, not
+    a stream or tracking failure (tracking kept working — cards and
+    dominos appeared over a black void). MindAR injects its camera
+    `<video>` with `z-index: -2`. While only `body` carried
+    `background: #000`, that background propagated to the root canvas
+    (painted behind everything, negative z-index included) and the video
+    was visible. The gesture-blocking change had set the background on
+    `html, body` together; with `html` owning a background, `body`'s no
+    longer propagates and instead paints at its normal position in the
+    painting order — *above* negative-z-index descendants. The body's
+    black rectangle covered the video while the transparent WebGL canvas
+    (z-index auto) and card overlay (z-index 10) still painted on top:
+    exactly "scene visible, camera black." Fixed two ways at once: the
+    page background lives on `body` only (restoring propagation), and
+    `#ar-container` now sets `isolation: isolate`, trapping the video's
+    negative z-index inside the container's own stacking context so no
+    future page-level background can ever paint over the camera again.
+  - **Card jitter after the rigid tracking profile.** Expected trade-off
+    surfaced by the profile split: with pose smoothing removed
+    (`TRACKING_PROFILE_RIGID_ANCHOR`), the estimator's high-frequency
+    noise reaches the 2D projection raw, and the fixed-factor Lerp in the
+    overlay can't both kill tremor at rest and stay lag-free during pans.
+    Replaced the Lerp with a proper One Euro filter in **screen space
+    only** (`src/client/OneEuroFilter.ts`, per-axis per-card): the 3D
+    scene keeps the rigid pose (no swim), while the overlay's cutoff
+    frequency adapts to card speed — canonical pointing defaults
+    (minCutoff 1.0 Hz, beta 0.007, dCutoff 1.0 Hz). Verified numerically:
+    ±3 px input tremor at rest collapses to ~0.3 px output; a 600 px/s
+    pan carries only ~10 px steady-state lag; the first frame after a
+    hysteresis reset snaps exactly to the input (no ghost slide). Filter
+    history resets when the hide-grace window expires, so re-detections
+    anchor at the new position instead of sliding from the old one.
+    On-device calibration knobs are documented at the constants in
+    `HotspotOverlay.ts` (lower minCutoff if rest tremor persists; raise
+    beta if fast pans feel draggy).
+
   No iOS work. No WebXR work.
