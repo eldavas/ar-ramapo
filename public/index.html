@@ -7,7 +7,19 @@
   <link rel="icon" href="data:,">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { overflow: hidden; background: #000; }
+    /* touch-action/overscroll: an AR viewport owns every touch. Without
+       this, iOS Safari's default gestures (double-tap zoom, pan/rubber-band,
+       long-press callout) visually scale or drag the camera feed + scene,
+       which reads as the scene "rotating/adjusting" on stray taps. */
+    html, body {
+      overflow: hidden;
+      background: #000;
+      touch-action: none;
+      overscroll-behavior: none;
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+    }
     #ar-container { width: 100vw; height: 100vh; position: relative; }
   </style>
 </head>

@@ -1,6 +1,10 @@
 import * as THREE from 'three';
 import { resolveExperience } from '../../packages/experience-manifest/ManifestResolver.js';
-import { ARSessionManager } from './ARSessionManager.js';
+import {
+  ARSessionManager,
+  TRACKING_PROFILE_RIGID_ANCHOR,
+  TRACKING_PROFILE_SMOOTH_UI,
+} from './ARSessionManager.js';
 import { RenderEngine } from './RenderEngine.js';
 import { RiveController } from './RiveController.js';
 import { InputBridge } from './InputBridge.js';
@@ -34,7 +38,14 @@ async function main(): Promise<void> {
     throw new Error(`Experience "${experience.targetId}" has no mindTargetUrl declared in the manifest.`);
   }
 
-  const session = new ARSessionManager(container, experience.mindTargetUrl);
+  // Spatial scenes are rigidly locked to the physical model, so tracking
+  // must stay responsive during phone motion; the legacy floating card
+  // prefers maximum smoothing at rest. See ARSessionManager for the two
+  // profiles and why the old smooth values made the spatial scene "swim".
+  const trackingProfile =
+    experience.modelUrl !== undefined ? TRACKING_PROFILE_RIGID_ANCHOR : TRACKING_PROFILE_SMOOTH_UI;
+
+  const session = new ARSessionManager(container, experience.mindTargetUrl, trackingProfile);
   const { renderer, scene, camera, anchor } = await session.start(0);
 
   const renderEngine = new RenderEngine(renderer, scene, camera);

@@ -55,6 +55,15 @@ export class RiveController {
       canvas: this.canvas,
       stateMachines: this.stateMachineName,
       autoplay: true,
+      // This class's pointerDown/pointerUp methods are the ONLY input path
+      // into the state machine. By default Rive also attaches its own
+      // touch/mouse/pointer listeners to the canvas; once the canvas sits
+      // inside an on-screen hotspot card (HotspotOverlay), one iPhone tap
+      // would then reach the state machine several times — Rive's own
+      // touchstart handler, our forwarded pointerdown, and the iOS
+      // compatibility mousedown — making click-driven transitions fire and
+      // immediately re-fire (visually "the animation doesn't trigger").
+      shouldDisableRiveListeners: true,
       onLoad: (): void => this.handleLoad(rive),
     });
   }

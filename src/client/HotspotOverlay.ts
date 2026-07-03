@@ -174,6 +174,15 @@ export class HotspotOverlay {
     card.appendChild(canvas);
 
     const forwardPointer = (event: PointerEvent, isDown: boolean): void => {
+      // Isolate the card's input from everything else: stopPropagation()
+      // keeps the event from bubbling to any document-level listener
+      // (InputBridge's raycast path, if a future experience ever runs
+      // both), and preventDefault() on pointerdown suppresses the iOS
+      // compatibility mouse-event sequence and default tap behaviors
+      // (double-tap zoom) for this touch — the tap belongs to Rive only.
+      event.stopPropagation();
+      event.preventDefault();
+
       if (!rive.isReady) return;
       const rect = canvas.getBoundingClientRect();
       if (rect.width === 0 || rect.height === 0) return;

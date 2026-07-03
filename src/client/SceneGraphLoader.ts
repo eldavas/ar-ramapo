@@ -33,6 +33,16 @@ function metersToMarkerWidths(physicalTargetWidthMeters: number): number {
  */
 export const HOTSPOT_NODE_PREFIX = 'hotspot_';
 
+/**
+ * Phase 3 visual-debug aid: proxy meshes that host a hotspot are tinted
+ * solid red so they read instantly against the dark Rive card pills during
+ * on-device bench-testing. Applied semantically (nearest mesh ancestor of
+ * each hotspot_* node) — never by content node name, per the Golden Rule
+ * (AR_SYSTEM.md §E). Unlit material on purpose: the MindAR scene has no
+ * lights, and the tint must read identically from every angle.
+ */
+const HOTSPOT_HOST_DEBUG_COLOR = 0xff0000;
+
 export interface Hotspot {
   name: string;
   node: THREE.Object3D;
@@ -94,7 +104,20 @@ export class SceneGraphLoader {
       }
     });
 
+    for (const hotspot of hotspots) {
+      tintNearestMeshAncestor(hotspot.node, root);
+    }
+
     return { root, hotspots, occluders };
+  }
+}
+
+function tintNearestMeshAncestor(node: THREE.Object3D, stopAt: THREE.Object3D): void {
+  for (let current = node.parent; current !== null && current !== stopAt; current = current.parent) {
+    if ((current as THREE.Mesh).isMesh) {
+      (current as THREE.Mesh).material = new THREE.MeshBasicMaterial({ color: HOTSPOT_HOST_DEBUG_COLOR });
+      return;
+    }
   }
 }
 
