@@ -14,16 +14,22 @@ try {
   // no .env file — fall back to whatever the environment already provides
 }
 
+function parsePort(value: string | undefined, fallback: number): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
 export const NODE_ENV: string = process.env.NODE_ENV || 'development';
 export const isProduction: boolean = NODE_ENV === 'production';
 
-export const PORT: number = Number(process.env.PORT) || 3000;
+export const PORT: number = parsePort(process.env.PORT, 3000);
 export const HOST: string = process.env.HOST || '0.0.0.0';
 
-// HTTPS only ever applies in development (see server/startServer.ts) —
-// production TLS termination happens at the hosting/reverse-proxy layer.
-export const ENABLE_HTTPS: boolean = process.env.ENABLE_HTTPS !== 'false';
-export const SSL_CERT: string = process.env.SSL_CERT || './localhost.pem';
-export const SSL_KEY: string = process.env.SSL_KEY || './localhost-key.pem';
+// No hardcoded file-path fallback on purpose: a machine with no .env and no
+// local certs must still resolve these to "" and boot cleanly on HTTP (see
+// server/startServer.ts's orchestration rule) rather than pointing at a path
+// that only ever existed on one developer's laptop.
+export const HTTPS_KEY_PATH: string = process.env.HTTPS_KEY_PATH ?? '';
+export const HTTPS_CERT_PATH: string = process.env.HTTPS_CERT_PATH ?? '';
 
 export const CORS_ORIGIN: string = process.env.CORS_ORIGIN || '*';
