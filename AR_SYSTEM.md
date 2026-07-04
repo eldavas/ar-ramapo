@@ -151,6 +151,13 @@ routing, nothing else**:
   the future iOS App Clip. Same source scene, different export — never a
   separately authored asset.
 - `mindTargetUrl?: string` — the compiled MindAR tracking target.
+- `trackingImageUrl?: string` — the raw plaque artwork (PNG), for tracking
+  engines that consume the image directly instead of a compiled feature
+  file: ARKit builds its `ARReferenceImage` from this bitmap plus
+  `physicalTargetWidthMeters`. Same single-source artwork that
+  `tools/build_plaque.py` generates and `bench-target.mind` was compiled
+  from — never a separately authored image. Required on any entry the iOS
+  App Clip consumes (`.mind` is MindAR-only and unreadable by ARKit).
 - `physicalTargetWidthMeters?: number` — the printed physical width of the
   tracking target. Optional in the type, but **required on any entry that
   declares `modelUrl`**: it is the sole scale bridge between meter-authored
@@ -203,7 +210,11 @@ schema above.
   review preceding this document for the full Option A/B analysis).
 - **Axis conventions are locked per engine, as named constants in code.**
   Authoring is Blender Z-up in meters; the glTF exporter converts to Y-up
-  (authored north/+Y becomes runtime −Z). Each tracking engine frames the
+  (authored north/+Y becomes runtime −Z). As of Phase 4 the USD export is
+  converted to the same Y-up / −Z-forward convention at export time, so
+  both runtime assets (`.glb`, `.usdz`) share one delivered orientation and
+  the USDZ complies with the Y-up stage convention ARKit/AR Quick Look
+  assume. Each tracking engine frames the
   flat plaque differently: MindAR anchor space is X-east / Y-north / Z-up in
   **marker-width units**; ARKit `ARImageAnchor` is X-east / Y-up / Z-south
   in meters. The rotation/scale glue transform between authored space and
@@ -505,3 +516,54 @@ schema above.
     beta if fast pans feel draggy).
 
   No iOS work. No WebXR work.
+
+- **Phase 4 — Native iOS App Clip. (OPEN)**
+  Goal: the iOS delivery path promised in §A — a native App Clip
+  (Swift / SwiftUI / ARKit / RealityKit / Rive iOS runtime) that consumes
+  the exact same creative assets and manifest as the web client, sharing
+  zero rendering code with it (§F). The native workspace lives in
+  `../ar-appclip`, a sibling of this repository — ARKit/RealityKit code
+  never enters this repo.
+
+  **Governance scope (this document, done first):**
+  - Manifest schema gains `trackingImageUrl` (§E): ARKit consumes the raw
+    plaque bitmap + `physicalTargetWidthMeters` to build its
+    `ARReferenceImage`; the compiled `.mind` file is MindAR-only. The
+    plaque PNG is now hosted under `/public/assets` (same single-source
+    artwork from `tools/build_plaque.py`, now copied into the served tree
+    by that tool).
+  - The `bench-test` entry declares `usdzUrl` and `trackingImageUrl`
+    (version 0.3.0) — the USDZ existed and was served but was never
+    declared, so no manifest-resolving client could reach it.
+  - The USDZ export in `tools/build_bench_scene.py` is re-specified as a
+    **Y-up, `.usda`-packaged USDZ** (same Blender scene, same single
+    export path — §E's zero-duplication rule intact). Two reasons,
+    both verified empirically against the previous artifact: (a) the old
+    export was a Z-up `.usdc` stage, violating the Y-up convention ARKit
+    and AR Quick Look assume (§F); (b) RealityKit's loader exposes no API
+    for USD `userProperties`, so the Golden Rule's metadata channel
+    (`label`, `riveStateMachine` on `hotspot_*` prims) was unreadable on
+    iOS from the binary crate — the ASCII `.usda` layer inside the
+    package is parsed by the App Clip's own small USD-text reader, while
+    RealityKit loads the identical package for rendering.
+
+  **Native scope (in `../ar-appclip`):** manifest intake mirroring
+  `ManifestResolver` semantics (typed errors, URL validation, the
+  modelUrl↔physicalTargetWidthMeters pairing rule applied to `usdzUrl`);
+  `ARImageTrackingConfiguration` sized from `physicalTargetWidthMeters`;
+  version-keyed asset caching; scene-graph mount with the §F glue
+  constants for ARKit (identity rotation and unit scale by construction,
+  given the Y-up meters export — recorded as named constants regardless,
+  per §F, and validated by re-running the Phase 3 bench-test rig on
+  device); hotspot discovery by `hotspot_` prefix traversal of the
+  RealityKit entity tree joined with the parsed `userProperties`; a
+  screen-space One Euro filter (same constants as `HotspotOverlay.ts`)
+  and the same 250 ms tracking-loss hysteresis; single-path touch
+  forwarding into the Rive artboard, mirroring the web's
+  clamp-to-canvas-edge behavior.
+
+  **Exit condition:** the bench-test rig passes the Phase 3 §G pass
+  criteria on the native stack (same plaque, same rig, same asymmetry
+  tell), and the validated ARKit glue constants are recorded here.
+
+  No changes to web-client runtime code. No WebXR work.

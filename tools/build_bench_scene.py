@@ -272,16 +272,89 @@ def export_glb(path: Path) -> None:
 
 
 def export_usdz(path: Path) -> None:
-    """USDZ for the future iOS workstream (§E: same scene, different
-    export). Non-fatal: the web bench-test only needs the GLB."""
+    """USDZ for the iOS App Clip (§E: same scene, different export).
+
+    Phase 4 re-specification (AR_SYSTEM.md §G Phase 4), both points verified
+    empirically against the previous artifact:
+
+      * Orientation converts at export to the same Y-up frame the glTF
+        export ships (§F: authored +Z up → +Y, authored +Y north → −Z).
+        The old export left the stage Z-up, which ARKit / AR Quick Look do
+        not honor — and the web/iOS assets must share one delivered frame.
+      * The package's default layer is ASCII .usda, not binary .usdc:
+        RealityKit's loader exposes no API for USD userProperties, so the
+        App Clip reads the Golden-Rule hotspot metadata
+        (label/riveStateMachine, §E) by parsing the ASCII layer of the SAME
+        package RealityKit renders. The usdz spec allows usda package
+        content (zip, entries stored uncompressed, data 64-byte aligned).
+
+    Non-fatal: the web bench-test only needs the GLB.
+    """
+    usda_path = path.with_suffix(".usda")
+    kwargs = dict(
+        filepath=str(usda_path),
+        export_custom_properties=True,  # userProperties:* on hotspot prims
+        convert_orientation=True,
+        export_global_up_selection="Y",
+        # "Forward" is the target axis authored +Y (scene north) lands on —
+        # verified empirically: 'Z' produced a root rotate of (90, 0, 180),
+        # i.e. (x, y, z) → (−x, z, y), flipping east to −X. 'NEGATIVE_Z'
+        # (with up 'Y') composes the proper rotation (x, y, z) → (x, z, −y):
+        # east stays +X, north → −Z — identical to the glTF exporter's
+        # mapping (§F).
+        export_global_forward_selection="NEGATIVE_Z",
+    )
     try:
         try:
-            bpy.ops.wm.usd_export(filepath=str(path), export_custom_properties=True)
+            bpy.ops.wm.usd_export(**kwargs)
         except TypeError:
-            bpy.ops.wm.usd_export(filepath=str(path))
+            # Older exporters lack the orientation args; a Z-up fallback
+            # would silently break the §F contract, so fail loudly instead.
+            raise RuntimeError(
+                "this Blender's usd_export does not support convert_orientation; "
+                "a Z-up usdz would violate AR_SYSTEM.md §F"
+            )
+        header = usda_path.read_bytes()[:8]
+        if not header.startswith(b"#usda"):
+            raise RuntimeError(
+                f"{usda_path} is not an ASCII usda layer (header {header!r}); "
+                "the App Clip's metadata reader requires usda"
+            )
+        write_usdz_package(path, usda_path)
+        usda_path.unlink()
         print(f"exported {path}")
     except Exception as error:  # noqa: BLE001 — report and continue
         print(f"WARNING: usdz export skipped: {error}", file=sys.stderr)
+
+
+def write_usdz_package(usdz_path: Path, default_layer: Path) -> None:
+    """Minimal spec-compliant usdz writer for a self-contained single-layer
+    package: a zip whose entries are STORED (no compression) with each
+    entry's file data aligned to a 64-byte boundary, padded via a dummy zip
+    extra field — the same technique usdzip uses. The default layer is the
+    first (and only) entry."""
+    import zipfile
+
+    payload = default_layer.read_bytes()
+    name = default_layer.name.encode("utf-8")
+
+    # First entry's local header starts at offset 0; its file data starts at
+    # 30 (fixed local-header size) + len(name) + len(extra). Pad `extra` so
+    # that offset is 64-byte aligned. An extra field is (id: u16, size: u16,
+    # bytes), so padding shorter than the 4-byte header rolls to pad + 64.
+    header_end = 30 + len(name)
+    pad = (64 - header_end % 64) % 64
+    if 0 < pad < 4:
+        pad += 64
+
+    info = zipfile.ZipInfo(default_layer.name, date_time=(1980, 1, 1, 0, 0, 0))
+    info.compress_type = zipfile.ZIP_STORED
+    if pad:
+        info.extra = b"\x86\x19" + (pad - 4).to_bytes(2, "little") + b"\x00" * (pad - 4)
+
+    usdz_path.parent.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(usdz_path, "w", compression=zipfile.ZIP_STORED) as archive:
+        archive.writestr(info, payload)
 
 
 if __name__ == "__main__":

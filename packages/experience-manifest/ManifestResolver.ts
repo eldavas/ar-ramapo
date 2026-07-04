@@ -54,6 +54,9 @@ export function resolveExperience(targetId: string): ExperienceManifest {
   if (entry.mindTargetUrl !== undefined) {
     assertValidAssetUrl(entry.targetId, 'mindTargetUrl', entry.mindTargetUrl);
   }
+  if (entry.trackingImageUrl !== undefined) {
+    assertValidAssetUrl(entry.targetId, 'trackingImageUrl', entry.trackingImageUrl);
+  }
 
   // physicalTargetWidthMeters is the sole scale bridge between
   // meter-authored content and the tracking engines (AR_SYSTEM.md §E/§F) —

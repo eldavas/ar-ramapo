@@ -25,6 +25,15 @@ export type ExperienceManifest = {
   usdzUrl?: string;
   mindTargetUrl?: string;
   /**
+   * Raw plaque artwork (PNG) for tracking engines that consume the image
+   * directly instead of a compiled feature file: ARKit builds its
+   * ARReferenceImage from this bitmap plus physicalTargetWidthMeters.
+   * Same single-source artwork bench-target.mind was compiled from —
+   * never a separately authored image (§E, §F). Required on any entry the
+   * iOS App Clip consumes.
+   */
+  trackingImageUrl?: string;
+  /**
    * Printed physical width of the tracking target, in meters. Required on
    * any entry that declares modelUrl (enforced by ManifestResolver): it is
    * the sole scale bridge between meter-authored content and the tracking
@@ -53,10 +62,15 @@ export const experienceManifest: ExperienceManifest[] = [
     targetId: 'bench-test',
     riveUrl: '/assets/ui-test.riv',
     modelUrl: '/assets/bench-scene.glb',
+    usdzUrl: '/assets/bench-scene.usdz',
     mindTargetUrl: '/assets/bench-target.mind',
+    trackingImageUrl: '/assets/bench-plaque.png',
     physicalTargetWidthMeters: 0.05,
     // 0.2.0: all four hotspot_* nodes in bench-scene.glb now declare
     // riveStateMachine (was two of four).
-    version: '0.2.0',
+    // 0.3.0 (Phase 4): usdzUrl declared (the file was served but never
+    // reachable through the manifest); trackingImageUrl added for ARKit;
+    // bench-scene.usdz re-exported as a Y-up .usda package (§F/§G Phase 4).
+    version: '0.3.0',
   },
 ];

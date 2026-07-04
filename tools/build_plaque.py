@@ -35,6 +35,12 @@ PX_PER_MM = SIZE_PX / SIZE_MM
 
 OUT_DIR = Path(__file__).resolve().parent / "plaque"
 
+# The manifest's trackingImageUrl (AR_SYSTEM.md §E, Phase 4) points at the
+# served copy: ARKit builds its ARReferenceImage from this exact bitmap.
+# Same single-source artwork, copied into the public tree — never authored
+# twice.
+SERVED_COPY = Path(__file__).resolve().parents[1] / "public" / "assets" / "bench-plaque.png"
+
 
 def mm(v: float) -> int:
     return round(v * PX_PER_MM)
@@ -152,7 +158,10 @@ PRINT_SHEET = f"""<!doctype html>
 
 if __name__ == "__main__":
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    build_artwork().save(OUT_DIR / "bench-plaque.png")
+    artwork = build_artwork()
+    artwork.save(OUT_DIR / "bench-plaque.png")
+    artwork.save(SERVED_COPY)
     (OUT_DIR / "print-sheet.html").write_text(PRINT_SHEET)
     print(f"wrote {OUT_DIR / 'bench-plaque.png'}")
+    print(f"wrote {SERVED_COPY}  (manifest trackingImageUrl)")
     print(f"wrote {OUT_DIR / 'print-sheet.html'}")
