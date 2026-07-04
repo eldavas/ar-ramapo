@@ -1,6 +1,7 @@
 import path from 'path';
 import express, { type Express } from 'express';
 import * as config from './config.js';
+import { appleAppSiteAssociationHandler } from './appleAppSiteAssociation.js';
 import { createCorsMiddleware } from './cors.js';
 import { healthHandler } from './health.js';
 import { manifestHandler } from './manifest.js';
@@ -22,6 +23,7 @@ export function createApp(): Express {
 
   app.get('/health', healthHandler);
   app.get('/api/manifest', manifestHandler);
+  app.get('/.well-known/apple-app-site-association', appleAppSiteAssociationHandler);
 
   app.use(express.static(PUBLIC_DIR));
   app.use('/rive', express.static(path.join(PROJECT_ROOT, 'node_modules/@rive-app/canvas-lite')));

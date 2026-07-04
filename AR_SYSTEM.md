@@ -535,6 +535,11 @@ schema above.
   - The `bench-test` entry declares `usdzUrl` and `trackingImageUrl`
     (version 0.3.0) — the USDZ existed and was served but was never
     declared, so no manifest-resolving client could reach it.
+  - `GET /.well-known/apple-app-site-association` is served as an explicit
+    route (§D) with `Content-Type: application/json` — Apple's domain
+    verification for App Clip invocation requires it. Platform deployment
+    identity (Team ID + Clip bundle ID), not an AR asset: it lives in
+    `server/appleAppSiteAssociation.ts`, never in the manifest (§E).
   - The USDZ export in `tools/build_bench_scene.py` is re-specified as a
     **Y-up, `.usda`-packaged USDZ** (same Blender scene, same single
     export path — §E's zero-duplication rule intact). Two reasons,
