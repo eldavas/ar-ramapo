@@ -555,7 +555,15 @@ schema above.
   **Native scope (in `../ar-appclip`):** manifest intake mirroring
   `ManifestResolver` semantics (typed errors, URL validation, the
   modelUrl↔physicalTargetWidthMeters pairing rule applied to `usdzUrl`);
-  `ARImageTrackingConfiguration` sized from `physicalTargetWidthMeters`;
+  ARKit world tracking with a continuously-tracked detection image sized
+  from `physicalTargetWidthMeters` (initially pure image tracking for
+  web-behavior parity; the first on-device TestFlight pass showed ARKit's
+  per-frame `isTracked` flickering on any motion blur, hiding the UI
+  constantly — world tracking keeps the anchor registered at its last
+  pose while the plaque is briefly unreadable, which is correct for a
+  static rig; the web keeps hide-on-target-lost, and the native overlay
+  constants — hysteresis 750 ms, One Euro minCutoff 0.6 — are tuned
+  per-platform by design);
   version-keyed asset caching; scene-graph mount with the §F glue
   constants for ARKit (identity rotation and unit scale by construction,
   given the Y-up meters export — recorded as named constants regardless,
