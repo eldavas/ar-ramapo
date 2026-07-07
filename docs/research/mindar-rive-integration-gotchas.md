@@ -6,6 +6,12 @@ embodied the fixes in `src/client/{ARSessionManager,RiveController,InputBridge}.
 so the code is the working reference — this document preserves the **why**
 behind those decisions, for refactors and for the iOS Rive workstream.
 
+> **Since Phase 5** the runtime package is `@rive-app/canvas` (full build —
+> the Card artboard renders Rive Text, which the lite build cannot). The
+> package layout is identical (`rive.wasm` at the package root, same
+> `rive_advanced.mjs` types), so every gotcha below applies unchanged;
+> read "canvas-lite" as "canvas".
+
 Treat as a pre-flight checklist whenever setting up or modifying this stack.
 
 ## Module loading
@@ -18,8 +24,9 @@ Treat as a pre-flight checklist whenever setting up or modifying this stack.
 
 ## Rive setup
 
-- `@rive-app/canvas-lite` has **no ESM build** suitable for CDN use. Install
-  locally and bundle (Phase 1 does this via npm + Vite).
+- `@rive-app/canvas-lite` (and the full `@rive-app/canvas` used since
+  Phase 5) has **no ESM build** suitable for CDN use. Install locally and
+  bundle (Phase 1 does this via npm + Vite).
 - The Rive canvas **must be in the DOM** (even off-screen via
   `position:fixed; top:-9999px`) or Rive's visibility check pauses its render
   loop entirely.

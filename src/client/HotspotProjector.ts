@@ -14,7 +14,7 @@ export interface ProjectedHotspot {
 
 /**
  * Projects hotspot world positions into screen space every frame so
- * HotspotOverlay can pin UI at them. Owns the three visibility guards:
+ * MarkerLayer can pin UI at them. Owns the three visibility guards:
  * frustum check (behind-camera and off-screen), occlusion raycast against
  * scene meshes, and tracking-loss (all hidden when the anchor group is
  * invisible — polled, because MindAR's targetFound/targetLost events do

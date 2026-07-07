@@ -52,8 +52,10 @@ export class InputBridge {
     const uv = hits[0]?.uv;
     if (!uv) return;
 
-    const size = this.rive.canvasSize;
-    const artboardPoint = this.rive.mapCanvasPointToArtboard(uv.x * size, (1 - uv.y) * size);
+    const artboardPoint = this.rive.mapCanvasPointToArtboard(
+      uv.x * this.rive.canvasWidth,
+      (1 - uv.y) * this.rive.canvasHeight
+    );
 
     if (isDown) {
       this.rive.pointerDown(artboardPoint.x, artboardPoint.y);

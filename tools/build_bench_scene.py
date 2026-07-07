@@ -28,7 +28,8 @@ Hierarchy (per §G authoring scope):
   └── Physical_Model_Offset_Group (empty at -plaque_top_center)
       ├── game_box
       └── domino_1..4
-          └── hotspot_domino_N  (empty; label/riveStateMachine custom props)
+          └── hotspot_domino_N  (empty; label/contentKey/riveArtboard/
+                                 riveStateMachine custom props)
 
 Hotspots are EMPTIES, not proxy meshes: §G specifies empties, glTF has no
 "invisible mesh" flag, and SceneGraphLoader treats every mesh as an
@@ -58,9 +59,13 @@ PLAQUE_CENTER_XY = Vector((0.18, 0.04))
 
 # Dominoes: dims are LOCAL (pre-rotation) extents; rot_z_deg is applied as
 # the object's Z rotation, per the measurement sheet's own convention.
-# All four hotspots declare riveStateMachine so every card runs the
-# interactive Rive canvas during the bench-test (set to None for a
-# label-only card).
+#
+# Phase 5 Rive bindings (AR_SYSTEM.md §E Golden Rule): every hotspot binds
+# the Marker artboard/state machine from bench-ui.riv, and carries the
+# stable contentKey the ContentProvider resolves against the external
+# content source (the sheet row / future CMS document slug). The old
+# 'State Machine 1' name was the Rive-editor default; 'MarkerMachine' is
+# the Phase 5 contract name (docs/asset-authoring-guide.md).
 DOMINOES = [
     dict(
         name="domino_1",
@@ -68,7 +73,9 @@ DOMINOES = [
         location=(0.086, 0.238, 0.025),
         rot_z_deg=90.0,
         label="Domino 1 · standing on end",
-        rive_state_machine="State Machine 1",
+        content_key="bench-domino-1",
+        rive_artboard="Marker",
+        rive_state_machine="MarkerMachine",
         color=(0.80, 0.15, 0.15, 1.0),
     ),
     dict(
@@ -77,7 +84,9 @@ DOMINOES = [
         location=(0.296, 0.1865, 0.005),
         rot_z_deg=0.0,
         label="Domino 2 · lying flat",
-        rive_state_machine="State Machine 1",
+        content_key="bench-domino-2",
+        rive_artboard="Marker",
+        rive_state_machine="MarkerMachine",
         color=(0.15, 0.60, 0.20, 1.0),
     ),
     dict(
@@ -86,7 +95,9 @@ DOMINOES = [
         location=(0.155, 0.128, 0.0125),
         rot_z_deg=0.0,
         label="Domino 3 · on long side",
-        rive_state_machine="State Machine 1",
+        content_key="bench-domino-3",
+        rive_artboard="Marker",
+        rive_state_machine="MarkerMachine",
         color=(0.15, 0.30, 0.80, 1.0),
     ),
     dict(
@@ -95,7 +106,9 @@ DOMINOES = [
         location=(0.2835, 0.064, 0.010),
         rot_z_deg=90.0,
         label="Domino 4 · double stack",
-        rive_state_machine="State Machine 1",
+        content_key="bench-domino-4",
+        rive_artboard="Marker",
+        rive_state_machine="MarkerMachine",
         color=(0.85, 0.65, 0.10, 1.0),
     ),
 ]
@@ -110,10 +123,12 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 GLB_PATH = REPO_ROOT / "public" / "assets" / "bench-scene.glb"  # manifest modelUrl
 USDZ_PATH = REPO_ROOT / "public" / "assets" / "bench-scene.usdz"
 
-# Runtime contract (src/client/SceneGraphLoader.ts / HotspotOverlay.ts).
+# Runtime contract (src/client/SceneGraphLoader.ts / MarkerLayer.ts).
 HOTSPOT_PREFIX = "hotspot_"
 USERDATA_LABEL_KEY = "label"
 USERDATA_STATE_MACHINE_KEY = "riveStateMachine"
+USERDATA_ARTBOARD_KEY = "riveArtboard"
+USERDATA_CONTENT_KEY = "contentKey"
 
 
 def link(obj: bpy.types.Object) -> bpy.types.Object:
@@ -222,8 +237,9 @@ def build_scene() -> None:
         hotspot.parent = domino
         hotspot.location = (0.0, 0.0, 0.0)
         hotspot[USERDATA_LABEL_KEY] = spec["label"]
-        if spec["rive_state_machine"] is not None:
-            hotspot[USERDATA_STATE_MACHINE_KEY] = spec["rive_state_machine"]
+        hotspot[USERDATA_CONTENT_KEY] = spec["content_key"]
+        hotspot[USERDATA_ARTBOARD_KEY] = spec["rive_artboard"]
+        hotspot[USERDATA_STATE_MACHINE_KEY] = spec["rive_state_machine"]
 
     bpy.context.view_layer.update()
     report_and_verify(plaque_top_center)
@@ -234,7 +250,11 @@ def report_and_verify(plaque_top_center: Vector) -> None:
     for obj in sorted(bpy.data.objects, key=lambda o: o.name):
         t = obj.matrix_world.translation
         kind = "empty" if obj.data is None else "mesh"
-        props = {k: obj[k] for k in (USERDATA_LABEL_KEY, USERDATA_STATE_MACHINE_KEY) if k in obj}
+        props = {
+            k: obj[k]
+            for k in (USERDATA_LABEL_KEY, USERDATA_CONTENT_KEY, USERDATA_ARTBOARD_KEY, USERDATA_STATE_MACHINE_KEY)
+            if k in obj
+        }
         print(f"  {obj.name:32s} {kind:5s} ({t.x:+.4f}, {t.y:+.4f}, {t.z:+.4f}) {props or ''}")
 
     # §A invariant: plaque printed-face center must sit exactly at origin.

@@ -26,7 +26,7 @@ export function createApp(): Express {
   app.get('/.well-known/apple-app-site-association', appleAppSiteAssociationHandler);
 
   app.use(express.static(PUBLIC_DIR));
-  app.use('/rive', express.static(path.join(PROJECT_ROOT, 'node_modules/@rive-app/canvas-lite')));
+  app.use('/rive', express.static(path.join(PROJECT_ROOT, 'node_modules/@rive-app/canvas')));
 
   return app;
 }

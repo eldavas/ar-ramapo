@@ -26,6 +26,21 @@ function assertValidAssetUrl(targetId: string, field: string, url: string): void
   }
 }
 
+// contentUrl is the one field allowed to point off-origin (§E Phase 5): an
+// external content source is https by definition (Phase 5: the Google Sheet
+// gviz endpoint). Root-relative paths stay valid too, so a local stub or a
+// same-origin proxy needs no schema change.
+const CONTENT_URL_PATTERN = /^(\/\S+|https:\/\/\S+)$/;
+
+function assertValidContentUrl(targetId: string, url: string): void {
+  if (!CONTENT_URL_PATTERN.test(url)) {
+    throw new ManifestResolutionError(
+      `experience-manifest entry "${targetId}" has an invalid contentUrl: ${JSON.stringify(url)}. ` +
+        'contentUrl must be a root-relative /public path or an absolute https:// URL (AR_SYSTEM.md §E).'
+    );
+  }
+}
+
 /**
  * Resolves a targetId to its declared experience-manifest entry.
  *
@@ -56,6 +71,9 @@ export function resolveExperience(targetId: string): ExperienceManifest {
   }
   if (entry.trackingImageUrl !== undefined) {
     assertValidAssetUrl(entry.targetId, 'trackingImageUrl', entry.trackingImageUrl);
+  }
+  if (entry.contentUrl !== undefined) {
+    assertValidContentUrl(entry.targetId, entry.contentUrl);
   }
 
   // physicalTargetWidthMeters is the sole scale bridge between

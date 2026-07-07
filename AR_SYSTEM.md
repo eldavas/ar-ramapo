@@ -4,7 +4,9 @@
 decision that contradicts it is either a bug or a reason to update this file
 first — never the other way around silently.
 
-Status: Phase 3 (Spatial Bench-Test & Coordinate System Lockdown) open.
+Status: Phase 3 (Spatial Bench-Test & Coordinate System Lockdown) open —
+blocks only on the on-device pass-criteria measurement. Phase 4 (Native iOS
+App Clip) open. Phase 5 (Rive Interaction Layer & Content Binding) open.
 See §G for phase history.
 
 ---
@@ -158,6 +160,14 @@ routing, nothing else**:
   `tools/build_plaque.py` generates and `bench-target.mind` was compiled
   from — never a separately authored image. Required on any entry the iOS
   App Clip consumes (`.mind` is MindAR-only and unreadable by ARKit).
+- `contentUrl?: string` — route to the experience's external display-content
+  source, resolved by the client-side `ContentProvider` seam (Golden Rule
+  amendment below, Phase 5). Phase 5 points it at a published Google Sheet
+  endpoint; a future CMS is the same field with a different URL and a
+  different provider implementation — never a schema change. It carries a
+  URL only, never content. This is the one manifest field permitted to be an
+  absolute `https://` URL (an external source by definition); every other
+  asset URL remains a root-relative `/public` path.
 - `physicalTargetWidthMeters?: number` — the printed physical width of the
   tracking target. Optional in the type, but **required on any entry that
   declares `modelUrl`**: it is the sole scale bridge between meter-authored
@@ -187,12 +197,23 @@ schema above.
   file itself**: authored as Blender custom properties on the scene-graph
   nodes, exported as glTF `extras` (and the USD equivalent), surfacing at
   runtime as `object.userData`.
+- **Display content is addressed by the asset, never stored in the schema
+  (Phase 5 amendment).** A hotspot's `userData` carries its content
+  *binding key* (`contentKey`) and its Rive bindings (`riveArtboard`,
+  `riveStateMachine`); the display content behind that key (card title,
+  body copy, image reference) MAY live in an external content source,
+  resolved at runtime through the client-side `ContentProvider` seam and
+  routed via the manifest's `contentUrl`. The manifest schema, the
+  `/api/manifest` response, and this document remain forbidden from
+  carrying the content itself or any per-node behavior matrix.
 - The render engine **discovers** interaction nodes dynamically by tree
   traversal (the `hotspot_` name prefix), never by reading node lists,
   bindings, or copy from a configuration payload.
-- Consequence: changing what a hotspot does, says, or triggers is an **asset
-  edit and a manifest version bump** — it must never require touching this
-  file, the schema, the API, or application code.
+- Consequence: changing what a card *says* is a **content-source edit** (a
+  sheet row today, a CMS record later — no redeploy); changing what a
+  hotspot *binds to* is an **asset edit and a manifest version bump**.
+  Neither must ever require touching this file, the schema, the API, or
+  application code.
 
 ---
 
@@ -580,3 +601,67 @@ schema above.
   tell), and the validated ARKit glue constants are recorded here.
 
   No changes to web-client runtime code. No WebXR work.
+
+- **Phase 5 — Rive Interaction Layer & Content Binding. (OPEN)**
+  Goal: replace the bench-test per-hotspot label cards with the production
+  interaction model — a per-hotspot **Marker** Rive instance as the visual
+  cue, plus **one** screen-fixed **Card** bottom sheet as the universal
+  content panel — and prove the external-content seam end to end (§E
+  Golden Rule amendment): card copy edited in an external source (a Google
+  Sheet this phase) appears in the AR card with zero code, asset, or
+  schema change.
+
+  **Interaction model:** the app owns *placement*, Rive owns *appearance*.
+  Markers are repositioned every frame by the existing
+  projector/One-Euro/hysteresis pipeline; their artboard animates only
+  local state (idle / pressed / selected / dimmed). The Card's canvas
+  never moves; its enter/exit/refresh motion lives entirely inside the
+  artboard — which is why it always animates from the same screen spot
+  regardless of which marker was tapped. Tap detection stays at the DOM
+  level as the single input path (`shouldDisableRiveListeners: true`
+  stands, per the Phase 3 on-device double-fire lesson); the app answers
+  the Card's authored close button through a Rive Event rather than
+  letting the artboard mutate its own `isOpen` state.
+
+  **Governance scope (this document, done first):** the `contentUrl`
+  manifest field (§E), the Golden Rule amendment separating content
+  *binding* (in the asset) from content *storage* (external, behind the
+  `ContentProvider` seam) (§E), and this entry.
+
+  **Runtime scope:** `@rive-app/canvas-lite` → `@rive-app/canvas` (the
+  Card renders Rive Text; the lite runtime has no text support);
+  `RiveController` gains named-artboard support, a shared parsed
+  `RiveFile` across instances, and public fail-loud accessors for boolean
+  inputs, triggers, text runs, and Rive events; `HotspotOverlay` →
+  `MarkerLayer` (same projection/filter/hysteresis skeleton, Rive-only
+  visuals, tap → selection callback); new `CardPanel` (bottom sheet,
+  content set via text runs + `cardImage` referenced-asset substitution);
+  new `ContentProvider` seam with a `GoogleSheetContentProvider` (gviz
+  JSON endpoint — a future CMS is a new provider class, nothing else
+  changes).
+
+  **Authoring scope:** `bench-ui.riv` — two artboards (`Marker`, `Card`);
+  the exact artboard / state-machine / input / text-run / event naming
+  contract lives in docs/asset-authoring-guide.md, not here (Golden Rule:
+  this file never lists input names). Bench-scene rebuild: `hotspot_*`
+  nodes gain `contentKey` and `riveArtboard` custom properties, and
+  `riveStateMachine` values rename `'State Machine 1'` → `'MarkerMachine'`
+  (the Rive-editor default name said nothing; both the .riv and the scene
+  are new this phase, so the rename is free). Manifest `bench-test` →
+  0.4.0.
+
+  **Pass criteria:** tap a marker → the Card opens with that hotspot's
+  content; the other markers dim; tapping another marker while open swaps
+  content with the authored refresh pulse (no close/reopen); the Card
+  closes via its authored close button, tap-outside, and re-tapping the
+  selected marker; tracking loss hides markers but never the Card;
+  editing a sheet cell changes the card copy on next load with no
+  redeploy; `proxy-target` runs regression-free.
+
+  **Exit condition:** the CMS-era migration is a provider swap — a new
+  `ContentProvider` implementation pointed at the CMS endpoint — with
+  zero changes to the manifest schema, the assets, or the UI modules.
+
+  No iOS work in this repo. No WebXR work. No new tracking targets.
+  Independent of Phase 3's on-device measurement pass and Phase 4's
+  native workstream.

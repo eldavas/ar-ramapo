@@ -31,6 +31,12 @@ belongs in the manifest instead (AR_SYSTEM.md §D/§E).
 
 ## 2. Editing the Rive UI
 
+> **Phase 5 note:** everything in §2.1–2.3 describes the *legacy
+> single-card* experience (`proxy-target`, `ui-test.riv`) — still accurate
+> for that path. Spatial experiences (anything declaring `modelUrl`) use
+> the **two-artboard contract in §2.4** instead: Rive bindings arrive per
+> hotspot from the scene asset, not from `STATE_MACHINE_NAME`.
+
 ### 2.1 What this project expects from a `.riv` file
 
 Read from `src/client/RiveController.ts` and `src/client/main.ts` — these
@@ -72,6 +78,65 @@ adding a new public method to the class — keep the "no direct access to
 Rive internals outside this file" boundary intact (see the `internals()`
 cast and its comment at the top of `RiveController.ts` for why that
 boundary exists).
+
+### 2.4 Phase 5 contract — `bench-ui.riv` (Marker + Card)
+
+The spatial experience's UI is one `.riv` file with **two artboards**,
+served at the manifest's `riveUrl` (`/assets/bench-ui.riv`). The names
+below are the load-bearing contract between the file and the runtime
+(`MarkerLayer.ts`, `CardPanel.ts`); all are case-sensitive, and a mismatch
+fails loudly at startup (wrong artboard/state-machine name) or on first
+use (wrong input/text-run name), never silently.
+
+Design rule behind everything here: **the app owns placement, Rive owns
+appearance.** Markers are repositioned every frame by the projector — never
+keyframe an artboard sliding to a location. The Card's canvas never moves —
+its enter/exit motion lives entirely inside the artboard, which is why it
+always animates from the same screen spot.
+
+**Artboard `Marker`** — square, author at 120×120 (rendered at 96 CSS px;
+the visual anchor must be the artboard **center**, which the runtime pins
+to the projected hotspot point):
+
+| Contract item | Exact name | Notes |
+|---|---|---|
+| State machine | `MarkerMachine` | bound per hotspot via the `riveStateMachine` custom property (authored by `tools/build_bench_scene.py`) |
+| Boolean input | `isSelected` | default false; true while this marker's content is in the Card |
+| Boolean input | `isDimmed` | default false; true on every *other* marker while one is selected |
+| Hover/press feedback | Rive listeners inside the state machine | visuals only — no tap inputs or events; the app detects taps at the DOM level (single input path) |
+
+Author states to tolerate any flag combination and rapid toggling.
+
+**Artboard `Card`** — author at 480×360 (4:3; rendered `min(92vw, 480px)`
+wide, bottom-center). At rest (`isOpen` false) it must show nothing —
+"closed" is an artboard state, not a hidden canvas:
+
+| Contract item | Exact name | Notes |
+|---|---|---|
+| State machine | `CardMachine` | |
+| Boolean input | `isOpen` | default false. false→true plays Enter, true→false plays Exit; both transitions must be interruptible |
+| Trigger input | `refresh` | quick content pulse fired when content swaps while already open; must be a visual no-op if fired mid-Enter |
+| Text run | `title` | at the artboard root, exported name, non-empty placeholder value |
+| Text run | `body` | same; give it a fixed-size text area with clip/ellipsis — sheet content length is unbounded |
+| Referenced image asset | `cardImage` | mark the image **Referenced** (not Embedded) with this exact asset name; the runtime substitutes its bitmap from the content source's `imageUrl` |
+| Rive Event | `closeRequested` | type General, fired by the authored close button's listener. The button must NOT change `isOpen` itself — the app owns that state and answers the event |
+| Fonts | embedded | export with fonts embedded; the runtime is self-hosted and referenced fonts would fail to resolve |
+
+**Hotspot custom properties (scene asset side):** each `hotspot_*` node
+carries `label`, `contentKey`, `riveArtboard` (`Marker`), and
+`riveStateMachine` (`MarkerMachine`) — authored in
+`tools/build_bench_scene.py`, all four required by `MarkerLayer` since
+Phase 5.
+
+**Content source (Google Sheet):** the manifest's `contentUrl` points at
+the sheet's gviz endpoint
+(`https://docs.google.com/spreadsheets/d/<SHEET_ID>/gviz/tq?tqx=out:json`),
+sharing set to "anyone with the link can view". First row is the header —
+`contentKey | title | body | imageUrl` (column order free, labels exact) —
+one row per hotspot. `imageUrl` is optional; root-relative paths under
+`/public` (e.g. `/assets/content/images/domino-1.jpg`) are recommended —
+absolute https URLs work only if the host serves CORS headers. Editing a
+cell shows up on the next page load; no redeploy.
 
 ---
 

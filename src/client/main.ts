@@ -6,15 +6,20 @@ import {
   TRACKING_PROFILE_SMOOTH_UI,
 } from './ARSessionManager.js';
 import { RenderEngine } from './RenderEngine.js';
-import { RiveController } from './RiveController.js';
+import { RiveController, loadRiveFile } from './RiveController.js';
 import { InputBridge } from './InputBridge.js';
 import { SceneGraphLoader } from './SceneGraphLoader.js';
 import { HotspotProjector } from './HotspotProjector.js';
-import { HotspotOverlay } from './HotspotOverlay.js';
+import { MarkerLayer, contentKeyOf } from './MarkerLayer.js';
+import { CardPanel, CardImageSlot } from './CardPanel.js';
+import { GoogleSheetContentProvider } from './ContentProvider.js';
+import type { Hotspot } from './SceneGraphLoader.js';
 
-// TODO: replace with the state machine name from your .riv file. Not part
-// of the experience-manifest schema (§E only covers asset URLs), so this
-// stays a top-level constant, same as before Phase 1.
+// State machine name inside ui-test.riv, the legacy single-card experience
+// (proxy-target). Spatial experiences don't use this — their Rive bindings
+// are authored per hotspot in the scene asset (Golden Rule, §E), and the
+// Card contract lives in CardPanel.ts. Not part of the manifest schema (§E
+// only covers asset URLs), so it stays a top-level constant.
 const STATE_MACHINE_NAME = 'State Machine 1';
 
 // Single-experience today by design — see AR_SYSTEM.md §E and the
@@ -57,21 +62,81 @@ async function main(): Promise<void> {
   // directly over the tracking target/origin (that origin is a reference
   // point, not a hotspot — see AR_SYSTEM.md §A).
   if (experience.modelUrl !== undefined) {
-    // Spatial pipeline (Phase 3, AR_SYSTEM.md §G): the baked scene mesh is
-    // mounted on the anchor with the §F glue transform applied, and
-    // hotspot_* nodes get screen-space cards pinned by per-frame projection.
+    // Spatial pipeline (Phase 3 + Phase 5, AR_SYSTEM.md §G): the baked
+    // scene mesh is mounted on the anchor with the §F glue transform
+    // applied; hotspot_* nodes get screen-space Rive markers pinned by
+    // per-frame projection, and one screen-fixed Card panel displays the
+    // externally-sourced content for whichever marker is selected.
     if (experience.physicalTargetWidthMeters === undefined) {
       // ManifestResolver already enforces this pairing; the recheck exists
       // for type narrowing and to keep the invariant local and loud.
       throw new Error(`Experience "${experience.targetId}" declares modelUrl without physicalTargetWidthMeters.`);
+    }
+    if (experience.contentUrl === undefined) {
+      // Same pattern as above: spatial experiences carry their external
+      // content route since Phase 5 (§E).
+      throw new Error(`Experience "${experience.targetId}" declares modelUrl without contentUrl.`);
     }
 
     const loader = new SceneGraphLoader(experience.modelUrl, experience.physicalTargetWidthMeters);
     const { root, hotspots, occluders } = await loader.load();
     anchor.group.add(root);
 
-    const overlay = new HotspotOverlay(experience.riveUrl);
-    overlay.attach(hotspots);
+    // One fetch/parse of the .riv serves all marker instances plus the
+    // Card; the image slot captures the Card's `cardImage` referenced
+    // asset at parse time for sheet-driven substitution.
+    const imageSlot = new CardImageSlot();
+    const riveFile = await loadRiveFile(experience.riveUrl, imageSlot.assetLoader);
+
+    const contentProvider = new GoogleSheetContentProvider(experience.contentUrl);
+    contentProvider.prefetch();
+
+    const markers = new MarkerLayer(riveFile);
+    await markers.attach(hotspots);
+    const card = new CardPanel(riveFile, imageSlot);
+    await card.attach();
+
+    // Selection state machine (app-owned; the artboards only mirror it).
+    let selected: Hotspot | null = null;
+    const closeCard = (): void => {
+      selected = null;
+      markers.setSelected(null);
+      card.close();
+    };
+
+    markers.onMarkerTap((hotspot) => {
+      if (selected === hotspot) {
+        // Re-tapping the selected marker toggles the card away.
+        closeCard();
+        return;
+      }
+      selected = hotspot;
+      markers.setSelected(hotspot);
+      contentProvider
+        .getContent(contentKeyOf(hotspot))
+        .then((content) => {
+          // A slower fetch must not overwrite a newer selection.
+          if (selected === hotspot) card.open(content);
+        })
+        .catch((error: unknown) => {
+          // Loud (§C) but session-preserving: the card simply doesn't
+          // open; tracking and markers keep running.
+          console.error('[ar-ramapo] content resolution failed:', error);
+          if (selected === hotspot) closeCard();
+        });
+    });
+
+    card.onCloseRequested(closeCard);
+
+    // Tap-outside closes the card. Markers and the card stopPropagation()
+    // their own pointerups, so any pointerup that reaches document is
+    // outside both by construction; the contains checks are a second
+    // guard in case that ever changes.
+    document.addEventListener('pointerup', (event) => {
+      if (!card.isOpen) return;
+      if (markers.containsEventTarget(event.target) || card.containsEventTarget(event.target)) return;
+      closeCard();
+    });
 
     const projector = new HotspotProjector(
       camera,
@@ -83,13 +148,13 @@ async function main(): Promise<void> {
       () => anchor.group.visible
     );
     renderEngine.onFrame((deltaMs) => {
-      overlay.update(projector.project(), deltaMs);
+      markers.update(projector.project(), deltaMs);
     });
   } else {
     // Legacy single-card experience (pre-Phase-3, e.g. "proxy-target"): one
     // Rive-textured plane anchored directly above the tracked target,
     // driven by InputBridge's document-level touch raycast.
-    const rive = new RiveController(experience.riveUrl, STATE_MACHINE_NAME);
+    const rive = new RiveController({ riveUrl: experience.riveUrl, stateMachine: STATE_MACHINE_NAME });
 
     const riveTexture = new THREE.CanvasTexture(rive.canvas);
     riveTexture.generateMipmaps = false;

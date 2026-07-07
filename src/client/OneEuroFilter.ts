@@ -5,7 +5,7 @@
  * aggressively while the value is near-still (killing high-frequency
  * tracking tremor) yet follows almost lag-free during fast movement.
  *
- * Used here in SCREEN SPACE only (HotspotOverlay card positions). The 3D
+ * Used here in SCREEN SPACE only (MarkerLayer marker positions). The 3D
  * pose itself stays on MindAR's responsive tracking profile — smoothing
  * the pose was what made the whole scene visibly lag behind the physical
  * model (see TRACKING_PROFILE_RIGID_ANCHOR in ARSessionManager.ts), so
