@@ -76,11 +76,11 @@ export const experienceManifest: ExperienceManifest[] = [
     mindTargetUrl: '/assets/bench-target.mind',
     trackingImageUrl: '/assets/bench-plaque.png',
     // Phase 5 external-content source (§E): a Google Sheet with header row
-    // contentKey | title | body | imageUrl, shared "anyone with the link
-    // can view". REPLACE the sheet id below with the real one — until then
-    // this resolves but fails loudly at fetch time, same policy as the
-    // asset files themselves (see the comment above).
-    contentUrl: 'https://docs.google.com/spreadsheets/d/REPLACE_WITH_SHEET_ID/gviz/tq?tqx=out:json',
+    // contentKey | title | subtitle | body | imageUrl, shared "anyone with
+    // the link can view". One row per hotspot contentKey declared in
+    // tools/build_bench_scene.py (bench-domino-1..4); subtitle/imageUrl are
+    // optional columns, currently blank.
+    contentUrl: 'https://docs.google.com/spreadsheets/d/1O4Zq8ggc7TgjKZIuUtufO-G9hJiK2KalJpD2Cux2sN8/gviz/tq?tqx=out:json',
     physicalTargetWidthMeters: 0.05,
     // 0.2.0: all four hotspot_* nodes in bench-scene.glb now declare
     // riveStateMachine (was two of four).
@@ -91,6 +91,9 @@ export const experienceManifest: ExperienceManifest[] = [
     // Card); hotspots gain contentKey + riveArtboard custom properties and
     // riveStateMachine renames 'State Machine 1' → 'MarkerMachine';
     // contentUrl introduced (external content seam).
-    version: '0.4.0',
+    // 0.4.1: contentUrl points at the real, populated Google Sheet
+    // (previously the unfilled REPLACE_WITH_SHEET_ID placeholder, which
+    // resolved but always failed at fetch time — the Card never opened).
+    version: '0.4.1',
   },
 ];
