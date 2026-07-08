@@ -12,6 +12,21 @@
 // (glTF `extras` → `object.userData`), discovered at runtime by tree
 // traversal (see src/client/SceneGraphLoader.ts).
 
+export type PlacementMode = 'tap' | 'image';
+
+/**
+ * GPS arrival gate for an 8th Wall experience (§E — a global physical
+ * constraint of the experience, not UI data, same reading as
+ * physicalTargetWidthMeters). Never a positioning source: GPS accuracy on
+ * phones is 10–30 m outdoors, so this only gates arrival — the precise
+ * origin comes from SLAM tap-placement or an image target.
+ */
+export interface GeoFenceSpec {
+  latitude: number;
+  longitude: number;
+  radiusMeters: number;
+}
+
 export type ExperienceManifest = {
   targetId: string;
   riveUrl: string;
@@ -23,7 +38,28 @@ export type ExperienceManifest = {
    * authored asset (§E).
    */
   usdzUrl?: string;
+  /** MindAR's compiled tracking target. Legacy engine path — an entry
+   * declares either this (MindAR) or `placement` (8th Wall), never both. */
   mindTargetUrl?: string;
+  /**
+   * Tracking-engine selector for the 8th Wall path. Undefined means the
+   * legacy MindAR path (routed off `mindTargetUrl`, unchanged since
+   * Phase 1); present means 8th Wall SLAM owns this experience:
+   *  - 'tap'   — GPS geofence gates arrival, then SLAM tap-to-place sets
+   *              the origin (requires `geo`).
+   *  - 'image' — an 8th Wall image target on the printed plaque sets the
+   *              origin (requires `imageTargetUrl` + `physicalTargetWidthMeters`).
+   */
+  placement?: PlacementMode;
+  /** GPS arrival gate, 8th Wall path only. See `placement`. */
+  geo?: GeoFenceSpec;
+  /**
+   * Compiled 8th Wall image-target JSON for `placement: 'image'` (built
+   * with `npx @8thwall/image-target-cli`, committed under
+   * /assets/image-targets/). The 8th Wall analogue of `mindTargetUrl` —
+   * never both declared on the same entry.
+   */
+  imageTargetUrl?: string;
   /**
    * Raw plaque artwork (PNG) for tracking engines that consume the image
    * directly instead of a compiled feature file: ARKit builds its
@@ -95,5 +131,38 @@ export const experienceManifest: ExperienceManifest[] = [
     // (previously the unfilled REPLACE_WITH_SHEET_ID placeholder, which
     // resolved but always failed at fetch time — the Card never opened).
     version: '0.4.1',
+  },
+  {
+    // Phase 2C: 8th Wall test entry (AR_SYSTEM.md's 8th-wall decision
+    // record) — reuses bench-test's own content (same bench-scene.glb,
+    // bench-ui.riv, and populated Google Sheet) so this exercises exactly
+    // the same MarkerLayer/CardPanel/ContentProvider pipeline as bench-test,
+    // isolating the variable under test to the tracking engine itself.
+    // A separate targetId (never bench-test's own) so flipping
+    // ACTIVE_TARGET_ID in main.ts back to 'bench-test' instantly restores
+    // the MindAR path with zero manifest changes.
+    targetId: '8thwall-test',
+    riveUrl: '/assets/bench-ui.riv',
+    modelUrl: '/assets/bench-scene.glb',
+    placement: 'image',
+    // Compiled from bench-plaque.png with `npx @8thwall/image-target-cli`
+    // (single-source artwork rule, §E/§F) — regenerate if the plaque art
+    // changes. Extracted from the 8th-wall branch (git checkout 8th-wall --
+    // public/assets/image-targets/), same as bench-plaque.png itself.
+    imageTargetUrl: '/assets/image-targets/bench-plaque/bench-plaque.json',
+    trackingImageUrl: '/assets/bench-plaque.png',
+    physicalTargetWidthMeters: 0.05,
+    // PLACEHOLDER COORDINATES (Ramapo College campus center) — desk/local
+    // testing bypasses the fence entirely with ?fakegeo=1 (see
+    // GeoFenceService). Replace with the real site's lat/lng before any
+    // field test; radius is deliberately generous — the fence is an
+    // arrival gate, not a positioning source.
+    geo: {
+      latitude: 41.0817,
+      longitude: -74.174,
+      radiusMeters: 30,
+    },
+    contentUrl: 'https://docs.google.com/spreadsheets/d/1O4Zq8ggc7TgjKZIuUtufO-G9hJiK2KalJpD2Cux2sN8/gviz/tq?tqx=out:json',
+    version: '0.1.0',
   },
 ];

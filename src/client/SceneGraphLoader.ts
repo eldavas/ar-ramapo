@@ -2,10 +2,16 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 /**
- * §F axis-convention lockdown — the glue between authored space and
- * MindAR's anchor space. These two constants are the ONLY place this
- * conversion exists on the web runtime; they are validated by the Phase 3
- * bench-test and must never be re-derived ad hoc at call sites.
+ * §F axis-convention lockdown — the glue between authored space and each
+ * tracking engine's anchor space. MindAR needs it here because its anchor
+ * frame and marker-width scale are baked into the loaded mesh itself. 8th
+ * Wall does NOT: its AnchorSource implementations (ImageTargetAnchorSource's
+ * own TARGET_FRAME_TO_WORLD_FIX, TapPlacedAnchorSource's yaw-only placement)
+ * already deliver a correctly-oriented, real-meters anchor group, and
+ * `scale:'absolute'` means the meter-authored GLB mounts at identity scale —
+ * applying this MindAR glue on top would double-transform the scene (see the
+ * Phase 2B decision record). These two constants remain the ONLY place the
+ * MindAR conversion exists on the web runtime; never re-derived ad hoc.
  *
  * Rotation: Blender authors Z-up; the glTF exporter converts to Y-up, so
  * exported content is X-east / Y-up / Z-south. MindAR's anchor frames the
@@ -19,11 +25,19 @@ const GLTF_TO_MINDAR_ROTATION_X_RADIANS = Math.PI / 2;
  * Scale: MindAR anchor space is measured in marker-widths (the plaque spans
  * exactly 1 unit), while scene content is authored in meters. The
  * conversion factor is 1 / physicalTargetWidthMeters — supplied per
- * experience by the manifest (AR_SYSTEM.md §E), never hardcoded.
+ * experience by the manifest (AR_SYSTEM.md §E), never hardcoded. MindAR
+ * only — see the tracking-engine glue comment above.
  */
 function metersToMarkerWidths(physicalTargetWidthMeters: number): number {
   return 1 / physicalTargetWidthMeters;
 }
+
+/**
+ * Which tracking engine's anchor frame this load targets. Defaults to
+ * 'mindar' so every pre-existing call site (unchanged since Phase 3) keeps
+ * compiling and behaving identically without passing a third argument.
+ */
+export type SceneTrackingEngine = 'mindar' | '8thwall';
 
 /**
  * Interaction nodes are discovered by name prefix via tree traversal —
@@ -66,16 +80,17 @@ export interface LoadedSceneGraph {
 
 /**
  * Loads the baked scene mesh declared in the experience manifest, applies
- * the §F glue transform, and discovers `hotspot_*` interaction nodes.
- * Rendering and projection are deliberately not this module's job — see
- * RenderEngine.ts and HotspotProjector.ts.
+ * the tracking-engine glue transform for `engine`, and discovers
+ * `hotspot_*` interaction nodes. Rendering and projection are deliberately
+ * not this module's job — see RenderEngine.ts and HotspotProjector.ts.
  */
 export class SceneGraphLoader {
   private readonly loader = new GLTFLoader();
 
   constructor(
     private readonly modelUrl: string,
-    private readonly physicalTargetWidthMeters: number
+    private readonly physicalTargetWidthMeters: number,
+    private readonly engine: SceneTrackingEngine = 'mindar'
   ) {}
 
   async load(): Promise<LoadedSceneGraph> {
@@ -83,8 +98,14 @@ export class SceneGraphLoader {
 
     const root = new THREE.Group();
     root.name = 'scene-graph-root';
-    root.rotation.x = GLTF_TO_MINDAR_ROTATION_X_RADIANS;
-    root.scale.setScalar(metersToMarkerWidths(this.physicalTargetWidthMeters));
+    if (this.engine === 'mindar') {
+      root.rotation.x = GLTF_TO_MINDAR_ROTATION_X_RADIANS;
+      root.scale.setScalar(metersToMarkerWidths(this.physicalTargetWidthMeters));
+    }
+    // '8thwall': identity rotation, scale 1 — AnchorSource (Image/TapPlaced)
+    // already supplies the correct frame and real-meters absolute scale;
+    // applying the MindAR glue here too would double-transform the scene
+    // (see the constants' doc comment above).
     root.add(gltf.scene);
 
     const hotspots: Hotspot[] = [];

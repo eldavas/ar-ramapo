@@ -16,6 +16,7 @@
     "start": "node dist/server.js"
   },
   "dependencies": {
+    "@8thwall/engine-binary": "^1.0.0",
     "@rive-app/canvas": "^2.38.4",
     "express": "^5.2.1",
     "mind-ar": "1.2.5",

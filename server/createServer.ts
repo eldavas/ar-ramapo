@@ -27,6 +27,11 @@ export function createApp(): Express {
 
   app.use(express.static(PUBLIC_DIR));
   app.use('/rive', express.static(path.join(PROJECT_ROOT, 'node_modules/@rive-app/canvas')));
+  // 8th Wall engine binary, self-hosted (same pattern as /rive): xr.js plus
+  // its runtime chunks and the licensing attribution asset
+  // (resources/powered-by.svg) load same-origin — no CDN at runtime
+  // (AR_SYSTEM.md §C/§F, the 8th-wall decision record).
+  app.use('/xr', express.static(path.join(PROJECT_ROOT, 'node_modules/@8thwall/engine-binary/dist')));
 
   return app;
 }
