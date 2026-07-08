@@ -11,6 +11,12 @@
 
 export interface CardContent {
   title: string;
+  /**
+   * Optional secondary line rendered between the title and body (the
+   * Card's `subtitle` text run — e.g. a date, category, or short tag).
+   * Absent/empty clears the run rather than leaving stale content.
+   */
+  subtitle?: string;
   body: string;
   /**
    * Optional image for the Card's `cardImage` slot. Root-relative /public
@@ -41,6 +47,7 @@ export interface ContentProvider {
 // The sheet's required header labels (first row, exact strings).
 const COLUMN_CONTENT_KEY = 'contentKey';
 const COLUMN_TITLE = 'title';
+const COLUMN_SUBTITLE = 'subtitle';
 const COLUMN_BODY = 'body';
 const COLUMN_IMAGE_URL = 'imageUrl';
 
@@ -52,8 +59,9 @@ const COLUMN_IMAGE_URL = 'imageUrl';
  * Phase 5 test loop.
  *
  * Expected sheet shape: first row is the header — contentKey | title |
- * body | imageUrl — one row per hotspot below it. Column order is free;
- * columns are matched by header label.
+ * subtitle | body | imageUrl — one row per hotspot below it. subtitle is
+ * optional, same as imageUrl. Column order is free; columns are matched by
+ * header label.
  *
  * The gviz response is JSON wrapped in
  * `google.visualization.Query.setResponse(…)`; long-stable but
@@ -171,6 +179,7 @@ export class GoogleSheetContentProvider implements ContentProvider {
     const keyIndex = this.requireColumn(labels, COLUMN_CONTENT_KEY);
     const titleIndex = this.requireColumn(labels, COLUMN_TITLE);
     const bodyIndex = this.requireColumn(labels, COLUMN_BODY);
+    const subtitleIndex = labels.indexOf(COLUMN_SUBTITLE); // optional column
     const imageIndex = labels.indexOf(COLUMN_IMAGE_URL); // optional column
 
     const entries = new Map<string, CardContent>();
@@ -194,8 +203,9 @@ export class GoogleSheetContentProvider implements ContentProvider {
         );
       }
 
+      const subtitle = subtitleIndex === -1 ? undefined : readCell(row, subtitleIndex);
       const imageUrl = imageIndex === -1 ? undefined : readCell(row, imageIndex);
-      entries.set(key, imageUrl === undefined ? { title, body } : { title, body, imageUrl });
+      entries.set(key, { title, body, ...(subtitle !== undefined && { subtitle }), ...(imageUrl !== undefined && { imageUrl }) });
     }
     return entries;
   }
@@ -207,7 +217,7 @@ export class GoogleSheetContentProvider implements ContentProvider {
       throw new ContentResolutionError(
         `Sheet at ${this.contentUrl} has no "${label}" column. Header labels found: ${found}. The first ` +
           `sheet row must contain ${COLUMN_CONTENT_KEY}, ${COLUMN_TITLE}, ${COLUMN_BODY} (and optionally ` +
-          `${COLUMN_IMAGE_URL}).`
+          `${COLUMN_SUBTITLE}, ${COLUMN_IMAGE_URL}).`
       );
     }
     return index;

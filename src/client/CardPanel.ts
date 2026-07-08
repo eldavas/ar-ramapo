@@ -11,15 +11,17 @@ const CARD_STATE_MACHINE = 'CardMachine';
 const INPUT_IS_OPEN = 'isOpen';
 const TRIGGER_REFRESH = 'refresh';
 const TEXT_RUN_TITLE = 'title';
+const TEXT_RUN_SUBTITLE = 'subtitle';
 const TEXT_RUN_BODY = 'body';
 const EVENT_CLOSE_REQUESTED = 'closeRequested';
 export const CARD_IMAGE_ASSET_NAME = 'cardImage';
 
-// Authored artboard size (480×360, 4:3) — the CSS box keeps this aspect and
-// the backing store renders it at up to 2× for retina sharpness.
-const CARD_CSS_WIDTH = 'min(92vw, 480px)';
-const CARD_ARTBOARD_WIDTH = 480;
-const CARD_ARTBOARD_HEIGHT = 360;
+// Authored artboard size (350×480 portrait bottom sheet) — the CSS box
+// keeps this aspect and the backing store renders it at up to 2× for
+// retina sharpness.
+const CARD_CSS_WIDTH = 'min(92vw, 350px)';
+const CARD_ARTBOARD_WIDTH = 350;
+const CARD_ARTBOARD_HEIGHT = 480;
 const MAX_BACKING_SCALE = 2;
 
 /**
@@ -181,6 +183,7 @@ export class CardPanel {
    */
   open(content: CardContent): void {
     this.rive.setText(TEXT_RUN_TITLE, content.title);
+    this.rive.setText(TEXT_RUN_SUBTITLE, content.subtitle ?? '');
     this.rive.setText(TEXT_RUN_BODY, content.body);
     if (content.imageUrl !== undefined) {
       this.imageSlot.setImage(content.imageUrl).catch((error: unknown) => {

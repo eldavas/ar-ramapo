@@ -107,9 +107,10 @@ to the projected hotspot point):
 
 Author states to tolerate any flag combination and rapid toggling.
 
-**Artboard `Card`** — author at 480×360 (4:3; rendered `min(92vw, 480px)`
-wide, bottom-center). At rest (`isOpen` false) it must show nothing —
-"closed" is an artboard state, not a hidden canvas:
+**Artboard `Card`** — author at 350×480 (bottom-sheet portrait; rendered
+`min(92vw, 350px)` wide, bottom-center, aspect-ratio locked to the artboard).
+At rest (`isOpen` false) it must show nothing — "closed" is an artboard
+state, not a hidden canvas:
 
 | Contract item | Exact name | Notes |
 |---|---|---|
@@ -117,7 +118,8 @@ wide, bottom-center). At rest (`isOpen` false) it must show nothing —
 | Boolean input | `isOpen` | default false. false→true plays Enter, true→false plays Exit; both transitions must be interruptible |
 | Trigger input | `refresh` | quick content pulse fired when content swaps while already open; must be a visual no-op if fired mid-Enter |
 | Text run | `title` | at the artboard root, exported name, non-empty placeholder value |
-| Text run | `body` | same; give it a fixed-size text area with clip/ellipsis — sheet content length is unbounded |
+| Text run | `subtitle` | optional secondary line (e.g. a date/category tag) between title and body; may be set to an empty string — author it to collapse gracefully when blank |
+| Text run | `body` | same as `title`; give it a fixed-size text area with clip/ellipsis — sheet content length is unbounded |
 | Referenced image asset | `cardImage` | mark the image **Referenced** (not Embedded) with this exact asset name; the runtime substitutes its bitmap from the content source's `imageUrl` |
 | Rive Event | `closeRequested` | type General, fired by the authored close button's listener. The button must NOT change `isOpen` itself — the app owns that state and answers the event |
 | Fonts | embedded | export with fonts embedded; the runtime is self-hosted and referenced fonts would fail to resolve |
@@ -132,9 +134,10 @@ Phase 5.
 the sheet's gviz endpoint
 (`https://docs.google.com/spreadsheets/d/<SHEET_ID>/gviz/tq?tqx=out:json`),
 sharing set to "anyone with the link can view". First row is the header —
-`contentKey | title | body | imageUrl` (column order free, labels exact) —
-one row per hotspot. `imageUrl` is optional; root-relative paths under
-`/public` (e.g. `/assets/content/images/domino-1.jpg`) are recommended —
+`contentKey | title | subtitle | body | imageUrl` (column order free, labels
+exact) — one row per hotspot. `subtitle` and `imageUrl` are optional;
+root-relative paths under `/public` (e.g.
+`/assets/content/images/domino-1.jpg`) are recommended for images —
 absolute https URLs work only if the host serves CORS headers. Editing a
 cell shows up on the next page load; no redeploy.
 
