@@ -1,0 +1,23 @@
+{
+  "imagePath": "/assets/image-targets/bench-plaque/bench-plaque_luminance.png",
+  "metadata": null,
+  "name": "bench-plaque",
+  "type": "PLANAR",
+  "properties": {
+    "left": 128,
+    "top": 0,
+    "width": 768,
+    "height": 1024,
+    "isRotated": true,
+    "originalWidth": 1024,
+    "originalHeight": 1024
+  },
+  "resources": {
+    "originalImage": "bench-plaque_original.png",
+    "croppedImage": "bench-plaque_cropped.png",
+    "thumbnailImage": "bench-plaque_thumbnail.png",
+    "luminanceImage": "bench-plaque_luminance.png"
+  },
+  "created": 1783545586723,
+  "updated": 1783545586723
+}

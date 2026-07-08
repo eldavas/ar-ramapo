@@ -1,0 +1,31 @@
+{
+  "name": "ar-prototype-8thwall",
+  "version": "0.1.0",
+  "description": "8th Wall SLAM + GPS geofence + Rive UI spike (greenfield pivot from MindAR image tracking)",
+  "main": "dist/server.js",
+  "type": "module",
+  "engines": {
+    "node": ">=20.12"
+  },
+  "scripts": {
+    "build:server": "tsc",
+    "build:client": "vite build",
+    "build": "tsc && vite build",
+    "dev:client": "vite build --watch",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p src/client/tsconfig.json",
+    "start": "node dist/server.js"
+  },
+  "dependencies": {
+    "@8thwall/engine-binary": "^1.0.0",
+    "@rive-app/canvas": "^2.38.4",
+    "express": "^5.2.1",
+    "three": "0.160.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.1.0",
+    "@types/three": "0.160.0",
+    "typescript": "^6.0.3",
+    "vite": "^8.1.3"
+  }
+}

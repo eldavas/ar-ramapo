@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AR Prototype — 8th Wall</title>
+  <link rel="icon" href="data:,">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    /* touch-action/overscroll: an AR viewport owns every touch. Without
+       this, iOS Safari's default gestures (double-tap zoom, pan/rubber-band,
+       long-press callout) visually scale or drag the camera feed + scene,
+       which reads as the scene "rotating/adjusting" on stray taps. */
+    html, body {
+      overflow: hidden;
+      touch-action: none;
+      overscroll-behavior: none;
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+    }
+    body { background: #000; }
+    /* Unlike MindAR (which injected a <video> at negative z-index and
+       needed stacking-context guards here), 8th Wall draws the camera feed
+       directly into this WebGL canvas via GlTextureRenderer — one normal,
+       app-owned element. Rive overlays (MarkerLayer z-index:10, CardPanel
+       z-index:20, UX overlay z-index:30) self-mount to <body> above it. */
+    #camerafeed { position: fixed; inset: 0; width: 100vw; height: 100vh; }
+    /* Required by the 8th Wall XR Engine License (§1.3.1.2, "material in
+       which Licensee utilizes the functionality of the Software" must
+       carry attribution) — see docs/AR_SYSTEM.md for the full decision
+       record. z-index 25 keeps it above the AR canvas/Rive markers (10)
+       and the Card (20) but below the blocking UX overlay (30), so it
+       never fights a tap. */
+    #powered-by-8thwall {
+      position: fixed; left: 12px; bottom: 12px; z-index: 25;
+      width: 96px; opacity: 0.85; pointer-events: auto;
+    }
+    #powered-by-8thwall img { display: block; width: 100%; }
+  </style>
+</head>
+<body>
+  <canvas id="camerafeed"></canvas>
+  <a id="powered-by-8thwall" href="https://8thwall.org" target="_blank" rel="noopener">
+    <img src="/xr/resources/powered-by.svg" alt="Powered by 8th Wall" />
+  </a>
+  <!-- 8th Wall engine binary, self-hosted from /xr (an Express static route
+       over node_modules/@8thwall/engine-binary/dist — no CDN at runtime,
+       AR_SYSTEM.md §C/§F). Loaded as a plain script, never bundled: the
+       binary has its own chunk loader; data-preload-chunks="slam" starts
+       fetching the world-tracking chunk (xr-slam.js) immediately so it is
+       warm by the time the user passes the geolocation UX states. App code
+       awaits the XR8Promise shim from @8thwall/engine-binary (resolves on
+       the engine's `xrloaded` event). -->
+  <script src="/xr/xr.js" async data-preload-chunks="slam"></script>
+  <!-- Vite-built bundle (three and @rive-app/canvas are bundled npm
+       dependencies, not CDN imports — see vite.config.ts). This single
+       stable filename is produced by both `vite build` and
+       `vite build --watch`, so this tag never changes between dev and
+       production. -->
+  <script type="module" src="/dist/main.js"></script>
+</body>
+</html>
