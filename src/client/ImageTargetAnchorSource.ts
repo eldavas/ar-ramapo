@@ -86,6 +86,17 @@ export class ImageTargetAnchorSource implements AnchorSource {
   private unsubscribe: (() => void) | null = null;
   private readonly originChangedHandlers: Array<() => void> = [];
   private readonly scratchQuat = new THREE.Quaternion();
+  // Phase 3 debug tracing (?debug=1, see the inline console in index.html):
+  // this class previously had NO logging beyond the scale-mismatch warning
+  // in anchorScaleForEvent — the placement:'tap' path (PlacementController/
+  // TapPlacedAnchorSource) got full lifecycle tracing two phases ago, but
+  // 8thwall-test uses placement:'image', which never touches that code at
+  // all. This closes that gap. 'updated' fires every frame the target is
+  // visible, so it's throttled; 'found'/'lost'/isTracking() transitions are
+  // infrequent and always logged.
+  private lastLoggedTrackingResult: boolean | null = null;
+  private lastUpdatedLogMs = 0;
+  private static readonly UPDATED_LOG_INTERVAL_MS = 1000;
 
   constructor(
     private readonly session: EightWallSession,
@@ -105,6 +116,7 @@ export class ImageTargetAnchorSource implements AnchorSource {
   }
 
   acquire(): Promise<void> {
+    console.log(`[ImageTargetAnchorSource] acquire() called for target "${this.targetName}" — waiting for first imagefound...`);
     // Re-acquire is a no-op by design: re-alignment is automatic on every
     // sighting of the plaque, so there is nothing to re-run.
     if (this.acquired) return Promise.resolve();
@@ -119,7 +131,15 @@ export class ImageTargetAnchorSource implements AnchorSource {
    * persistence is the whole point of the hybrid design.
    */
   isTracking(): boolean {
-    return this.acquired && this.session.trackingStatus === 'NORMAL';
+    const result = this.acquired && this.session.trackingStatus === 'NORMAL';
+    if (result !== this.lastLoggedTrackingResult) {
+      this.lastLoggedTrackingResult = result;
+      console.log(
+        `[ImageTargetAnchorSource] isTracking() -> ${result} (acquired=${this.acquired}, ` +
+          `trackingStatus=${this.session.trackingStatus}) — HotspotProjector hides all markers while this is false.`
+      );
+    }
+    return result;
   }
 
   /** UX-only signal (e.g. a "glance at the plaque to re-align" hint). */
@@ -144,14 +164,21 @@ export class ImageTargetAnchorSource implements AnchorSource {
     switch (kind) {
       case 'found': {
         if (event === null) return;
+        console.log(
+          `[ImageTargetAnchorSource] FOUND "${event.name}" — engine scale=${event.scale.toFixed(3)}m, ` +
+            `position=(${event.position.x.toFixed(2)}, ${event.position.y.toFixed(2)}, ${event.position.z.toFixed(2)}), ` +
+            `already acquired=${this.acquired}`
+        );
         this.applyPose(event);
         this.imageVisible = true;
         if (!this.acquired) {
           this.acquired = true;
           this.group.visible = true;
+          console.log('[ImageTargetAnchorSource] first acquire — group now visible, resolving acquire().');
           this.acquireResolve?.();
           this.acquireResolve = null;
         } else {
+          console.log('[ImageTargetAnchorSource] re-detection after lost — firing onOriginChanged (pose discontinuity).');
           // Re-detection after a lost = pose discontinuity.
           for (const handler of this.originChangedHandlers) {
             handler();
@@ -161,16 +188,30 @@ export class ImageTargetAnchorSource implements AnchorSource {
       }
       case 'updated':
         if (event !== null) {
+          const now = performance.now();
+          if (now - this.lastUpdatedLogMs > ImageTargetAnchorSource.UPDATED_LOG_INTERVAL_MS) {
+            this.lastUpdatedLogMs = now;
+            console.log(
+              `[ImageTargetAnchorSource] updated — engine scale=${event.scale.toFixed(3)}m, ` +
+                `position=(${event.position.x.toFixed(2)}, ${event.position.y.toFixed(2)}, ${event.position.z.toFixed(2)}), ` +
+                `group.position=(${this.group.position.x.toFixed(2)}, ${this.group.position.y.toFixed(2)}, ${this.group.position.z.toFixed(2)})`
+            );
+          }
           this.applyPose(event);
           this.imageVisible = true;
         }
         break;
       case 'lost':
+        console.log('[ImageTargetAnchorSource] LOST — pose frozen at last snap, SLAM world tracking persists it.');
         // Pose freezes at the last snap; SLAM world tracking persists it.
         this.imageVisible = false;
         break;
-      // 'loading' / 'scanning' are UX coaching signals consumed in
-      // main.ts, not anchor state.
+      case 'loading':
+        console.log('[ImageTargetAnchorSource] loading image target data...');
+        break;
+      case 'scanning':
+        console.log('[ImageTargetAnchorSource] scanning for target...');
+        break;
     }
   }
 

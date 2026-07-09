@@ -118,6 +118,18 @@ export class EightWallSession {
             xr8.XrController.updateCameraProjectionMatrix({
               origin: { x: 0, y: 1.6, z: 0 },
             });
+            // Phase 3C diagnostic: three reads at three different points in
+            // the lifecycle, to settle (with numbers, not more theories)
+            // whether the CSS box is actually full-screen, and whether the
+            // engine rewrites canvas/renderer sizing on its own first frame
+            // after onStart already fired.
+            this.logCanvasDiagnostics('onStart (synchronous, before first frame)', handles);
+            requestAnimationFrame(() => {
+              this.logCanvasDiagnostics('first requestAnimationFrame after onStart', handles);
+            });
+            window.setTimeout(() => {
+              this.logCanvasDiagnostics('+1000ms after onStart', handles);
+            }, 1000);
             resolve(handles);
           },
           onUpdate: () => {
@@ -213,5 +225,33 @@ export class EightWallSession {
   stop(): void {
     this.xr8?.stop();
     this.frameBus.reset();
+  }
+
+  /**
+   * Phase 3C diagnostic (?debug=1): measures the exact discrepancy behind
+   * the "canvas locked to ~1/3 screen, markers flash in the black area"
+   * report, instead of guessing further. Two competing theories on the
+   * table: (a) our own CSS box for #camerafeed isn't actually full-screen
+   * (a layout bug we could fix), or (b) the CSS box IS full-screen but
+   * XR8's internal drawing-buffer/viewport is smaller (an engine-internal
+   * issue no CSS change here can touch). rect vs. canvas.width/height vs.
+   * window.innerWidth/innerHeight/devicePixelRatio settles which one it
+   * is, with numbers.
+   */
+  private logCanvasDiagnostics(label: string, handles: Xr8ThreejsScene): void {
+    const rect = this.canvas.getBoundingClientRect();
+    const rendererSize = new THREE.Vector2();
+    handles.renderer.getSize(rendererSize);
+    console.log(
+      `[EightWallSession] canvas diagnostics @ ${label}:\n` +
+        `  canvas.getBoundingClientRect() = ${rect.width.toFixed(1)} x ${rect.height.toFixed(1)} ` +
+        `(left=${rect.left.toFixed(1)}, top=${rect.top.toFixed(1)})\n` +
+        `  canvas.width/height (drawing buffer) = ${this.canvas.width} x ${this.canvas.height}\n` +
+        `  window.innerWidth/innerHeight = ${window.innerWidth} x ${window.innerHeight}\n` +
+        `  window.devicePixelRatio = ${window.devicePixelRatio}\n` +
+        `  renderer.getSize() = ${rendererSize.x.toFixed(1)} x ${rendererSize.y.toFixed(1)}, ` +
+        `renderer.getPixelRatio() = ${handles.renderer.getPixelRatio()}\n` +
+        `  camera.aspect = ${handles.camera.aspect.toFixed(3)}`
+    );
   }
 }
