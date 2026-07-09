@@ -37,23 +37,21 @@ export type ImageEventHandler = (kind: ImageEventKind, event: Xr8ImageTrackedEve
  * stage — the app never calls renderer.render(). Handles are read back via
  * XR8.Threejs.xrScene() after the pipeline starts.
  *
- * CORRECTION (Phase 2D): this class previously also claimed the app "never
- * attaches its own resize handler," on the assumption the engine handled
- * full-window canvas sizing automatically. Verified false by grepping the
- * installed dist/xr.js: "FullWindowCanvas" appears exactly once, as
- * `PQ(r, "FullWindowCanvas", "XRExtras.FullWindowCanvas", ...)` — a
- * deprecation-shim pointer, not an implementation; `window.XRExtras` is
- * never assigned anywhere in the binary. That utility lives only in a
- * separate, hosted-platform-only script this self-hosted setup doesn't
- * load. Without it, the renderer keeps whatever size
- * XR8.Threejs.pipelineModule() measured the canvas at ONCE, at onStart —
- * if that predates layout settling, the camera feed and every overlay stay
- * pinned to that smaller size for the rest of the session (the reported
- * "camera feed fills ~1/3 of the screen" symptom). installFullWindowResize()
- * below is this app's replacement for the missing FullWindowCanvas: it
- * mutates the SAME renderer/camera instance XR8 already owns and renders
- * with every frame, so it is not a second resize authority fighting the
- * engine — it is the resize handling the engine doesn't provide.
+ * CORRECTION (Phase 2E, supersedes the Phase 2D note): Phase 2D added a
+ * manual installFullWindowResize() here, reasoning that the engine had no
+ * resize handling of its own (based on XRExtras.FullWindowCanvas being
+ * absent from the binary). That was an incomplete read of the evidence.
+ * Grepping the installed dist/xr.js again, more broadly, turns up
+ * `addEventListener("resize", ...)` and `addEventListener(
+ * "orientationchange", ...)` registered by the engine itself, plus
+ * internal use of devicePixelRatio/innerWidth/innerHeight — the engine
+ * DOES own resize end to end, just not through the (absent) XRExtras
+ * utility. installFullWindowResize() was therefore a second handler
+ * competing with the engine's own one on the same two events — consistent
+ * with the on-device symptom (correct-ish at first load, distorted after
+ * an orientation change re-triggered both handlers). Removed. The app
+ * must not touch renderer/camera sizing at all; XR8.Threejs.pipelineModule()
+ * owns it completely, same as it owns the render call.
  *
  * start() must be called from a user gesture: on iOS Safari the engine
  * requests DeviceMotionEvent permission during XR8.run(), and that prompt
@@ -65,7 +63,6 @@ export class EightWallSession {
   private status: Xr8TrackingStatus = 'UNSPECIFIED';
   private readonly statusHandlers: TrackingStatusHandler[] = [];
   private readonly imageHandlers: ImageEventHandler[] = [];
-  private removeResizeListeners: (() => void) | null = null;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -121,7 +118,6 @@ export class EightWallSession {
             xr8.XrController.updateCameraProjectionMatrix({
               origin: { x: 0, y: 1.6, z: 0 },
             });
-            this.installFullWindowResize(handles);
             resolve(handles);
           },
           onUpdate: () => {
@@ -215,42 +211,7 @@ export class EightWallSession {
   }
 
   stop(): void {
-    this.removeResizeListeners?.();
-    this.removeResizeListeners = null;
     this.xr8?.stop();
     this.frameBus.reset();
-  }
-
-  /**
-   * This app's replacement for the engine's missing FullWindowCanvas
-   * utility (see the class doc comment's Phase 2D correction). Sets the
-   * renderer's drawing-buffer size and the camera's aspect to match the
-   * actual viewport, once immediately (in case onStart fired before layout
-   * settled — e.g. mid-transition out of a UxOverlay panel) and again on
-   * every resize/orientationchange.
-   *
-   * `updateStyle: false` on setSize deliberately leaves the canvas's CSS
-   * box alone — #camerafeed's stylesheet rule (100vw/100vh) already owns
-   * visual layout; this only syncs the internal drawing buffer + the
-   * camera's aspect ratio to match it, avoiding a second source of truth
-   * for the canvas's on-screen size.
-   */
-  private installFullWindowResize(handles: Xr8ThreejsScene): void {
-    const { renderer, camera } = handles;
-    const resize = (): void => {
-      const width = window.innerWidth;
-      const height = window.innerHeight;
-      renderer.setPixelRatio(window.devicePixelRatio || 1);
-      renderer.setSize(width, height, false);
-      camera.aspect = width / height;
-      camera.updateProjectionMatrix();
-    };
-    resize();
-    window.addEventListener('resize', resize);
-    window.addEventListener('orientationchange', resize);
-    this.removeResizeListeners = () => {
-      window.removeEventListener('resize', resize);
-      window.removeEventListener('orientationchange', resize);
-    };
   }
 }

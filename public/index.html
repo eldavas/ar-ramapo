@@ -6,7 +6,7 @@
        the safe-area-inset box on notched devices, leaving black bars where
        the canvas should extend edge-to-edge. Standard, inert on devices
        without a notch. -->
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>AR Prototype</title>
   <link rel="icon" href="data:,">
   <style>
@@ -57,6 +57,61 @@
   </style>
 </head>
 <body>
+  <!-- ?debug=1 field-testing console — plain inline script, deliberately
+       NOT part of the Vite bundle, so it installs before /dist/main.js
+       (and any of its imports) even begins to evaluate. This is the fix
+       for the Phase 2D console missing early boot/import failures: a
+       class-constructor-time patch (inside a TS module) can only run
+       AFTER that module's whole import graph has already resolved and
+       executed — this repo has hit exactly that failure mode before (a
+       missing npm dependency once made the entire module graph fail to
+       load, silently, with nothing on screen to show for it). Plain
+       synchronous JS, no build step, so it is guaranteed to run first. -->
+  <script>
+    (function () {
+      if (!/(?:^|[?&])debug=1(?:&|$)/.test(location.search)) return;
+      var bar = document.createElement('div');
+      bar.id = 'ar-debug-console';
+      bar.style.cssText =
+        'position:fixed;top:0;left:0;right:0;max-height:38vh;overflow-y:auto;z-index:999999;' +
+        'background:rgba(0,0,0,0.78);color:#8f8;font:11px/1.4 ui-monospace,monospace;' +
+        'padding:4px 6px;white-space:pre-wrap;word-break:break-word;pointer-events:none;';
+      document.body.appendChild(bar);
+
+      var MAX_LINES = 200;
+      function append(text, color) {
+        var row = document.createElement('div');
+        row.style.color = color;
+        row.textContent = new Date().toISOString().slice(11, 23) + '  ' + text;
+        bar.appendChild(row);
+        while (bar.childElementCount > MAX_LINES) bar.removeChild(bar.firstChild);
+        bar.scrollTop = bar.scrollHeight;
+      }
+      function stringify(args) {
+        return Array.prototype.map.call(args, function (arg) {
+          if (typeof arg === 'string') return arg;
+          if (arg && typeof arg === 'object' && 'message' in arg && 'stack' in arg) {
+            return (arg.name || 'Error') + ': ' + arg.message;
+          }
+          try { return JSON.stringify(arg); } catch (e) { return String(arg); }
+        }).join(' ');
+      }
+
+      var original = { log: console.log, warn: console.warn, error: console.error };
+      console.log = function () { original.log.apply(console, arguments); append(stringify(arguments), '#8f8'); };
+      console.warn = function () { original.warn.apply(console, arguments); append(stringify(arguments), '#fc5'); };
+      console.error = function () { original.error.apply(console, arguments); append(stringify(arguments), '#f66'); };
+
+      window.addEventListener('error', function (event) {
+        append('[uncaught] ' + event.message + ' (' + event.filename + ':' + event.lineno + ':' + event.colno + ')', '#f66');
+      });
+      window.addEventListener('unhandledrejection', function (event) {
+        append('[unhandled rejection] ' + String(event.reason), '#f66');
+      });
+
+      console.log('[ar-debug-console] active before module script — ' + new Date().toISOString());
+    })();
+  </script>
   <div id="ar-container"></div>
   <canvas id="camerafeed"></canvas>
   <a id="powered-by-8thwall" href="https://8thwall.org" target="_blank" rel="noopener">

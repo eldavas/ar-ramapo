@@ -343,7 +343,15 @@ async function runEightWallExperience(experience: ExperienceManifest): Promise<v
         () => {
           session
             .start(imageTargets !== null ? { imageTargetData: imageTargets.imageTargetData } : {})
-            .then(resolve, reject);
+            .then(resolve, (error: unknown) => {
+              // Dedicated log for this specific phase, distinct from the
+              // generic top-level "fatal startup error" catch in main() —
+              // on a small on-screen console, knowing it was
+              // EightWallSession.start() specifically (vs. manifest
+              // resolution, asset fetch, etc.) narrows the search a lot.
+              console.error('[runEightWallExperience] EightWallSession.start() rejected:', error);
+              reject(error);
+            });
         }
       );
     });
