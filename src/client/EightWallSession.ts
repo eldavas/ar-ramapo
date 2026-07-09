@@ -242,6 +242,8 @@ export class EightWallSession {
     const rect = this.canvas.getBoundingClientRect();
     const rendererSize = new THREE.Vector2();
     handles.renderer.getSize(rendererSize);
+    const rendererCanvas = handles.renderer.domElement;
+    const sameElement = rendererCanvas === this.canvas;
     console.log(
       `[EightWallSession] canvas diagnostics @ ${label}:\n` +
         `  canvas.getBoundingClientRect() = ${rect.width.toFixed(1)} x ${rect.height.toFixed(1)} ` +
@@ -251,7 +253,14 @@ export class EightWallSession {
         `  window.devicePixelRatio = ${window.devicePixelRatio}\n` +
         `  renderer.getSize() = ${rendererSize.x.toFixed(1)} x ${rendererSize.y.toFixed(1)}, ` +
         `renderer.getPixelRatio() = ${handles.renderer.getPixelRatio()}\n` +
-        `  camera.aspect = ${handles.camera.aspect.toFixed(3)}`
+        `  camera.aspect = ${handles.camera.aspect.toFixed(3)}\n` +
+        `  renderer.domElement === #camerafeed -> ${sameElement}` +
+        (sameElement
+          ? ''
+          : ` (MISMATCH! renderer.domElement.id="${rendererCanvas.id}", ` +
+            `tagName=${rendererCanvas.tagName}, isConnected=${rendererCanvas.isConnected}, ` +
+            `parentElement=${rendererCanvas.parentElement?.tagName ?? 'null'} — ` +
+            'our #camerafeed CSS rule can never reach this element if true.)')
     );
   }
 }
