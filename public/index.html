@@ -113,7 +113,15 @@
     })();
   </script>
   <div id="ar-container"></div>
-  <canvas id="camerafeed"></canvas>
+  <!-- Inline style duplicates the #camerafeed stylesheet rule below on
+       purpose (Phase 3D): on-device measurement showed getBoundingClientRect()
+       stuck at the raw HTML canvas default (300x150) despite the external
+       rule targeting the confirmed-correct element, for a reason not yet
+       isolated. An inline attribute wins any stylesheet-cascade ambiguity
+       outright, so this is a cheap, harmless second path to the same box
+       size while EightWallSession's own JS-side renderer.setSize(...,true)
+       does the authoritative fix. Keep both rules in sync if either changes. -->
+  <canvas id="camerafeed" style="position: fixed; inset: 0; width: 100vw; height: 100vh; display: block;"></canvas>
   <a id="powered-by-8thwall" href="https://8thwall.org" target="_blank" rel="noopener">
     <img src="/xr/resources/powered-by.svg" alt="Powered by 8th Wall" />
   </a>

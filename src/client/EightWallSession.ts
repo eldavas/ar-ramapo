@@ -37,21 +37,28 @@ export type ImageEventHandler = (kind: ImageEventKind, event: Xr8ImageTrackedEve
  * stage — the app never calls renderer.render(). Handles are read back via
  * XR8.Threejs.xrScene() after the pipeline starts.
  *
- * CORRECTION (Phase 2E, supersedes the Phase 2D note): Phase 2D added a
- * manual installFullWindowResize() here, reasoning that the engine had no
- * resize handling of its own (based on XRExtras.FullWindowCanvas being
- * absent from the binary). That was an incomplete read of the evidence.
- * Grepping the installed dist/xr.js again, more broadly, turns up
- * `addEventListener("resize", ...)` and `addEventListener(
- * "orientationchange", ...)` registered by the engine itself, plus
- * internal use of devicePixelRatio/innerWidth/innerHeight — the engine
- * DOES own resize end to end, just not through the (absent) XRExtras
- * utility. installFullWindowResize() was therefore a second handler
- * competing with the engine's own one on the same two events — consistent
- * with the on-device symptom (correct-ish at first load, distorted after
- * an orientation change re-triggered both handlers). Removed. The app
- * must not touch renderer/camera sizing at all; XR8.Threejs.pipelineModule()
- * owns it completely, same as it owns the render call.
+ * CORRECTION (Phase 3D, supersedes both the Phase 2D and Phase 2E notes):
+ * Phase 2D added a manual installFullWindowResize(), reasoning the engine
+ * had no resize handling of its own. Phase 2E removed it, having found
+ * `addEventListener("resize"/"orientationchange", ...)` strings inside
+ * dist/xr.js and concluding the engine owned resize end to end — but that
+ * only proved those listeners exist SOMEWHERE in a ~1MB bundle covering
+ * several unrelated features (face effects, world effects, sky effects),
+ * not that they're wired to the Threejs pipeline module this app uses.
+ * On-device measurement (?debug=1, three reads: onStart, first
+ * requestAnimationFrame, +1000ms) settled it with hard numbers: renderer.
+ * getSize() stayed at exactly 300x150 (the raw, unstyled HTML canvas
+ * default) and camera.aspect stayed at exactly 2.000 (=300/150),
+ * unchanged across a full second — proof nothing resizes this pipeline on
+ * its own. Separately, getBoundingClientRect() ALSO measured 300x150 on
+ * the confirmed-correct #camerafeed element (renderer.domElement ===
+ * canvas, verified true), meaning the external stylesheet rule wasn't
+ * winning the layout box either, for a reason not yet isolated. Restored
+ * installFullWindowResize() below, now calling renderer.setSize(..., true)
+ * (updateStyle: true, not Phase 2D's false) so it also rewrites the
+ * canvas's inline style directly — authoritative regardless of whether the
+ * stylesheet cascade or the engine's own (apparently inactive, for this
+ * pipeline) resize handling was the gap.
  *
  * start() must be called from a user gesture: on iOS Safari the engine
  * requests DeviceMotionEvent permission during XR8.run(), and that prompt
@@ -63,6 +70,7 @@ export class EightWallSession {
   private status: Xr8TrackingStatus = 'UNSPECIFIED';
   private readonly statusHandlers: TrackingStatusHandler[] = [];
   private readonly imageHandlers: ImageEventHandler[] = [];
+  private removeResizeListeners: (() => void) | null = null;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -118,12 +126,12 @@ export class EightWallSession {
             xr8.XrController.updateCameraProjectionMatrix({
               origin: { x: 0, y: 1.6, z: 0 },
             });
-            // Phase 3C diagnostic: three reads at three different points in
-            // the lifecycle, to settle (with numbers, not more theories)
-            // whether the CSS box is actually full-screen, and whether the
-            // engine rewrites canvas/renderer sizing on its own first frame
-            // after onStart already fired.
-            this.logCanvasDiagnostics('onStart (synchronous, before first frame)', handles);
+            // Phase 3D: log-fix-log in the same pass, so this single deploy
+            // both proves the pre-fix state and confirms (or refutes) the
+            // fix, instead of spending another round trip on one half.
+            this.logCanvasDiagnostics('onStart, BEFORE installFullWindowResize', handles);
+            this.installFullWindowResize(handles);
+            this.logCanvasDiagnostics('onStart, AFTER installFullWindowResize', handles);
             requestAnimationFrame(() => {
               this.logCanvasDiagnostics('first requestAnimationFrame after onStart', handles);
             });
@@ -223,8 +231,38 @@ export class EightWallSession {
   }
 
   stop(): void {
+    this.removeResizeListeners?.();
+    this.removeResizeListeners = null;
     this.xr8?.stop();
     this.frameBus.reset();
+  }
+
+  /**
+   * See the class doc comment's Phase 3D correction. `updateStyle: true`
+   * deliberately rewrites canvas.style.width/height via JS on every call —
+   * the most authoritative sizing mechanism available, since it runs after
+   * whatever the engine does internally and doesn't depend on winning a
+   * CSS cascade we haven't fully isolated. Runs once immediately (onStart
+   * may have measured the canvas before layout/engine init settled) and
+   * again on every resize/orientationchange.
+   */
+  private installFullWindowResize(handles: Xr8ThreejsScene): void {
+    const { renderer, camera } = handles;
+    const resize = (): void => {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      renderer.setPixelRatio(window.devicePixelRatio || 1);
+      renderer.setSize(width, height, true);
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+    };
+    resize();
+    window.addEventListener('resize', resize);
+    window.addEventListener('orientationchange', resize);
+    this.removeResizeListeners = () => {
+      window.removeEventListener('resize', resize);
+      window.removeEventListener('orientationchange', resize);
+    };
   }
 
   /**
@@ -244,6 +282,13 @@ export class EightWallSession {
     handles.renderer.getSize(rendererSize);
     const rendererCanvas = handles.renderer.domElement;
     const sameElement = rendererCanvas === this.canvas;
+    // Identity was confirmed true in the previous capture, and
+    // getBoundingClientRect() still came back 300x150 anyway — meaning the
+    // #camerafeed stylesheet rule isn't the thing determining this
+    // element's layout box at all. getComputedStyle is the only way to see
+    // what the browser actually resolved (our rule, an inline override
+    // from somewhere, or neither), instead of inferring it indirectly.
+    const computed = window.getComputedStyle(this.canvas);
     console.log(
       `[EightWallSession] canvas diagnostics @ ${label}:\n` +
         `  canvas.getBoundingClientRect() = ${rect.width.toFixed(1)} x ${rect.height.toFixed(1)} ` +
@@ -260,7 +305,11 @@ export class EightWallSession {
           : ` (MISMATCH! renderer.domElement.id="${rendererCanvas.id}", ` +
             `tagName=${rendererCanvas.tagName}, isConnected=${rendererCanvas.isConnected}, ` +
             `parentElement=${rendererCanvas.parentElement?.tagName ?? 'null'} — ` +
-            'our #camerafeed CSS rule can never reach this element if true.)')
+            'our #camerafeed CSS rule can never reach this element if true.)') +
+        `\n  canvas.id="${this.canvas.id}" canvas.isConnected=${this.canvas.isConnected}\n` +
+        `  canvas.style.cssText (inline) = "${this.canvas.style.cssText}"\n` +
+        `  getComputedStyle: position=${computed.position} display=${computed.display} ` +
+        `width=${computed.width} height=${computed.height} inset=${computed.inset || '(n/a)'}`
     );
   }
 }
