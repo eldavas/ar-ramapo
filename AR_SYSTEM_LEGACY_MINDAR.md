@@ -1,3 +1,14 @@
+> **Historical snapshot — superseded 2026-07-09.** This is `AR_SYSTEM.md`
+> exactly as it stood through the end of Phase 5, before the Phase 6 (8th
+> Wall SLAM tracking) update. It describes MindAR as the only web tracking
+> engine, which is no longer true — see the current `AR_SYSTEM.md` for the
+> live governance document, and `docs/research/8th-wall-troubleshooting.md`
+> for the full 8th Wall integration history. Everything below is preserved
+> verbatim for historical reference (Phase 0–5 governance and history are
+> still accurate as *history* — MindAR itself is still in active use by the
+> `proxy-target` and `bench-test` manifest entries, just no longer the only
+> engine).
+
 # AR_SYSTEM.md
 
 **This file is the single source of truth for this project.** Any code, PR, or
@@ -7,10 +18,7 @@ first — never the other way around silently.
 Status: Phase 3 (Spatial Bench-Test & Coordinate System Lockdown) open —
 blocks only on the on-device pass-criteria measurement. Phase 4 (Native iOS
 App Clip) open. Phase 5 (Rive Interaction Layer & Content Binding) open.
-Phase 6 (8th Wall SLAM Tracking, Additive Engine) open — see §G. See §G for
-full phase history. The Phase 0–5 document (MindAR as the only web tracking
-engine) is preserved verbatim at `AR_SYSTEM_LEGACY_MINDAR.md` for history;
-this file supersedes it as of Phase 6.
+See §G for phase history.
 
 ---
 
@@ -49,17 +57,8 @@ Two spatial invariants anchor the entire content pipeline:
   web app (see §C, §D).
 
 **Target platforms:**
-- Web / Android — Three.js + Rive, delivered as a standard HTTPS web
-  experience, no install required. Two tracking engines are supported side
-  by side as of Phase 6 (§F): **MindAR** (printed-plaque image tracking,
-  the original and still-active engine — `proxy-target`, `bench-test`) and
-  **8th Wall** (SLAM world tracking + GPS geofence + optional image-target
-  hybrid — `8thwall-test`). An experience declares exactly one, via the
-  manifest's `mindTargetUrl` (MindAR) or `placement` (8th Wall) fields
-  (§E) — never both. Rive rendering, the Marker/Card artboard contract,
-  and the whole content pipeline (`SceneGraphLoader`, `MarkerLayer`,
-  `CardPanel`, `ContentProvider`, `HotspotProjector`) are shared,
-  unmodified, across both engines, behind an `AnchorSource` seam (§F).
+- Web / Android — MindAR + Three.js + Rive, delivered as a standard HTTPS web
+  experience, no install required.
 - iOS — future native App Clip (ARKit + RealityKit + Rive iOS runtime). Not
   yet built. Not mixed into the web codebase (§F).
 
@@ -164,6 +163,7 @@ routing, nothing else**:
 - `usdzUrl?: string` — the USDZ variant of the same baked mesh, consumed by
   the future iOS App Clip. Same source scene, different export — never a
   separately authored asset.
+- `mindTargetUrl?: string` — the compiled MindAR tracking target.
 - `trackingImageUrl?: string` — the raw plaque artwork (PNG), for tracking
   engines that consume the image directly instead of a compiled feature
   file: ARKit builds its `ARReferenceImage` from this bitmap plus
@@ -184,29 +184,7 @@ routing, nothing else**:
   declares `modelUrl`**: it is the sole scale bridge between meter-authored
   content and the tracking engines (MindAR anchor space is measured in
   marker-widths and needs the ×(1/width) conversion; ARKit sizes its
-  `ARReferenceImage` from the same number). For 8th Wall `placement:'image'`
-  entries this same field sizes the image target; it does **not** scale
-  the mounted mesh (8th Wall's `scale:'absolute'` mode mounts at scale 1 —
-  see §F) — it is a cross-check against the engine's own meter estimate
-  only, warned on >25% divergence, never a render multiplier.
-- `placement?: 'tap' | 'image'` — 8th Wall path selector (Phase 6, §F).
-  Undefined means the legacy MindAR path, routed off `mindTargetUrl`
-  below; present means 8th Wall SLAM owns this experience. `'tap'` gates
-  arrival on `geo` then freezes the origin on a SLAM tap-to-place gesture;
-  `'image'` uses an 8th Wall image target (`imageTargetUrl`) as a
-  continuously-realigned origin, with SLAM persisting the anchor between
-  sightings. An entry declares this field XOR `mindTargetUrl`, never both.
-- `geo?: { latitude: number; longitude: number; radiusMeters: number }` —
-  GPS arrival gate for the 8th Wall path (`GeoFenceSpec`). Required for
-  `placement:'tap'` (the only arrival signal); optional but recommended
-  for `placement:'image'` (stops users hunting for a plaque miles away).
-  Never a positioning source — GPS accuracy is 10–30 m outdoors, so this
-  only gates arrival; the precise origin always comes from SLAM.
-- `imageTargetUrl?: string` — compiled 8th Wall image-target JSON
-  (`npx @8thwall/image-target-cli`) for `placement:'image'` entries — the
-  8th Wall analogue of `mindTargetUrl`, never declared alongside it.
-- `mindTargetUrl?: string` — the compiled MindAR tracking target (legacy
-  engine path, §F). An entry declares this XOR `placement`, never both.
+  `ARReferenceImage` from the same number).
 - `version: string` — bumped on any asset change, never silently replaced.
 
 ### Manifest exposure: `GET /api/manifest`
@@ -252,40 +230,8 @@ schema above.
 
 ## F. AR constraints
 
-- **MindAR and 8th Wall are the two supported web tracking engines (Phase 6
-  supersedes the original "MindAR is the only tracking library" rule).** No
-  *third* tracking library is introduced without a decision recorded in
-  this file. An experience declares exactly one engine per manifest entry
-  (§E: `mindTargetUrl` XOR `placement`), never both, and the two engines
-  share every downstream module unmodified — `SceneGraphLoader`,
-  `HotspotProjector`, `MarkerLayer`, `CardPanel`, `ContentProvider` — via
-  the `AnchorSource` seam (`src/client/AnchorSource.ts`): `kind`,
-  `group` (the mount point scene content parents under), `acquire()`,
-  `isTracking()`, `onOriginChanged()`. MindAR's own anchor is not an
-  `AnchorSource` implementation (it predates the interface) — its
-  `main.ts` branch stays entirely separate and untouched; 8th Wall's
-  `TapPlacedAnchorSource` (SLAM tap-to-place) and `ImageTargetAnchorSource`
-  (SLAM + image target hybrid) are the two current implementations.
-  `SceneGraphLoader`'s constructor takes an `engine: 'mindar' | '8thwall'`
-  parameter (default `'mindar'`, so every pre-Phase-6 call site is
-  unaffected): MindAR needs its own glue rotation/scale baked into the
-  loaded mesh (below); 8th Wall's `AnchorSource` implementations already
-  deliver a correctly oriented, real-meters anchor under `scale:'absolute'`,
-  so the loader mounts at identity rotation and scale 1 for that engine —
-  applying MindAR's glue on top would double-transform the scene.
-- **The 8th Wall engine binary is not MIT-licensed.** It ships under a
-  Niantic Spatial limited-use license
-  (`node_modules/@8thwall/engine-binary/LICENSE`): free for XR Engine
-  purposes, revocable, non-transferable; §1.2 restricts use in a paid
-  product whose value derives substantially from the Software's
-  functionality (revisit before any commercial deployment); §1.3.1
-  requires attribution "in any material in which Licensee utilizes the
-  functionality of the Software" — rendered as the engine's own
-  `resources/powered-by.svg` badge, always visible, linking to
-  8thwall.org (`public/index.html`, `#powered-by-8thwall`). Do not remove
-  it without re-reading §1.3. Self-hosted from `/xr`
-  (`server/createServer.ts`, same pattern as `/rive`) — no CDN at
-  runtime, same rule as every other runtime dependency in this repo.
+- **MindAR is the only tracking library for the web layer.** No competing
+  tracking library is introduced without a decision recorded in this file.
 - **WebXR is an optional enhancement, never a dependency.** Nothing in the
   core experience may require `navigator.xr` to function, because it doesn't
   exist on iOS Safari and can't be relied on as a baseline anywhere.
@@ -303,16 +249,10 @@ schema above.
   assume. Each tracking engine frames the
   flat plaque differently: MindAR anchor space is X-east / Y-north / Z-up in
   **marker-width units**; ARKit `ARImageAnchor` is X-east / Y-up / Z-south
-  in meters; 8th Wall's `scale:'absolute'` mode uses real meters directly
-  (identity rotation/scale from `SceneGraphLoader`, per the engine-coexistence
-  rule above), with `ImageTargetAnchorSource`'s own
-  `TARGET_FRAME_TO_WORLD_FIX` supplying the image-target frame fix
-  (best-inference pending further on-device validation — see
-  `docs/research/8th-wall-troubleshooting.md`). The rotation/scale glue
-  transform between authored space and each engine's anchor space is a
-  named constant in the runtime that consumes it, validated by the Phase 3
-  bench-test (MindAR) or by on-device Phase 6 testing (8th Wall), and never
-  derived ad hoc at call sites.
+  in meters. The rotation/scale glue transform between authored space and
+  each engine's anchor space is a named constant in the runtime that
+  consumes it, validated by the Phase 3 bench-test, and never derived ad hoc
+  at call sites.
 
 ---
 
@@ -736,101 +676,3 @@ schema above.
   No iOS work in this repo. No WebXR work. No new tracking targets.
   Independent of Phase 3's on-device measurement pass and Phase 4's
   native workstream.
-
-- **Phase 6 — 8th Wall SLAM Tracking, Additive Engine. (OPEN)**
-  Goal: add Niantic 8th Wall SLAM world tracking (+ GPS geofence, +
-  optional image-target hybrid) as a **second, opt-in** tracking engine,
-  alongside MindAR rather than replacing it — the original spike this
-  work is based on (`8th-wall` branch, single-commit, no common git
-  ancestor with `master`) framed it as a full pivot; this repo's Phase 6
-  is deliberately additive instead, since `proxy-target` and `bench-test`
-  still depend on MindAR. Full chronological detail, including three
-  wrong turns on the viewport bug before on-device measurement settled
-  it, lives in `docs/research/8th-wall-troubleshooting.md` — read it
-  before re-deriving any of this.
-
-  **Why 8th Wall:** SLAM world tracking plus drift correction, over
-  MindAR's image-only tracking — better stability for the ARClip/web
-  parity workstream. The hosted 8th Wall platform retired February 2026;
-  the project uses the free, self-hostable `@8thwall/engine-binary`
-  (SLAM World Effects, Image Targets, Absolute Scale — no VPS/Lightship
-  Maps, those are enterprise-only via Niantic Spatial), so the arrival
-  signal is a coarse GPS geofence plus either SLAM tap-to-place or an
-  8th Wall image target for the precise origin.
-
-  **Governance scope (this document, done first):** the engine-coexistence
-  rule and licensing/attribution note (§F), the additive manifest schema
-  extension — `placement`, `geo`, `imageTargetUrl` (§E) — and this entry.
-  Unlike the original spike's own governance record, `mindTargetUrl`
-  was **not** removed and `placement` was made optional, not required —
-  the spike's schema would have broken `proxy-target`/`bench-test` at
-  compile time.
-
-  **Extraction approach:** surgical (`git checkout 8th-wall --
-  <paths>`), not a merge — `git merge-base` confirms the two branches
-  share no common history, and a straight
-  `git merge --allow-unrelated-histories -X theirs` would have silently
-  replaced this document's entire Phase 0–5 record, the Apple App Clip
-  association route, and `package.json`'s dependency set with the
-  spike's own versions. Eleven new client modules were pulled in as-is
-  (`EightWallSession`, `AnchorSource`, `PlacementController`,
-  `TapPlacedAnchorSource`, `ImageTargetAnchorSource`, `ImageTargetLoader`,
-  `GeoFenceService`, `DevSimSession`, `FrameBus`, `UxOverlay`,
-  `RecordGeoMode`), plus two type-declaration files and the compiled
-  `bench-plaque` image-target assets that were missed in the first
-  extraction pass. `@8thwall/engine-binary` was added to `package.json`
-  by hand; `mind-ar` was kept.
-
-  **Runtime scope:** `main.ts` forks on `experience.placement !==
-  undefined` into `runEightWallExperience()`, sharing
-  `SceneGraphLoader`/`MarkerLayer`/`CardPanel`/`ContentProvider`/
-  `HotspotProjector` unmodified with the MindAR branch (§F's
-  `AnchorSource` seam); the MindAR branch is untouched. Desk-testing
-  bypasses are query params, not build flags: `?fakegeo=1` (fake GPS
-  fix), `?fakear=1` (swap the engine for `DevSimSession`'s orbiting-camera
-  sim — SLAM only runs on real phones), `?recordgeo=1` (GPS-recording
-  site-setup mode). `?debug=1` activates an on-screen console (a plain
-  inline `<script>` at the top of `index.html`'s `<body>`, installed
-  before `/dist/main.js` and its import graph even begin to evaluate —
-  necessary because this repo has previously hit module-load failures
-  a constructor-time console patch would have missed entirely).
-
-  **Infrastructure:** `/xr` static route (`server/createServer.ts`,
-  mirrors `/rive`); `public/index.html`'s `#camerafeed` canvas coexists
-  with MindAR's `#ar-container` (only one is driven per page load); the
-  `#powered-by-8thwall` license attribution link (§F). Test entry
-  `8thwall-test` reuses `bench-test`'s own `bench-scene.glb`,
-  `bench-ui.riv`, and content sheet, so the tracking engine is the only
-  variable under test. `main.ts`'s `ACTIVE_TARGET_ID` currently points at
-  `8thwall-test` for this walkthrough — flip it back to `bench-test` to
-  resume the MindAR path; no other change needed.
-
-  **Progress (2026-07-09):** viewport rendering confirmed fixed on-device
-  with measured numbers (`canvas.getBoundingClientRect()` now matches
-  `window.innerWidth/innerHeight` exactly; `renderer.getPixelRatio()` and
-  `camera.aspect` both correct) — see the troubleshooting doc §3 for the
-  three earlier wrong turns and why each was wrong. A scale-mismatch
-  warning (`ImageTargetAnchorSource`'s cross-check against
-  `physicalTargetWidthMeters`) was investigated and confirmed **not** to
-  drive any render transform in either consumer (`anchorScaleForEvent()`
-  always returns `1`; `SceneGraphLoader`'s 8th-Wall branch never reads
-  the value) — see the troubleshooting doc §4.
-
-  **Still open, blocking phase close:** Rive markers/cards do not
-  reliably render on top of the tracked content — they flash briefly on
-  first image-target detection, then disappear, so a tap never gets the
-  chance to open a card. Leading hypothesis: unstable image-target
-  tracking (repeated found/lost cycles, a non-converging scale estimate
-  across the same session) rather than a code defect in the marker
-  pipeline itself, which is shared, unmodified, with the already-working
-  MindAR path. See the troubleshooting doc §5–6 for the full evidence
-  chain and the branching next-steps plan (get a clean
-  `isTracking()` transition log first; branch from there).
-
-  **Exit condition:** the `8thwall-test` rig passes the same functional
-  bar as `bench-test` — markers persist on tracked content, tapping opens
-  the correct card — on a real device, with the root cause of the
-  marker-rendering gap above identified and either fixed or, if it's a
-  physical tracking-quality issue, documented with a mitigation.
-
-  No iOS work. No WebXR work. No changes to the MindAR runtime path.
