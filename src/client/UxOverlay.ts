@@ -22,6 +22,17 @@ export class UxOverlay {
   private cornerHandler: (() => void) | null = null;
 
   constructor() {
+    // ?debug=1 — field-testing on-screen console. The engine binary ships
+    // no native debug UI: @8thwall/engine-binary's dist/xr.js references
+    // "XRExtras.FullWindowCanvas" only as a deprecation-shim string
+    // (verified by grepping the installed binary — window.XRExtras is
+    // never assigned anywhere in it); XRExtras itself is a separate,
+    // hosted-platform-only script this self-hosted setup doesn't load. A
+    // phone has no devtools console, so this mirrors console.log/warn/error
+    // and uncaught errors onto the screen instead.
+    if (new URLSearchParams(window.location.search).has('debug')) {
+      installDebugConsole();
+    }
     this.container = document.createElement('div');
     this.container.style.cssText =
       'position:fixed;inset:0;z-index:30;pointer-events:none;' +
@@ -121,4 +132,77 @@ export class UxOverlay {
     this.hidePanel();
     this.hideHint();
   }
+}
+
+let debugConsoleInstalled = false;
+
+/**
+ * Patches console.log/warn/error (plus window.onerror and
+ * unhandledrejection) to also render onto a fixed on-screen strip — the
+ * only way to see runtime output on a phone with no attached devtools.
+ * z-index 40: above everything else in the app (UxOverlay panel 30, Card
+ * 20, markers 10). pointer-events:none so it can never swallow the
+ * placement tap or a marker tap underneath it. Idempotent: main() only
+ * constructs one UxOverlay per session, but this guards a future caller
+ * from double-patching console methods.
+ */
+function installDebugConsole(): void {
+  if (debugConsoleInstalled) return;
+  debugConsoleInstalled = true;
+
+  const log = document.createElement('div');
+  log.id = 'ar-debug-console';
+  log.style.cssText =
+    'position:fixed;top:0;left:0;right:0;max-height:38vh;overflow-y:auto;z-index:40;' +
+    'background:rgba(0,0,0,0.78);color:#8f8;font:11px/1.4 ui-monospace,monospace;' +
+    'padding:4px 6px;white-space:pre-wrap;word-break:break-word;pointer-events:none;';
+  document.body.appendChild(log);
+
+  const MAX_LINES = 200;
+  const append = (text: string, color: string): void => {
+    const row = document.createElement('div');
+    row.style.color = color;
+    row.textContent = `${new Date().toISOString().slice(11, 23)}  ${text}`;
+    log.appendChild(row);
+    while (log.childElementCount > MAX_LINES) {
+      log.removeChild(log.firstChild as ChildNode);
+    }
+    log.scrollTop = log.scrollHeight;
+  };
+
+  const stringify = (args: unknown[]): string =>
+    args
+      .map((arg) => {
+        if (typeof arg === 'string') return arg;
+        if (arg instanceof Error) return `${arg.name}: ${arg.message}`;
+        try {
+          return JSON.stringify(arg);
+        } catch {
+          return String(arg);
+        }
+      })
+      .join(' ');
+
+  const original = { log: console.log, warn: console.warn, error: console.error };
+  console.log = (...args: unknown[]): void => {
+    original.log(...args);
+    append(stringify(args), '#8f8');
+  };
+  console.warn = (...args: unknown[]): void => {
+    original.warn(...args);
+    append(stringify(args), '#fc5');
+  };
+  console.error = (...args: unknown[]): void => {
+    original.error(...args);
+    append(stringify(args), '#f66');
+  };
+
+  window.addEventListener('error', (event) => {
+    append(`[uncaught] ${event.message} (${event.filename}:${event.lineno}:${event.colno})`, '#f66');
+  });
+  window.addEventListener('unhandledrejection', (event) => {
+    append(`[unhandled rejection] ${String(event.reason)}`, '#f66');
+  });
+
+  console.log('[ar-debug-console] on-screen logging active');
 }

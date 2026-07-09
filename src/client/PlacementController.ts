@@ -30,6 +30,13 @@ export class PlacementController {
   private fromFallback = false;
   private active = false;
   private frameCallbackInstalled = false;
+  // Phase 2D debug tracing (?debug=1, see UxOverlay): logged only on
+  // TRANSITION, not per-frame, to avoid flooding the on-screen console at
+  // 30-60fps. Distinguishes the two ways "tap does nothing" can happen:
+  // hasPose never goes true (no reticle ever appears — the tap handler's
+  // own early-return silently ignores every tap), vs. hasPose is true but
+  // the confirming tap itself never reaches onTap.
+  private lastLoggedPoseState: 'none' | 'hit' | 'fallback' | null = null;
 
   constructor(
     private readonly session: EightWallSession,
@@ -59,8 +66,10 @@ export class PlacementController {
    * down before resolution, so run() can be invoked again later (re-place).
    */
   run(): Promise<PlacementPose> {
+    console.log('[PlacementController] run() started — waiting for a hit-test pose before any tap counts.');
     this.active = true;
     this.hasPose = false;
+    this.lastLoggedPoseState = null;
     this.scene.add(this.reticle);
     // FrameBus has no unsubscribe (parent-repo convention: subscriptions
     // live for the session), so the callback is installed once and gates
@@ -72,13 +81,24 @@ export class PlacementController {
 
     return new Promise<PlacementPose>((resolve) => {
       const onTap = (event: PointerEvent): void => {
-        if (!this.active || !this.hasPose) return;
+        if (!this.active || !this.hasPose) {
+          console.log(
+            `[PlacementController] tap ignored — active=${this.active} hasPose=${this.hasPose} ` +
+              '(no reticle pose yet: either SLAM hit-test and the ground-plane fallback both ' +
+              'returned nothing, or run() already resolved).'
+          );
+          return;
+        }
         event.stopPropagation();
         this.active = false;
         this.canvas.removeEventListener('pointerup', onTap);
 
         const position = this.reticle.position.clone();
         const quaternion = yawTowardCamera(position, this.camera);
+        console.log(
+          `[PlacementController] tap ACCEPTED at pose (${position.x.toFixed(2)}, ${position.y.toFixed(2)}, ` +
+            `${position.z.toFixed(2)}), fromFallback=${this.fromFallback} — resolving run().`
+        );
         this.scene.remove(this.reticle);
         this.reticle.visible = false;
         resolve({ position, quaternion });
@@ -91,19 +111,33 @@ export class PlacementController {
     if (!this.active) return;
 
     const hit = this.session.hitTest(0.5, 0.5);
+    let state: 'none' | 'hit' | 'fallback';
     if (hit) {
       this.reticle.position.set(hit.position.x, hit.position.y, hit.position.z);
       this.hasPose = true;
       this.fromFallback = false;
+      state = 'hit';
     } else {
       const fallback = this.groundPlaneFallback();
       if (fallback) {
         this.reticle.position.copy(fallback);
         this.hasPose = true;
         this.fromFallback = true;
+        state = 'fallback';
       } else {
         this.hasPose = false;
+        state = 'none';
       }
+    }
+
+    if (state !== this.lastLoggedPoseState) {
+      this.lastLoggedPoseState = state;
+      console.log(
+        `[PlacementController] pose source -> ${state}` +
+          (state === 'none'
+            ? ' (SLAM hitTest empty AND ground-plane fallback out of [0.3, 8] m range or behind camera — reticle hidden, taps will be ignored)'
+            : '')
+      );
     }
 
     this.reticle.visible = this.hasPose;

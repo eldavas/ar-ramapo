@@ -2,7 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- viewport-fit=cover: without it, iOS Safari keeps #camerafeed inside
+       the safe-area-inset box on notched devices, leaving black bars where
+       the canvas should extend edge-to-edge. Standard, inert on devices
+       without a notch. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>AR Prototype</title>
   <link rel="icon" href="data:,">
   <style>

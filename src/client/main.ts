@@ -398,6 +398,10 @@ async function runEightWallExperience(experience: ExperienceManifest): Promise<v
   // same seam the MindAR path uses with anchor.group.
   const loader = new SceneGraphLoader(modelUrl, experience.physicalTargetWidthMeters, '8thwall');
   const { root, hotspots, occluders } = await loader.load();
+  console.log(
+    `[runEightWallExperience] SceneGraphLoader found ${hotspots.length} hotspot_* node(s) ` +
+      `and ${occluders.length} occluder mesh(es) in ${modelUrl}.`
+  );
   anchorSource.group.add(root);
 
   const imageSlot = new CardImageSlot();
@@ -410,6 +414,7 @@ async function runEightWallExperience(experience: ExperienceManifest): Promise<v
   await markers.attach(hotspots);
   const card = new CardPanel(riveFile, imageSlot);
   await card.attach();
+  console.log('[runEightWallExperience] MarkerLayer and CardPanel attached — content pipeline is live.');
 
   let selected: Hotspot | null = null;
   const closeCard = (): void => {
