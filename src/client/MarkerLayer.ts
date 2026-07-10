@@ -3,6 +3,7 @@ import { RiveController } from './RiveController.js';
 import { OneEuroFilter1D } from './OneEuroFilter.js';
 import type { Hotspot } from './SceneGraphLoader.js';
 import type { ProjectedHotspot } from './HotspotProjector.js';
+import { traceT } from './TraceLog.js';
 
 /**
  * Per the Golden Rule (AR_SYSTEM.md §E), everything a marker binds to comes
@@ -44,6 +45,13 @@ interface MarkerEntry {
   filterX: OneEuroFilter1D;
   filterY: OneEuroFilter1D;
   lostTimeMs: number;
+  /**
+   * Mirrors element.style.display so the on-device telemetry logs
+   * block/none TRANSITIONS only — update() runs per frame and re-assigns
+   * the style unconditionally, which is fine for the DOM but would be
+   * per-frame spam if logged directly.
+   */
+  shown: boolean;
 }
 
 // Marker state-machine contract (bench-ui.riv, docs/asset-authoring-guide.md).
@@ -157,6 +165,13 @@ export class MarkerLayer {
 
       if (projection.visible) {
         entry.lostTimeMs = 0;
+        if (!entry.shown) {
+          entry.shown = true;
+          console.log(
+            `[${traceT()}] [MarkerLayer] "${hotspot.name}" -> display:block ` +
+              `(projection visible at ${projection.screenX.toFixed(0)},${projection.screenY.toFixed(0)})`
+          );
+        }
 
         // One Euro per axis: kills at-rest tracking tremor without
         // perceptible lag during fast pans. On the first frame after a
@@ -178,6 +193,14 @@ export class MarkerLayer {
           // Grace expired: hide and forget the filter history so the next
           // re-detection anchors at the new position instead of sliding
           // over from the old one.
+          if (entry.shown) {
+            entry.shown = false;
+            console.log(
+              `[${traceT()}] [MarkerLayer] "${hotspot.name}" -> display:none ` +
+                `(hysteresis ${HYSTERESIS_WINDOW_MS}ms expired; cause: ` +
+                `${projection.hiddenReason === 'tracking' ? 'tracking=false' : 'frustum=false'})`
+            );
+          }
           entry.element.style.display = 'none';
           entry.filterX.reset();
           entry.filterY.reset();
@@ -230,6 +253,13 @@ export class MarkerLayer {
       event.stopPropagation();
       event.preventDefault();
 
+      // Tap-chain telemetry (troubleshooting doc §6): confirms the DOM
+      // half of the tap path fired; onMarkerTap/getContent/card.open are
+      // logged by the experience wiring in main.ts.
+      console.log(
+        `[${traceT()}] [Tap] pointer${isDown ? 'down' : 'up'} on marker "${hotspot.name}"`
+      );
+
       if (rive.isReady) {
         const rect = element.getBoundingClientRect();
         if (rect.width > 0 && rect.height > 0) {
@@ -276,6 +306,7 @@ export class MarkerLayer {
         MARKER_FILTER_DERIVATIVE_CUTOFF_HZ
       ),
       lostTimeMs: 0,
+      shown: false,
     });
     return element;
   }

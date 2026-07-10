@@ -827,6 +827,20 @@ schema above.
   chain and the branching next-steps plan (get a clean
   `isTracking()` transition log first; branch from there).
 
+  **Progress (2026-07-09, second pass):** desk research against the
+  official 8th Wall engine docs narrowed the leading hypothesis to the
+  `trackingStatus === 'NORMAL'` gate in `ImageTargetAnchorSource
+  .isTracking()` interacting with `scale:'absolute'`'s documented
+  behavior (status sits `LIMITED` until absolute scale converges — and
+  §4 of the troubleshooting doc shows it never converged). Full
+  transition-only, on-device telemetry landed across the chain
+  (`EightWallSession` reason capture, image events, `isTracking()`
+  snapshot, `HotspotProjector` visibility reasons, `MarkerLayer`
+  display transitions, tap chain) — troubleshooting doc §7 has the log
+  grammar, the expected timeline, and the open (a)/(b) decision. **No
+  behavior change shipped; the fix decision explicitly waits on a clean
+  on-device capture.**
+
   **Exit condition:** the `8thwall-test` rig passes the same functional
   bar as `bench-test` — markers persist on tracked content, tapping opens
   the correct card — on a real device, with the root cause of the

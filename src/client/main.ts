@@ -30,6 +30,7 @@ import { TapPlacedAnchorSource } from './TapPlacedAnchorSource.js';
 import { ImageTargetAnchorSource } from './ImageTargetAnchorSource.js';
 import { loadImageTargetData } from './ImageTargetLoader.js';
 import { runRecordGeoMode } from './RecordGeoMode.js';
+import { traceT } from './TraceLog.js';
 
 // State machine name inside ui-test.riv, the legacy single-card experience
 // (proxy-target). Spatial experiences don't use this — their Rive bindings
@@ -431,20 +432,33 @@ async function runEightWallExperience(experience: ExperienceManifest): Promise<v
     card.close();
   };
 
+  // Tap-chain telemetry (troubleshooting doc §6): each hop logs once, so
+  // an on-device capture can confirm exactly how far a tap that beats the
+  // marker's disappearance actually gets.
   markers.onMarkerTap((hotspot) => {
     if (selected === hotspot) {
+      console.log(`[${traceT()}] [Tap] onMarkerTap "${hotspot.name}" — re-tap on selected, closing card`);
       closeCard();
       return;
     }
+    const contentKey = contentKeyOf(hotspot);
+    console.log(
+      `[${traceT()}] [Tap] onMarkerTap "${hotspot.name}" — selecting, getContent("${contentKey}")...`
+    );
     selected = hotspot;
     markers.setSelected(hotspot);
     contentProvider
-      .getContent(contentKeyOf(hotspot))
+      .getContent(contentKey)
       .then((content) => {
-        if (selected === hotspot) card.open(content);
+        const current = selected === hotspot;
+        console.log(
+          `[${traceT()}] [Tap] getContent("${contentKey}") resolved — ` +
+            (current ? 'calling card.open()' : 'selection changed meanwhile, dropped')
+        );
+        if (current) card.open(content);
       })
       .catch((error: unknown) => {
-        console.error('[ar-ramapo] content resolution failed:', error);
+        console.error(`[${traceT()}] [Tap] getContent("${contentKey}") failed:`, error);
         if (selected === hotspot) closeCard();
       });
   });

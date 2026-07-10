@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { AnchorSource, OriginKind } from './AnchorSource.js';
 import type { EightWallSession, ImageEventKind } from './EightWallSession.js';
 import type { Xr8ImageTrackedEvent } from './types/xr8.js';
+import { traceT } from './TraceLog.js';
 
 /**
  * §F axis-convention lockdown, image-target edition — the ONLY place the
@@ -42,19 +43,41 @@ const TARGET_FRAME_TO_WORLD_FIX = new THREE.Quaternion().setFromAxisAngle(
  */
 const SCALE_MISMATCH_TOLERANCE = 0.25; // ±25%
 
+// applyPose() runs on every imageupdated (per frame while the target is in
+// view), so an unthrottled mismatch warning floods the 200-line on-screen
+// console during exactly the sessions it exists to diagnose. Once per
+// second preserves the signal (§4 of the troubleshooting doc reads the
+// ratio's trend across a session, not per-frame values).
+const SCALE_MISMATCH_WARN_INTERVAL_MS = 1000;
+let lastScaleMismatchWarnMs = 0;
+
 function anchorScaleForEvent(
   event: Xr8ImageTrackedEvent,
   physicalTargetWidthMeters: number
 ): number {
   const ratio = event.scale / physicalTargetWidthMeters;
   if (Math.abs(ratio - 1) > SCALE_MISMATCH_TOLERANCE) {
-    console.warn(
-      `[ar-ramapo] image-target scale mismatch: engine sees ${event.scale.toFixed(3)} m, ` +
-        `manifest declares ${physicalTargetWidthMeters} m (ratio ${ratio.toFixed(2)}). ` +
-        'Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong.'
-    );
+    const now = performance.now();
+    if (now - lastScaleMismatchWarnMs > SCALE_MISMATCH_WARN_INTERVAL_MS) {
+      lastScaleMismatchWarnMs = now;
+      console.warn(
+        `[${traceT()}] [ImageTarget] scale mismatch: engine sees ${event.scale.toFixed(3)} m, ` +
+          `manifest declares ${physicalTargetWidthMeters} m (ratio ${ratio.toFixed(2)}). ` +
+          'Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong.'
+      );
+    }
   }
   return 1;
+}
+
+/** Compact pose formatter for the telemetry lines below. */
+function formatPose(event: Xr8ImageTrackedEvent): string {
+  const p = event.position;
+  const r = event.rotation;
+  return (
+    `pos=(${p.x.toFixed(2)}, ${p.y.toFixed(2)}, ${p.z.toFixed(2)}) ` +
+    `rot=(${r.x.toFixed(2)}, ${r.y.toFixed(2)}, ${r.z.toFixed(2)}, ${r.w.toFixed(2)})`
+  );
 }
 
 /**
@@ -86,15 +109,13 @@ export class ImageTargetAnchorSource implements AnchorSource {
   private unsubscribe: (() => void) | null = null;
   private readonly originChangedHandlers: Array<() => void> = [];
   private readonly scratchQuat = new THREE.Quaternion();
-  // Phase 3 debug tracing (?debug=1, see the inline console in index.html):
-  // this class previously had NO logging beyond the scale-mismatch warning
-  // in anchorScaleForEvent — the placement:'tap' path (PlacementController/
-  // TapPlacedAnchorSource) got full lifecycle tracing two phases ago, but
-  // 8thwall-test uses placement:'image', which never touches that code at
-  // all. This closes that gap. 'updated' fires every frame the target is
-  // visible, so it's throttled; 'found'/'lost'/isTracking() transitions are
-  // infrequent and always logged.
-  private lastLoggedTrackingResult: boolean | null = null;
+  // On-device telemetry (?debug=1, see the inline console in index.html),
+  // instrumented for the troubleshooting doc §5–6 investigation: every
+  // input that feeds the marker-visibility gate is logged on CHANGE, never
+  // per frame — isTracking() is polled every frame by HotspotProjector, so
+  // the snapshot below is the only spam guard. 'updated' fires every frame
+  // the target is in view and stays throttled to 1/s.
+  private lastTrackingSnapshot: string | null = null;
   private lastUpdatedLogMs = 0;
   private static readonly UPDATED_LOG_INTERVAL_MS = 1000;
 
@@ -116,7 +137,9 @@ export class ImageTargetAnchorSource implements AnchorSource {
   }
 
   acquire(): Promise<void> {
-    console.log(`[ImageTargetAnchorSource] acquire() called for target "${this.targetName}" — waiting for first imagefound...`);
+    console.log(
+      `[${traceT()}] [ImageTargetAnchorSource] acquire() — waiting for first imagefound of "${this.targetName}"...`
+    );
     // Re-acquire is a no-op by design: re-alignment is automatic on every
     // sighting of the plaque, so there is nothing to re-run.
     if (this.acquired) return Promise.resolve();
@@ -131,12 +154,21 @@ export class ImageTargetAnchorSource implements AnchorSource {
    * persistence is the whole point of the hybrid design.
    */
   isTracking(): boolean {
-    const result = this.acquired && this.session.trackingStatus === 'NORMAL';
-    if (result !== this.lastLoggedTrackingResult) {
-      this.lastLoggedTrackingResult = result;
+    const status = this.session.trackingStatus;
+    const reason = this.session.trackingReason;
+    const result = this.acquired && status === 'NORMAL';
+    // Log when ANY component of the gate changes — not just the boolean
+    // result. The §6 decision (gate too strict vs. LIMITED legitimately
+    // meaning "hide") hinges on seeing imageVisible=true coincide with
+    // status=LIMITED, which a result-only log can never show.
+    const snapshot = `${this.acquired}|${this.imageVisible}|${status}|${reason}|${result}`;
+    if (snapshot !== this.lastTrackingSnapshot) {
+      this.lastTrackingSnapshot = snapshot;
       console.log(
-        `[ImageTargetAnchorSource] isTracking() -> ${result} (acquired=${this.acquired}, ` +
-          `trackingStatus=${this.session.trackingStatus}) — HotspotProjector hides all markers while this is false.`
+        `[${traceT()}] [ImageTargetAnchorSource] isTracking()\n` +
+          `  acquired=${this.acquired} imageVisible=${this.imageVisible}\n` +
+          `  trackingStatus=${status} reason=${reason}\n` +
+          `  => ${result}${result ? '' : ' (markers hidden while false)'}`
       );
     }
     return result;
@@ -164,21 +196,23 @@ export class ImageTargetAnchorSource implements AnchorSource {
     switch (kind) {
       case 'found': {
         if (event === null) return;
+        const wasAcquired = this.acquired;
         console.log(
-          `[ImageTargetAnchorSource] FOUND "${event.name}" — engine scale=${event.scale.toFixed(3)}m, ` +
-            `position=(${event.position.x.toFixed(2)}, ${event.position.y.toFixed(2)}, ${event.position.z.toFixed(2)}), ` +
-            `already acquired=${this.acquired}`
+          `[${traceT()}] [ImageTarget] FOUND "${event.name}"\n` +
+            `  scale=${event.scale.toFixed(3)}m ${formatPose(event)}\n` +
+            `  acquired: ${wasAcquired} -> true` +
+            (wasAcquired
+              ? ' (re-detection — firing onOriginChanged, pose discontinuity)'
+              : ' (first acquire — group visible, resolving acquire())')
         );
         this.applyPose(event);
         this.imageVisible = true;
         if (!this.acquired) {
           this.acquired = true;
           this.group.visible = true;
-          console.log('[ImageTargetAnchorSource] first acquire — group now visible, resolving acquire().');
           this.acquireResolve?.();
           this.acquireResolve = null;
         } else {
-          console.log('[ImageTargetAnchorSource] re-detection after lost — firing onOriginChanged (pose discontinuity).');
           // Re-detection after a lost = pose discontinuity.
           for (const handler of this.originChangedHandlers) {
             handler();
@@ -192,9 +226,8 @@ export class ImageTargetAnchorSource implements AnchorSource {
           if (now - this.lastUpdatedLogMs > ImageTargetAnchorSource.UPDATED_LOG_INTERVAL_MS) {
             this.lastUpdatedLogMs = now;
             console.log(
-              `[ImageTargetAnchorSource] updated — engine scale=${event.scale.toFixed(3)}m, ` +
-                `position=(${event.position.x.toFixed(2)}, ${event.position.y.toFixed(2)}, ${event.position.z.toFixed(2)}), ` +
-                `group.position=(${this.group.position.x.toFixed(2)}, ${this.group.position.y.toFixed(2)}, ${this.group.position.z.toFixed(2)})`
+              `[${traceT()}] [ImageTarget] updated (throttled 1/s) "${event.name}" ` +
+                `scale=${event.scale.toFixed(3)}m ${formatPose(event)}`
             );
           }
           this.applyPose(event);
@@ -202,15 +235,19 @@ export class ImageTargetAnchorSource implements AnchorSource {
         }
         break;
       case 'lost':
-        console.log('[ImageTargetAnchorSource] LOST — pose frozen at last snap, SLAM world tracking persists it.');
+        console.log(
+          `[${traceT()}] [ImageTarget] LOST "${event?.name ?? this.targetName}"\n` +
+            `  imageVisible: ${this.imageVisible} -> false; acquired stays ${this.acquired}\n` +
+            '  pose frozen at last snap — SLAM world tracking persists it'
+        );
         // Pose freezes at the last snap; SLAM world tracking persists it.
         this.imageVisible = false;
         break;
       case 'loading':
-        console.log('[ImageTargetAnchorSource] loading image target data...');
+        console.log(`[${traceT()}] [ImageTarget] loading image target data...`);
         break;
       case 'scanning':
-        console.log('[ImageTargetAnchorSource] scanning for target...');
+        console.log(`[${traceT()}] [ImageTarget] scanning for target...`);
         break;
     }
   }

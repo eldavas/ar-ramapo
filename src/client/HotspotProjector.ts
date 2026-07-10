@@ -1,5 +1,9 @@
 import * as THREE from 'three';
 import type { Hotspot } from './SceneGraphLoader.js';
+import { traceT } from './TraceLog.js';
+
+/** Which guard zeroed `visible` — null while visible. */
+export type HotspotHiddenReason = 'tracking' | 'frustum';
 
 export interface ProjectedHotspot {
   hotspot: Hotspot;
@@ -10,6 +14,13 @@ export interface ProjectedHotspot {
   visible: boolean;
   /** Line of sight from the camera is blocked by scene geometry. */
   occluded: boolean;
+  /**
+   * Why `visible` is false ('tracking' = isTrackingActive() returned
+   * false; 'frustum' = behind the camera or outside NDC bounds), so
+   * downstream consumers (MarkerLayer's hide log) can name the exact
+   * cause instead of re-deriving it.
+   */
+  hiddenReason: HotspotHiddenReason | null;
 }
 
 /**
@@ -33,6 +44,10 @@ export class HotspotProjector {
   private readonly ndcPosition = new THREE.Vector3();
   private readonly cameraOrigin = new THREE.Vector3();
   private readonly rayDirection = new THREE.Vector3();
+  // On-device telemetry (troubleshooting doc §6): per-hotspot visibility
+  // state, logged ONLY on transition — project() runs every frame, so a
+  // per-frame log would flood the ?debug=1 console instantly.
+  private readonly lastLoggedState = new Map<Hotspot, string>();
 
   constructor(
     private readonly camera: THREE.PerspectiveCamera,
@@ -69,8 +84,30 @@ export class HotspotProjector {
 
       const visible = trackingActive && inFrustum;
       const occluded = visible && this.isOccluded(hotspot);
+      const hiddenReason: HotspotHiddenReason | null = visible
+        ? null
+        : !trackingActive
+          ? 'tracking'
+          : 'frustum';
 
-      return { hotspot, screenX, screenY, visible, occluded };
+      // Transition-only visibility telemetry. Occlusion is part of the
+      // state string on purpose: an occluded marker stays mounted (dimmed,
+      // not hidden), and that distinction matters when reconstructing why
+      // a marker "disappeared".
+      const state = visible
+        ? occluded
+          ? 'VISIBLE (occluded=true — marker dimmed, not hidden)'
+          : 'VISIBLE'
+        : `HIDDEN (${hiddenReason === 'tracking' ? 'tracking=false' : 'frustum=false'})`;
+      if (this.lastLoggedState.get(hotspot) !== state) {
+        this.lastLoggedState.set(hotspot, state);
+        console.log(
+          `[${traceT()}] [HotspotProjector] "${hotspot.name}" -> ${state} ` +
+            `(screen=${screenX.toFixed(0)},${screenY.toFixed(0)})`
+        );
+      }
+
+      return { hotspot, screenX, screenY, visible, occluded, hiddenReason };
     });
   }
 

@@ -453,3 +453,75 @@ to the next one, rather than guessing at a fix.
    and now confirmed to have no bearing on tracking stability, which is a
    property of the engine's own image recognition, not of any
    manifest-declared number).
+
+---
+
+## 7. Instrumentation pass (2026-07-09) — telemetry for §6 step 1, no fix applied
+
+Desk research (official docs + code trace, this session) sharpened §5's
+hypothesis into something falsifiable: `ImageTargetAnchorSource
+.isTracking()` gates markers on `trackingStatus === 'NORMAL'`, and the
+official docs establish that under `scale:'absolute'` the engine sits in
+`LIMITED` until absolute scale converges (`configure()` reference: absolute
+positions honored "once scale has been estimated"; the official Coaching
+Overlay exists precisely to walk users out of that state; §4's own logs
+show the scale estimate never converging). The base mesh renders ungated
+(pose snaps straight from image events), which is why dominos stay correct
+while markers vanish — the two paths diverge exactly at `isTracking()`.
+
+**Deliberately NOT fixed yet.** Two readings remain possible and the
+decision needs on-device telemetry, not inference: (a) the gate is too
+strict — the plaque being actively tracked (`imageVisible=true`) is a
+valid pose regardless of SLAM status, so markers should show; or (b)
+`LIMITED` really does mean the world frame is unreliable enough that
+showing markers would misplace them. What discriminates: whether marker
+positions during `imageVisible && LIMITED` windows are correct (a) or
+visibly wrong (b), and which `reason` the engine reports.
+
+Telemetry added (all transition-triggered, never per-frame; all carry a
+session-relative `[+N.Ns]` stamp from `src/client/TraceLog.ts` in the
+message text, so a capture survives losing the debug console's own
+wall-clock prefix):
+
+- `[TrackingStatus]` — `EightWallSession` no longer discards `reason`;
+  logs every `(status, reason)` change (the same pair the binary's
+  dispatcher dedupes on). The binary's reason enum is richer than the
+  documented two: `INITIALIZING` / `RELOCALIZING` / `TOO_MUCH_MOTION` /
+  `NOT_ENOUGH_TEXTURE` — the discriminator between "scale never
+  converged", "bad environment texture", and "relocalization churn".
+- `[ImageTarget]` — `FOUND`/`LOST` with scale, full pose, and the
+  `acquired` transition; `updated` throttled to 1/s; the scale-mismatch
+  warning now throttled to 1/s too (it fired per frame while the target
+  was in view — console flood).
+- `[ImageTargetAnchorSource] isTracking()` — logs when ANY gate input
+  changes (`acquired`, `imageVisible`, `trackingStatus`, `reason`,
+  result), not just the boolean result: the (a)/(b) decision hinges on
+  seeing `imageVisible=true` coincide with `LIMITED`.
+- `[HotspotProjector]` — per-hotspot VISIBLE ↔ HIDDEN transitions with
+  the failing guard named (`tracking=false` / `frustum=false`;
+  occlusion is part of the state string since it dims rather than
+  hides). `ProjectedHotspot` gained a `hiddenReason` field so
+  MarkerLayer can name the cause without re-deriving it.
+- `[MarkerLayer]` — `display:block`/`display:none` transitions, the
+  hide log naming the hysteresis expiry and the projector's reason.
+- `[Tap]` — `pointerdown`/`pointerup` on a marker (MarkerLayer), then
+  `onMarkerTap` → `getContent()` resolved/failed → `card.open()` (the
+  8th Wall wiring in main.ts), one line per hop.
+
+**Expected timeline if the hypothesis holds** (capture with `?debug=1`,
+copy text per §6 step 1 — don't transcribe a photo):
+
+```
+[TrackingStatus] NORMAL … → [ImageTarget] FOUND (acquired: false -> true)
+→ isTracking() => true → [HotspotProjector] VISIBLE → [MarkerLayer] display:block
+→ [TrackingStatus] LIMITED reason=… → isTracking() => false (imageVisible may still be true)
+→ [HotspotProjector] HIDDEN (tracking=false) → [MarkerLayer] display:none
+→ [ImageTarget] updated keeps arriving while dominos keep rendering
+```
+
+If instead the projector reports `HIDDEN (frustum=false)`, or markers
+never log `display:block` at all while `isTracking() => true`, the bug is
+downstream and §6 step 2's second branch applies. While capturing, also
+note on screen whether dominos are correctly placed during
+`imageVisible=true && LIMITED` windows — that's the (a)/(b) discriminator
+above.

@@ -9,6 +9,7 @@ import type {
   Xr8TrackingStatusEvent,
 } from './types/xr8.js';
 import type { FrameBus } from './FrameBus.js';
+import { traceT } from './TraceLog.js';
 
 export type TrackingStatusHandler = (status: Xr8TrackingStatus) => void;
 
@@ -68,6 +69,14 @@ export type ImageEventHandler = (kind: ImageEventKind, event: Xr8ImageTrackedEve
 export class EightWallSession {
   private xr8: Xr8 | null = null;
   private status: Xr8TrackingStatus = 'UNSPECIFIED';
+  // The engine's own reason for the current status. The binary's enum is
+  // richer than the two documented values (INITIALIZING/UNSPECIFIED): the
+  // installed xr-slam.js also ships RELOCALIZING, TOO_MUCH_MOTION and
+  // NOT_ENOUGH_TEXTURE — exactly the field that discriminates between
+  // "absolute scale never converged", "environment texture too poor" and
+  // "relocalization churn" during the marker-visibility investigation
+  // (troubleshooting doc §5–6). Previously discarded; never discard again.
+  private statusReason = 'UNSPECIFIED';
   private readonly statusHandlers: TrackingStatusHandler[] = [];
   private readonly imageHandlers: ImageEventHandler[] = [];
   private removeResizeListeners: (() => void) | null = null;
@@ -150,9 +159,19 @@ export class EightWallSession {
             {
               event: 'reality.trackingstatus',
               process: (event: unknown) => {
-                const { status } = event as Xr8TrackingStatusEvent;
-                if (status === this.status) return;
+                const { status, reason } = event as Xr8TrackingStatusEvent;
+                const reasonText = reason ?? 'UNSPECIFIED';
+                // Dedupe on the (status, reason) pair — the same pair the
+                // binary's own dispatcher dedupes on — so a reason-only
+                // change (LIMITED/INITIALIZING → LIMITED/NOT_ENOUGH_TEXTURE)
+                // is captured instead of silently swallowed.
+                if (status === this.status && reasonText === this.statusReason) return;
+                const previous = `${this.status} (${this.statusReason})`;
                 this.status = status;
+                this.statusReason = reasonText;
+                console.log(
+                  `[${traceT()}] [TrackingStatus] ${status} reason=${reasonText} — was ${previous}`
+                );
                 for (const handler of this.statusHandlers) {
                   handler(status);
                 }
@@ -178,6 +197,11 @@ export class EightWallSession {
 
   get trackingStatus(): Xr8TrackingStatus {
     return this.status;
+  }
+
+  /** The engine's reason for the current trackingStatus (see field note). */
+  get trackingReason(): string {
+    return this.statusReason;
   }
 
   onTrackingStatus(handler: TrackingStatusHandler): void {
