@@ -525,3 +525,73 @@ downstream and §6 step 2's second branch applies. While capturing, also
 note on screen whether dominos are correctly placed during
 `imageVisible=true && LIMITED` windows — that's the (a)/(b) discriminator
 above.
+
+---
+
+## 8. First on-device capture (2026-07-09): hypothesis refuted in its
+specific form — `trackingStatus` was never parsing at all
+
+The §7 telemetry produced its answer on the first capture, and it was
+neither §7's (a) nor (b): every `isTracking()` snapshot, across the whole
+session, read
+
+```
+acquired=true imageVisible=true trackingStatus=undefined reason=UNSPECIFIED
+=> false (markers hidden while false)
+```
+
+`trackingStatus=undefined` — not `LIMITED`, not `NORMAL`, not even the
+`'UNSPECIFIED'` the field initializes to. That last detail is the proof:
+the only way the getter returns `undefined` instead of its initial
+`'UNSPECIFIED'` is the `reality.trackingstatus` listener having fired and
+assigned `event.status` where `event.status` didn't exist. The listener
+read the payload off the top-level event object; the binary wraps every
+listener payload as `{name, detail}` — verified by construction in the
+installed `dist/xr.js`, whose internal dispatcher literally pushes
+`{name: `${module}.${event}`, detail: payload}` into the listener queue.
+Image events always parsed fine for one reason only: `emitImage()` had a
+defensive `.detail ?? raw` unwrap from day one (its own comment left the
+shape as an open question — now settled: **nested**). The trackingstatus
+listener lacked the unwrap, so:
+
+- `this.status` became `undefined` on the first dispatch and the
+  `(status, reason)` dedupe then swallowed every subsequent event.
+- `isTracking()`'s `status === 'NORMAL'` could never be true, in any
+  session, under any tracking quality. Markers were gated off
+  unconditionally — a pure code bug, not a tracking-quality problem.
+- The §5 "leading hypothesis" (absolute-scale non-convergence keeping
+  status in LIMITED) is refuted *as the cause of this symptom*: the gate
+  never got as far as reading a real status.
+
+Two supporting observations from the same capture:
+
+- **Absolute scale now converges.** Engine estimates ran 0.046–0.063 m
+  against the declared 0.05 m (ratio 0.9–1.26) — no scale-mismatch
+  warnings fired at all, in stark contrast to §4's 12.4× readings.
+  Re-detection poses were consistent to the centimeter across
+  FOUND/LOST cycles. Tracking quality looks healthy.
+- **FOUND/LOST churn continues** (~every 2–5 s with the plaque in view),
+  each firing `onOriginChanged`. Harmless for the anchor (poses agree),
+  but worth watching: every churn resets MarkerLayer's One Euro filters
+  once markers actually render.
+
+**Loose end, explicitly unresolved:** the originally reported "markers
+flash briefly on first detection" is *incompatible* with a
+permanently-false gate — `MarkerLayer` creates markers at `display:none`
+and only `projection.visible === true` can ever show one. Whatever
+flashed in the pre-instrumentation sessions (UxOverlay hint, the Card
+during an earlier build, something else), it wasn't the marker pipeline
+under this gate. Don't spend time on it unless it reappears in an
+instrumented capture, where the logs will now name it.
+
+**Fix applied (parse only — the §7 (a)/(b) gate decision stays open):**
+the trackingstatus listener now applies the same `.detail ?? raw` unwrap
+as `emitImage()`, types the result as `Partial<...>`, and fail-loudly
+warns (with the raw JSON) if `status` is still undefined after the
+unwrap, instead of poisoning the cached status. `isTracking()` and the
+`NORMAL` gate are untouched. **Next capture decides the gate:** with
+status parsing fixed, either status reads `NORMAL` with the plaque in
+view and markers simply work (gate was fine all along, §7 moot), or it
+reads `LIMITED reason=…` and §7's (a)/(b) discriminator — marker/domino
+placement correctness during `imageVisible && LIMITED` windows — finally
+gets its evidence.

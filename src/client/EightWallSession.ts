@@ -159,7 +159,25 @@ export class EightWallSession {
             {
               event: 'reality.trackingstatus',
               process: (event: unknown) => {
-                const { status, reason } = event as Xr8TrackingStatusEvent;
+                // Device capture 2026-07-09 (troubleshooting doc §8)
+                // settled the payload-shape question: the binary's
+                // dispatcher wraps EVERY listener payload as {name, detail}
+                // (verified in dist/xr.js: it pushes
+                // {name:`${module}.${event}`, detail}). Reading {status}
+                // off the top-level object yielded status=undefined
+                // permanently, which held isTracking() false and markers
+                // hidden regardless of actual tracking quality. Same
+                // unwrap emitImage always had; typed Partial because a
+                // shape this class got wrong once stays untrusted (§C).
+                const { status, reason } = ((event as { detail?: unknown }).detail ??
+                  event) as Partial<Xr8TrackingStatusEvent>;
+                if (status === undefined) {
+                  console.warn(
+                    `[${traceT()}] [TrackingStatus] unparseable payload (status undefined even ` +
+                      `after .detail unwrap): ${JSON.stringify(event).slice(0, 300)}`
+                  );
+                  return;
+                }
                 const reasonText = reason ?? 'UNSPECIFIED';
                 // Dedupe on the (status, reason) pair — the same pair the
                 // binary's own dispatcher dedupes on — so a reason-only
@@ -221,10 +239,13 @@ export class EightWallSession {
   }
 
   private emitImage(kind: ImageEventKind, raw: unknown): void {
-    // Defensive payload read: the trackingstatus listener receives its
-    // struct directly, but some 8th Wall docs show image payloads nested
-    // under .detail. Lock the type (and drop the fallback) after the
-    // Phase D on-device checkpoint confirms which shape the binary sends.
+    // Payload shape CONFIRMED nested (device capture 2026-07-09 +
+    // binary inspection, troubleshooting doc §8): the engine dispatches
+    // {name, detail} to every listener. This unwrap is the reason image
+    // events always parsed while the trackingstatus listener — which
+    // lacked it until the same capture exposed status=undefined — never
+    // did. Keep the ?? fallback as cheap insurance against a future
+    // binary flattening the shape.
     const detail =
       raw === null
         ? null

@@ -841,6 +841,21 @@ schema above.
   behavior change shipped; the fix decision explicitly waits on a clean
   on-device capture.**
 
+  **Progress (2026-07-09, first instrumented capture):** hypothesis
+  refuted in its specific form — `trackingStatus` read `undefined` in
+  every snapshot: the `reality.trackingstatus` listener parsed the
+  payload off the top-level event object, but the binary wraps every
+  listener payload as `{name, detail}` (verified by construction in the
+  installed `dist/xr.js`; image events only ever worked because
+  `emitImage()` had the `.detail` unwrap from day one). The gate could
+  therefore never pass, in any session, under any tracking quality — a
+  parse bug, not a tracking-quality problem. Parse fixed (unwrap +
+  fail-loud warn on a still-unparseable payload); the `NORMAL` gate
+  itself deliberately untouched — troubleshooting doc §8 has the full
+  capture analysis, including that absolute scale now converges
+  (0.046–0.063 m vs. 0.05 declared) and that the next capture decides
+  whether the gate needs changing at all.
+
   **Exit condition:** the `8thwall-test` rig passes the same functional
   bar as `bench-test` — markers persist on tracked content, tapping opens
   the correct card — on a real device, with the root cause of the
