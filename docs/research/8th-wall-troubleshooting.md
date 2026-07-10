@@ -739,3 +739,62 @@ bad pose (`scale=0.106` m, ratio 2.12, rotation far from the usual
 values) and stayed there for ~a minute. Same §5 churn family — if
 misplaced content is ever observed on screen, correlate with these
 lines before suspecting the render pipeline.
+
+---
+
+## 11. Root cause found (2026-07-10): the Card artboard's `Closed` state
+hides the card and `OpenIdle` never keys it back on — an asset
+authoring bug, isolated without a device or the Rive editor
+
+The corrected desk test (`?fakear=1&fakegeo=1&debug=1`) reproduced the
+invisible card on desktop, which made it fully harness-testable. A new
+tool, **`tools/inspect_rive_ui.mjs`** (same transient-localhost +
+headless-Chrome pattern as `compile_mind_target.mjs`), loads
+`bench-ui.riv` with the app's own `@rive-app/canvas` runtime, drives the
+Card exactly as `CardPanel` does, and counts non-transparent pixels.
+The numbers are unambiguous:
+
+```
+CardMachine state changes on isOpen=true:  Closed → OpenIdle   (transition wiring CORRECT)
+Card pixels via state machine:             0 at +250/500/1000/2000 ms  (invisible)
+Card 'OpenIdle' animation played directly: 546,856 pixels      (content EXISTS and renders)
+Marker control via MarkerMachine:          ~10,100 pixels      (healthy)
+```
+
+Mechanism (a classic Rive authoring trap): properties not keyed by the
+current state persist from the previous state. The `Closed` animation
+keys the card's visibility off (per the guide's own contract: "at rest
+it must show nothing — 'closed' is an artboard state"); `OpenIdle` keys
+only its idle motion and **never keys the visibility back on**. Played
+directly, `OpenIdle` starts from design-time defaults (visible) — hence
+546k pixels; reached through the state machine from `Closed`, it
+inherits hidden and draws nothing, forever. Every runtime observation
+across §9–§10 (open() completes, no throws, state machine advances,
+container swallows taps, zero visuals) is this one asset defect.
+
+Contract drift found by the same probe, to fix in the same authoring
+pass:
+
+- The contracted **`Enter` / `Exit` animations do not exist** in the
+  file at all — the Card's animations are `Closed`, `RefreshPulse`,
+  `OpenIdle` (asset-authoring-guide §2.4 requires Enter/Exit on the
+  false↔true transitions, both interruptible).
+- The Card artboard is **350×391**, not the contracted 350×480
+  (`CardPanel.ts`'s `CARD_ARTBOARD_WIDTH/HEIGHT` and the container's
+  CSS aspect-ratio assume 480 — today this only letterboxes via
+  Fit.contain, but the drift should be resolved on whichever side is
+  intended).
+- There is also a third artboard, `Viewport` (state machine
+  `"State Machine 1"`, input `isOpened`), not part of any documented
+  contract — presumably a leftover or a nested component; renders ~1.2k
+  px in isolation. Decide its fate while in the editor.
+
+**The fix is an asset edit, not code** (Golden Rule: Rive owns
+appearance): in the Rive editor, on the `Card` artboard — author
+`Enter`/`Exit` per the §2.4 contract (or minimally: key the hidden
+properties back to visible at the start of the open-side state), wire
+`Closed →(isOpen)→ Enter → OpenIdle` and back through `Exit`, re-export
+to `public/assets/bench-ui.riv`, and bump the manifest version on every
+entry that serves it (`bench-test`, `8thwall-test`) per §E. Then re-run
+`node tools/inspect_rive_ui.mjs` — the healthy signature is a non-zero
+state-machine pixel count — before spending any on-device session.

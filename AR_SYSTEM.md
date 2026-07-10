@@ -883,6 +883,19 @@ schema above.
   `#camerafeed`; guarded now, and the canvas diagnostics log
   `visualViewport` scale. Troubleshooting doc §10.
 
+  **Progress (2026-07-10): invisible-Card root cause found — an asset
+  authoring bug in `bench-ui.riv`, not code.** Isolated headlessly with
+  the new `tools/inspect_rive_ui.mjs` (same harness pattern as
+  `compile_mind_target.mjs`): `CardMachine` transitions
+  `Closed → OpenIdle` correctly on `isOpen=true`, but renders 0 pixels
+  through the state machine while the same `OpenIdle` animation played
+  directly renders ~547k — `Closed` keys the card's visibility off and
+  `OpenIdle` never keys it back on; the contracted `Enter`/`Exit`
+  animations don't exist in the file. The fix is a Rive-editor asset
+  edit + re-export + manifest version bump (Golden Rule: appearance
+  belongs to the asset). Full probe data and the authoring fix list in
+  troubleshooting doc §11.
+
   **Exit condition:** the `8thwall-test` rig passes the same functional
   bar as `bench-test` — markers persist on tracked content, tapping opens
   the correct card — on a real device, with the root cause of the
