@@ -197,11 +197,14 @@ export class CardPanel {
     // Logged at entry, before the fail-loud setText/setBool calls, so a
     // capture brackets an authoring-mismatch throw between this line and
     // the red error main.ts's catch prints.
+    const bounds = this.rive.bounds;
     console.log(
       `[${traceT()}] [Card] open("${content.title}") — ` +
         (this.open_
           ? 'already open, firing refresh pulse'
-          : 'opening: isOpen=true, pointerEvents=auto (container now intercepts every tap in its box)')
+          : 'opening: isOpen=true, pointerEvents=auto (container now intercepts every tap in its box)') +
+        ` | artboard bounds=${(bounds.maxX - bounds.minX).toFixed(0)}x${(bounds.maxY - bounds.minY).toFixed(0)}` +
+        ` container=${this.container.getBoundingClientRect().width.toFixed(0)}x${this.container.getBoundingClientRect().height.toFixed(0)}`
     );
     this.rive.setText(TEXT_RUN_TITLE, content.title);
     this.rive.setText(TEXT_RUN_SUBTITLE, content.subtitle ?? '');

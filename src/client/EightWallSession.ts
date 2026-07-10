@@ -340,6 +340,13 @@ export class EightWallSession {
         `(left=${rect.left.toFixed(1)}, top=${rect.top.toFixed(1)})\n` +
         `  canvas.width/height (drawing buffer) = ${this.canvas.width} x ${this.canvas.height}\n` +
         `  window.innerWidth/innerHeight = ${window.innerWidth} x ${window.innerHeight}\n` +
+        // visualViewport: on iOS, innerWidth tracks the VISUAL viewport, so
+        // an accidental pinch-zoom shrinks it uniformly and the resize
+        // handler sizes the canvas to the shrunken window (dead space
+        // right/bottom — §10 of the troubleshooting doc). scale != 1 here
+        // proves/refutes page zoom directly instead of inferring it from
+        // the uniform shrink factor.
+        `  visualViewport = ${window.visualViewport ? `${window.visualViewport.width.toFixed(1)} x ${window.visualViewport.height.toFixed(1)} scale=${window.visualViewport.scale.toFixed(3)}` : '(unsupported)'}\n` +
         `  window.devicePixelRatio = ${window.devicePixelRatio}\n` +
         `  renderer.getSize() = ${rendererSize.x.toFixed(1)} x ${rendererSize.y.toFixed(1)}, ` +
         `renderer.getPixelRatio() = ${handles.renderer.getPixelRatio()}\n` +

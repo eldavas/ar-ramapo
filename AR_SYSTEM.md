@@ -871,6 +871,18 @@ schema above.
   line discriminates, and the `?fakear=1` desk test that exercises the
   tap→card chain without a field session.
 
+  **Progress (2026-07-09, third instrumented capture):** the invisible
+  card confirmed by telemetry — `card.open()` ran to completion and its
+  container logged 22 s of swallowed taps while nothing was visible:
+  the open issue is now precisely "the Card artboard renders invisibly
+  under `isOpen=true`", discriminated next by the corrected desk test
+  (`?fakear=1&fakegeo=1&debug=1` — `fakegeo` is required; the geofence
+  gate runs before the engine branch and blocks any desk). A separate
+  viewport shrink (dead space right/bottom) was diagnosed as page/pinch
+  zoom, NOT a §3 recurrence — `touch-action: none` did not inherit onto
+  `#camerafeed`; guarded now, and the canvas diagnostics log
+  `visualViewport` scale. Troubleshooting doc §10.
+
   **Exit condition:** the `8thwall-test` rig passes the same functional
   bar as `bench-test` — markers persist on tracked content, tapping opens
   the correct card — on a real device, with the root cause of the

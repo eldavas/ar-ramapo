@@ -660,3 +660,82 @@ there too, this is a Card-artboard/CardPanel issue debuggable entirely
 at a desk; if it renders, the difference is environmental (network to
 the sheet, on-device Rive text rendering) and the new `[Card]`/`[Tap]`
 lines in a field capture will place the break exactly.
+
+**CORRECTION (learned the hard way):** `?fakear=1` alone is NOT enough
+for a desk test — the geofence arrival gate runs before the engine
+branch whenever the experience declares `geo`, and `8thwall-test`
+carries placeholder coordinates (Ramapo campus). On a desk anywhere
+else, real geolocation resolves to "Walk to the site to start" and the
+session never proceeds. The full desk-test parameter set is
+**`?fakear=1&fakegeo=1&debug=1`**.
+
+---
+
+## 10. Third instrumented capture (2026-07-09): S1 confirmed — the Card
+opens invisibly and swallows every tap; plus a new, distinct viewport
+shrink (NOT §3 again)
+
+### S1 confirmed by telemetry
+
+The capture contains the tail of the `[Card] open(…)` line (`…tercepts
+every tap in its box)`) followed by ~22 seconds of
+
+```
+[Card] pointerdown at (306,587) — swallowed by the open card container, …
+[Card] pointerup   at (306,587) — …
+[Card] pointerdown at (126,277) — …
+```
+
+So: `getContent()` resolved, `card.open()` ran to completion (the
+fail-loud setText/setBool accessors did not throw — a throw after
+`pointerEvents=auto` would have hit main.ts's catch and closed the
+card, and the swallow window would not have lasted 22 s), `isOpen=true`
+reached the state machine — **and the artboard drew nothing visible
+while its container intercepted every tap in the bottom-sheet box.**
+§9's S2 (hung sheet fetch) is eliminated. The bug is now precisely:
+*the Card artboard renders invisibly under `isOpen=true` on this
+device*. Whether that's artboard authoring (Enter animation not wired
+to `isOpen` the way CardPanel assumes) or a runtime rendering issue is
+exactly what the `?fakear=1&fakegeo=1&debug=1` desk test discriminates
+— the Card has still never been observed rendering on any engine (§9).
+`open()` now also logs the artboard bounds and container CSS box, so a
+0×0 artboard or collapsed container would name itself.
+
+### The viewport shrink — different mechanism than §3, same visual smell
+
+Reported: canvas leaves dead space right and bottom, "moderate" version
+of the §3 symptom. The diagnostics say it is NOT §3 (engine/CSS sizing
+all worked):
+
+```
+window.innerWidth/innerHeight = 351 x 621     (was 393 x 695)
+renderer.getSize() = 351.0 x 621.0            (matches innerWidth exactly)
+canvas drawing buffer = 1053 x 1863           (= 351x621 × dpr 3)
+camera.aspect = 0.565                         (correct for 351x621)
+```
+
+Every layer agrees with `innerWidth/innerHeight`; what shrank is the
+window itself: 393→351 and 695→621 are the SAME uniform factor
+(÷1.12) on both axes — the signature of page zoom. On iOS,
+`innerWidth` tracks the *visual* viewport and `user-scalable=no` has
+been ignored since iOS 10, so an accidental pinch zooms the page and
+the resize handler then faithfully sizes the canvas to the shrunken
+viewport. The hole that allowed it: `touch-action: none` was set on
+`html, body` — but `touch-action` does not inherit, and `#camerafeed`
+(most of the screen) never declared it, so pinches starting on the
+camera canvas reached the browser. Fixes/diagnostics shipped:
+
+- `#camerafeed` now carries `touch-action: none` in BOTH the stylesheet
+  rule and the inline style (the §3 keep-in-sync rule).
+- `logCanvasDiagnostics()` now logs `window.visualViewport`
+  width/height/scale — `scale != 1` proves page zoom directly if this
+  ever recurs (a reload also resets pinch zoom, worth knowing
+  mid-session).
+
+### Tracking note (watch, no action)
+
+One of the sessions in this capture converged its re-detections onto a
+bad pose (`scale=0.106` m, ratio 2.12, rotation far from the usual
+values) and stayed there for ~a minute. Same §5 churn family — if
+misplaced content is ever observed on screen, correlate with these
+lines before suspecting the render pipeline.
