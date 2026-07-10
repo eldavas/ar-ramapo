@@ -2,6 +2,7 @@ import { decodeImage } from '@rive-app/canvas';
 import type { AssetLoadCallback, ImageAsset, RiveFile } from '@rive-app/canvas';
 import { RiveController } from './RiveController.js';
 import type { CardContent } from './ContentProvider.js';
+import { traceT } from './TraceLog.js';
 
 // Card contract (bench-ui.riv, docs/asset-authoring-guide.md). These
 // strings are the .riv ↔ code contract for the Card artboard; the marker
@@ -138,6 +139,16 @@ export class CardPanel {
     const forwardPointer = (event: PointerEvent, isDown: boolean): void => {
       event.stopPropagation();
       event.preventDefault();
+      // These listeners only receive events while the container has
+      // pointer-events:auto — i.e. while the card believes it is open. A
+      // capture full of these lines while nothing is visibly on screen is
+      // the smoking gun for an invisible-but-open card swallowing every
+      // tap in its box (troubleshooting doc §9).
+      console.log(
+        `[${traceT()}] [Card] pointer${isDown ? 'down' : 'up'} at ` +
+          `(${event.clientX.toFixed(0)},${event.clientY.toFixed(0)}) — swallowed by the open ` +
+          'card container, forwarded into the artboard'
+      );
       if (!this.rive.isReady) return;
       const rect = this.container.getBoundingClientRect();
       if (rect.width === 0 || rect.height === 0) return;
@@ -157,6 +168,7 @@ export class CardPanel {
     await this.rive.whenReady();
     this.rive.onRiveEvent((eventName) => {
       if (eventName === EVENT_CLOSE_REQUESTED) {
+        console.log(`[${traceT()}] [Card] closeRequested Rive event — invoking close handler`);
         this.closeHandler?.();
       }
     });
@@ -182,6 +194,15 @@ export class CardPanel {
    * the session.
    */
   open(content: CardContent): void {
+    // Logged at entry, before the fail-loud setText/setBool calls, so a
+    // capture brackets an authoring-mismatch throw between this line and
+    // the red error main.ts's catch prints.
+    console.log(
+      `[${traceT()}] [Card] open("${content.title}") — ` +
+        (this.open_
+          ? 'already open, firing refresh pulse'
+          : 'opening: isOpen=true, pointerEvents=auto (container now intercepts every tap in its box)')
+    );
     this.rive.setText(TEXT_RUN_TITLE, content.title);
     this.rive.setText(TEXT_RUN_SUBTITLE, content.subtitle ?? '');
     this.rive.setText(TEXT_RUN_BODY, content.body);
@@ -203,6 +224,7 @@ export class CardPanel {
   /** Idempotent; the Exit animation plays inside the artboard. */
   close(): void {
     if (!this.open_) return;
+    console.log(`[${traceT()}] [Card] close() — isOpen=false, pointerEvents=none`);
     this.open_ = false;
     this.container.style.pointerEvents = 'none';
     this.rive.setBool(INPUT_IS_OPEN, false);

@@ -595,3 +595,68 @@ view and markers simply work (gate was fine all along, §7 moot), or it
 reads `LIMITED reason=…` and §7's (a)/(b) discriminator — marker/domino
 placement correctness during `imageVisible && LIMITED` windows — finally
 gets its evidence.
+
+---
+
+## 9. Second instrumented capture (2026-07-09): markers fixed and
+verified; the open issue moves to the tap → Card link
+
+The §8 parse fix resolved the original symptom outright, with the
+telemetry to prove each link:
+
+- `trackingStatus=NORMAL reason=UNSPECIFIED` in every snapshot — the §7
+  (a)/(b) gate question is **moot**; the `NORMAL` gate stays as designed.
+- `isTracking() => true` held through repeated `LOST` events
+  (`imageVisible=false`, `acquired=true`, still `=> true`) — the
+  scan-once-walk-around hybrid persistence works exactly as designed.
+- Full visibility chain observed live: `[HotspotProjector] VISIBLE` →
+  `[MarkerLayer] display:block`, with `HIDDEN (frustum=false)` flapping
+  only at the literal screen edges (x≈-3 and x≈394-396 on a 393-wide
+  viewport) — normal framing behavior, absorbed by the hysteresis.
+- Absolute scale converged (engine estimates 0.056–0.070 m vs. 0.05
+  declared; one transient 0.345 m reading immediately after a
+  re-detection, corrected within a second).
+- **A tap on a marker fired its Rive selection visual** (color change) —
+  pointer forwarding and the DOM tap path work.
+
+**New open issue, one link further down the chain:** the tapped marker's
+Card never appeared, and — the discriminating detail — after that first
+tap, taps on that marker AND every other marker produced nothing at all.
+The capture contained no `[Tap]`/content lines for the window in
+question (garbled/truncated), so two scenarios remain live:
+
+- **S1 (leading):** `getContent()` resolved and `card.open()` ran clean —
+  `open_=true`, `pointerEvents=auto`, `isOpen=true` into the state
+  machine — but the Card artboard drew nothing visible. The card's
+  container is a ~350×480 bottom sheet (y≈215–695 on this viewport)
+  whose listeners `stopPropagation()` every pointer event while open:
+  an invisibly-open card converts most of the lower screen into a dead
+  zone that neither the markers nor the tap-outside-close handler can
+  ever see. That mechanism reproduces "first tap works, every
+  subsequent tap dead" exactly. Note the Card has never been verified
+  rendering on ANY engine — the Phase 5 MindAR verification was
+  interrupted mid-way by the 8th Wall pivot (see `ACTIVE_TARGET_ID`'s
+  own comment), so an authoring/artboard issue is fully plausible.
+- **S2:** the Google Sheet fetch hung forever (the one silent path in
+  `GoogleSheetContentProvider` — every failure throws loudly, but a
+  never-settling fetch has no timeout). Weaker fit: the card never
+  opens, `pointerEvents` stays `none`, so markers would have remained
+  tappable.
+
+Telemetry added to discriminate (same transition-only discipline as §7):
+`[Card] open("title")` at entry (before the fail-loud setText/setBool
+calls, so an authoring throw is bracketed), `[Card] close()`,
+`[Card] closeRequested Rive event`, `[Card] pointerdown/up … swallowed
+by the open card container` (only observable while `pointerEvents:auto`
+— a capture full of these with nothing visible on screen is S1's
+smoking gun), and `[Tap] pointerup outside markers/card — closing card`
+in main.ts.
+
+**Fastest next test — no field session needed:** `?fakear=1&debug=1` on
+a desktop browser (or the phone at a desk) runs the identical
+tap→getContent→card.open chain against `DevSimSession`'s
+always-tracking anchor, with full devtools. If the Card fails to render
+there too, this is a Card-artboard/CardPanel issue debuggable entirely
+at a desk; if it renders, the difference is environmental (network to
+the sheet, on-device Rive text rendering) and the new `[Card]`/`[Tap]`
+lines in a field capture will place the break exactly.

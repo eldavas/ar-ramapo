@@ -856,6 +856,21 @@ schema above.
   (0.046–0.063 m vs. 0.05 declared) and that the next capture decides
   whether the gate needs changing at all.
 
+  **Progress (2026-07-09, second instrumented capture): the original
+  marker symptom is FIXED and verified on device** — markers render,
+  persist through image-lost windows (`trackingStatus=NORMAL`
+  throughout; the §8 gate question resolved as "gate was fine"), and a
+  marker tap fires its Rive selection visual. **The still-open blocker
+  moved one link down: tapping a marker never opens its Card, and after
+  the first tap all markers stop responding** — leading theory: the
+  Card opens invisibly and its `pointer-events:auto` bottom-sheet box
+  swallows every subsequent tap (the Card has never been verified
+  rendering on any engine; Phase 5's MindAR verification was
+  interrupted by this phase's pivot). Card-chain telemetry landed;
+  troubleshooting doc §9 has both candidate scenarios, what each log
+  line discriminates, and the `?fakear=1` desk test that exercises the
+  tap→card chain without a field session.
+
   **Exit condition:** the `8thwall-test` rig passes the same functional
   bar as `bench-test` — markers persist on tracked content, tapping opens
   the correct card — on a real device, with the root cause of the

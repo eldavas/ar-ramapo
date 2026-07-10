@@ -468,6 +468,7 @@ async function runEightWallExperience(experience: ExperienceManifest): Promise<v
   document.addEventListener('pointerup', (event) => {
     if (!card.isOpen) return;
     if (markers.containsEventTarget(event.target) || card.containsEventTarget(event.target)) return;
+    console.log(`[${traceT()}] [Tap] pointerup outside markers/card — closing card`);
     closeCard();
   });
 
