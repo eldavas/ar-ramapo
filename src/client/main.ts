@@ -228,26 +228,38 @@ async function main(): Promise<void> {
     card.close();
   };
 
+  // try/catch belt-and-suspenders around the whole handler: a synchronous
+  // throw (e.g. contentKeyOf on a mis-authored hotspot) happens before the
+  // .catch() below would even be attached, and would otherwise die
+  // silently as an uncaught exception in this DOM event handler.
+  const reportTapError = (error: unknown): void => {
+    console.error('[ar-ramapo] tap handling failed:', error);
+  };
+
   markers.onMarkerTap((hotspot) => {
-    if (selected === hotspot) {
-      // Re-tapping the selected marker toggles the card away.
-      closeCard();
-      return;
+    try {
+      if (selected === hotspot) {
+        // Re-tapping the selected marker toggles the card away.
+        closeCard();
+        return;
+      }
+      selected = hotspot;
+      markers.setSelected(hotspot);
+      contentProvider
+        .getContent(contentKeyOf(hotspot))
+        .then((content) => {
+          // A slower fetch must not overwrite a newer selection.
+          if (selected === hotspot) card.open(content);
+        })
+        .catch((error: unknown) => {
+          // Loud (§C) but session-preserving: the card simply doesn't open;
+          // tracking and markers keep running.
+          reportTapError(error);
+          if (selected === hotspot) closeCard();
+        });
+    } catch (error: unknown) {
+      reportTapError(error);
     }
-    selected = hotspot;
-    markers.setSelected(hotspot);
-    contentProvider
-      .getContent(contentKeyOf(hotspot))
-      .then((content) => {
-        // A slower fetch must not overwrite a newer selection.
-        if (selected === hotspot) card.open(content);
-      })
-      .catch((error: unknown) => {
-        // Loud (§C) but session-preserving: the card simply doesn't open;
-        // tracking and markers keep running.
-        console.error('[ar-ramapo] content resolution failed:', error);
-        if (selected === hotspot) closeCard();
-      });
   });
 
   card.onCloseRequested(closeCard);

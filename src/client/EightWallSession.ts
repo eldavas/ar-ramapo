@@ -34,9 +34,17 @@ export type ImageEventHandler = (kind: ImageEventKind, event: Xr8ImageTrackedEve
  * Ownership note (same constraint class as MindAR, recorded here on
  * purpose): XR8.Threejs.pipelineModule() creates and owns the three.js
  * renderer/scene/camera and issues the render call in its own onRender
- * stage. The app never calls renderer.render() and never attaches its own
- * resize handler. Handles are read back via XR8.Threejs.xrScene() after
- * the pipeline starts.
+ * stage. The app never calls renderer.render(). Handles are read back via
+ * XR8.Threejs.xrScene() after the pipeline starts.
+ *
+ * Resize is a separate story: on-device measurement on the master branch
+ * (see 0b3c63f) proved the engine does NOT resize this pipeline's
+ * renderer/camera on its own — canvas.getBoundingClientRect() and
+ * renderer.getSize() both stayed stuck at the raw 300x150 HTML canvas
+ * default regardless of the #camerafeed stylesheet rule. installFullWindowResize()
+ * below is the authoritative fix (JS-driven renderer.setSize(..., true)),
+ * paired with an inline style on the canvas in public/index.html as a
+ * second, redundant path to the same box size.
  *
  * start() must be called from a user gesture: on iOS Safari the engine
  * requests DeviceMotionEvent permission during XR8.run(), and that prompt
@@ -48,6 +56,7 @@ export class EightWallSession {
   private status: Xr8TrackingStatus = 'UNSPECIFIED';
   private readonly statusHandlers: TrackingStatusHandler[] = [];
   private readonly imageHandlers: ImageEventHandler[] = [];
+  private removeResizeListeners: (() => void) | null = null;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -103,6 +112,7 @@ export class EightWallSession {
             xr8.XrController.updateCameraProjectionMatrix({
               origin: { x: 0, y: 1.6, z: 0 },
             });
+            this.installFullWindowResize(handles);
             resolve(handles);
           },
           onUpdate: () => {
@@ -196,7 +206,35 @@ export class EightWallSession {
   }
 
   stop(): void {
+    this.removeResizeListeners?.();
+    this.removeResizeListeners = null;
     this.xr8?.stop();
     this.frameBus.reset();
+  }
+
+  /**
+   * See the class doc comment's resize note. `updateStyle: true` rewrites
+   * canvas.style.width/height via JS on every call — authoritative
+   * regardless of whether the stylesheet cascade wins the layout box on a
+   * given device. Runs once immediately (onStart may fire before layout
+   * has settled) and again on every resize/orientationchange.
+   */
+  private installFullWindowResize(handles: Xr8ThreejsScene): void {
+    const { renderer, camera } = handles;
+    const resize = (): void => {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      renderer.setPixelRatio(window.devicePixelRatio || 1);
+      renderer.setSize(width, height, true);
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+    };
+    resize();
+    window.addEventListener('resize', resize);
+    window.addEventListener('orientationchange', resize);
+    this.removeResizeListeners = () => {
+      window.removeEventListener('resize', resize);
+      window.removeEventListener('orientationchange', resize);
+    };
   }
 }

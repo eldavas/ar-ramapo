@@ -76,6 +76,9 @@ web_modules/
 .env.*
 !.env.example
 
+# mkcert local dev certs (per-machine, regenerate with mkcert)
+*.pem
+
 # parcel-bundler cache (https://parceljs.org/)
 .cache
 .parcel-cache
