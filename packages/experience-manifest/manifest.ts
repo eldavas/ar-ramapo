@@ -130,7 +130,13 @@ export const experienceManifest: ExperienceManifest[] = [
     // 0.4.1: contentUrl points at the real, populated Google Sheet
     // (previously the unfilled REPLACE_WITH_SHEET_ID placeholder, which
     // resolved but always failed at fetch time — the Card never opened).
-    version: '0.4.1',
+    // 0.4.2: bench-ui.riv fixed per the 2026-07-10 invisible-Card root
+    // cause (OpenIdle now re-keys Card_Body opacity/y; base opacity 0
+    // kills the first-load flash; Marker artboard back to the contracted
+    // 120×120 square) plus Card title/subtitle text runs restored;
+    // bench-scene.glb hotspot anchors moved from each domino's volumetric
+    // center to its top-Y (§G Phase 6, 2026-07-14 on-device findings).
+    version: '0.4.2',
   },
   {
     // Phase 2C: 8th Wall test entry (AR_SYSTEM.md's 8th-wall decision
@@ -163,6 +169,8 @@ export const experienceManifest: ExperienceManifest[] = [
       radiusMeters: 30,
     },
     contentUrl: 'https://docs.google.com/spreadsheets/d/1O4Zq8ggc7TgjKZIuUtufO-G9hJiK2KalJpD2Cux2sN8/gviz/tq?tqx=out:json',
-    version: '0.1.0',
+    // 0.1.1: same shared-asset fix as bench-test 0.4.2 (bench-ui.riv Card
+    // visibility + Marker anchoring, bench-scene.glb top-Y hotspots).
+    version: '0.1.1',
   },
 ];

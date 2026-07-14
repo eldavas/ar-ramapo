@@ -896,6 +896,62 @@ schema above.
   belongs to the asset). Full probe data and the authoring fix list in
   troubleshooting doc §11.
 
+  **Progress (2026-07-14): the §11 asset fix landed — Card renders, full
+  content pipeline verified on a real phone.** The fix was authored on the
+  `8th-wall` spike branch (commit `750d68c`, first on-device pass) and
+  cherry-picked into this branch asset-for-asset; findings from that
+  session, recorded so the next person doesn't re-derive them:
+
+  - **`bench-ui.riv` fixed exactly as §11 prescribed**: `OpenIdle` now
+    explicitly re-keys `Card_Body` `opacity=1, y=0` at frame 0 (Rive never
+    resets unkeyed properties on a state transition, so `Closed → OpenIdle`
+    inherited the hidden pose forever). The one-frame Card flash on fresh
+    page load was fixed by setting `Card_Body`'s *base* opacity to 0 —
+    only non-layout properties stick as base-value writes on a
+    `LayoutComponent` (`y` is recomputed by the flex engine every frame),
+    but a fully transparent element is invisible regardless of position.
+  - **Marker artboard re-squared to the contracted 120×120** (it had
+    drifted to 44×80, leaving the base "drooping" below the projected
+    anchor point) and its icon/line/base composite rebuilt as plain
+    positioned `Node`s with the touch point at exact artboard center,
+    matching the runtime's `Fit.contain`/`Alignment.center` pinning. The
+    same binary also carries the branch's earlier restoration of the Card
+    title/subtitle text runs (`750d68c`'s parent, `b42f3f5`) — the .riv is
+    a whole-file asset; the two fixes are inseparable and both wanted.
+  - **Corruption diagnostic worth keeping**: a Rive-editor "Save" once
+    exported a ZIP bundle to the `bench-ui.riv` path instead of overwriting
+    the binary; the runtime's only symptom is the generic `RiveFile.init()`
+    "The file failed to load". A real `.riv` starts with ASCII `RIVE`; if
+    `xxd -l4 public/assets/bench-ui.riv` shows `PK\x03\x04`, it's a zip —
+    `unzip -l` it and use the `.riv` inside.
+  - **`bench-scene.glb` hotspot anchors moved from each domino's
+    volumetric center to its top-Y** (X/Z unchanged), so markers sit on
+    top of the objects instead of floating at their centers. This was a
+    direct patch to the compiled GLB: `tools/build_bench_scene.py` still
+    authors hotspots at `(0,0,0)` local to the domino parent (Blender's
+    center-of-bounds origin), so **re-running the build script will
+    silently revert this** — port the top-Y offset into the script before
+    the next re-export.
+  - **Content sheet `imageUrl` gotcha**: Dropbox share links fail twice
+    over (no `Access-Control-Allow-Origin`, and PDFs aren't decodable
+    images); the sheet owner switched the column to real image URLs.
+    Confirms the asset-authoring guide's preference for root-relative
+    `/assets/...` paths.
+  - **Deferred by choice**: the Card's `isOpen` transitions run from the
+    state machine's `Any` state with a 220–280 ms linear blend rather than
+    the guide's named `Enter`/`Exit` clips. Functionally compliant
+    (`Any`-state sources are interruptible by construction) and fine
+    on-device; revisit only if the contract wording is enforced literally.
+
+  Verified on iPhone Safari over LAN HTTPS with the `?fakegeo=1&fakear=1`
+  desk-sim bypasses: scene load, hotspot projection, Rive markers, Card
+  open/close, and content-sheet images all work end to end. The real
+  SLAM + image-target path (`ImageTargetAnchorSource`, scanning the
+  physical plaque) is still untested on-device — the bypass skips it by
+  design. (The same spike commit also back-ported this branch's `0b3c63f`
+  dual-path canvas-resize fix into the spike; that part was *not* brought
+  back here — it already lives on this branch.)
+
   **Exit condition:** the `8thwall-test` rig passes the same functional
   bar as `bench-test` — markers persist on tracked content, tapping opens
   the correct card — on a real device, with the root cause of the

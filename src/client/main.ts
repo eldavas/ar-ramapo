@@ -435,32 +435,41 @@ async function runEightWallExperience(experience: ExperienceManifest): Promise<v
   // Tap-chain telemetry (troubleshooting doc §6): each hop logs once, so
   // an on-device capture can confirm exactly how far a tap that beats the
   // marker's disappearance actually gets.
+  //
+  // try/catch belt-and-suspenders around the whole handler: a synchronous
+  // throw (e.g. contentKeyOf on a mis-authored hotspot) happens before the
+  // .catch() below would even be attached, and would otherwise die
+  // silently as an uncaught exception in this DOM event handler.
   markers.onMarkerTap((hotspot) => {
-    if (selected === hotspot) {
-      console.log(`[${traceT()}] [Tap] onMarkerTap "${hotspot.name}" — re-tap on selected, closing card`);
-      closeCard();
-      return;
+    try {
+      if (selected === hotspot) {
+        console.log(`[${traceT()}] [Tap] onMarkerTap "${hotspot.name}" — re-tap on selected, closing card`);
+        closeCard();
+        return;
+      }
+      const contentKey = contentKeyOf(hotspot);
+      console.log(
+        `[${traceT()}] [Tap] onMarkerTap "${hotspot.name}" — selecting, getContent("${contentKey}")...`
+      );
+      selected = hotspot;
+      markers.setSelected(hotspot);
+      contentProvider
+        .getContent(contentKey)
+        .then((content) => {
+          const current = selected === hotspot;
+          console.log(
+            `[${traceT()}] [Tap] getContent("${contentKey}") resolved — ` +
+              (current ? 'calling card.open()' : 'selection changed meanwhile, dropped')
+          );
+          if (current) card.open(content);
+        })
+        .catch((error: unknown) => {
+          console.error(`[${traceT()}] [Tap] getContent("${contentKey}") failed:`, error);
+          if (selected === hotspot) closeCard();
+        });
+    } catch (error: unknown) {
+      console.error(`[${traceT()}] [Tap] onMarkerTap "${hotspot.name}" handler threw synchronously:`, error);
     }
-    const contentKey = contentKeyOf(hotspot);
-    console.log(
-      `[${traceT()}] [Tap] onMarkerTap "${hotspot.name}" — selecting, getContent("${contentKey}")...`
-    );
-    selected = hotspot;
-    markers.setSelected(hotspot);
-    contentProvider
-      .getContent(contentKey)
-      .then((content) => {
-        const current = selected === hotspot;
-        console.log(
-          `[${traceT()}] [Tap] getContent("${contentKey}") resolved — ` +
-            (current ? 'calling card.open()' : 'selection changed meanwhile, dropped')
-        );
-        if (current) card.open(content);
-      })
-      .catch((error: unknown) => {
-        console.error(`[${traceT()}] [Tap] getContent("${contentKey}") failed:`, error);
-        if (selected === hotspot) closeCard();
-      });
   });
 
   card.onCloseRequested(closeCard);
