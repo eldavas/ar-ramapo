@@ -952,6 +952,84 @@ schema above.
   dual-path canvas-resize fix into the spike; that part was *not* brought
   back here — it already lives on this branch.)
 
+  **Branch decision (2026-07-14): the `8th-wall` spike is retired in favor
+  of this branch, not merged into it.** Confirmed rather than assumed: a
+  trial `git merge --allow-unrelated-histories` surfaced 20 conflicting
+  files (nearly all of `src/client/`, both config files, both binary Rive
+  assets before the above port, the lockfile) — genuinely unrelated,
+  independently-built code under the same filenames, not small overlapping
+  edits. Before ruling out a real merge, verified this branch is a strict
+  superset of the spike, not just "ahead of it": every file present in
+  `8th-wall`'s `src/client`/`packages`/`server` also exists here (`git
+  ls-tree` diff, zero unique paths), this branch additionally has
+  `ARSessionManager.ts`/`InputBridge.ts`/`RenderEngine.ts` (MindAR, still
+  load-bearing for `proxy-target`/`bench-test`), `TraceLog.ts`, and the
+  Apple App Clip route the spike never had, and the spot-check above (§11
+  port) already confirmed the shared contract constants
+  (`MarkerLayer`/`CardPanel`'s artboard/state-machine/input names),
+  manifest asset paths, tap-handler robustness, and canvas-resize wiring
+  all match or exceed the spike's versions. Nothing from the spike's own
+  session findings survives only on `8th-wall` — development continues
+  here. The `8th-wall` branch itself is left in place for now (not
+  deleted), in case anything is missed.
+
+  **Progress (2026-07-14, Card bottom-sheet redesign):** replaced the
+  Card's Rive-owned open/close animation with an app-owned one, plus
+  drag-to-dismiss — the state-machine-driven fade could not do 1:1
+  finger-tracking with a velocity-based release cheaply, which is why
+  react-spring-bottom-sheet and react-native-bottom-sheet both drive their
+  sheet with a plain transform in code, not a design-tool timeline; this
+  follows the same pattern.
+
+  - **Rive simplified to pure content display**: `Closed`'s
+    `Card_Body opacity=0, y=380` keyframes and `OpenIdle`'s (§11)
+    `opacity=1, y=0` keyframes were both deleted, and `Card_Body`'s base
+    opacity restored to `1.0` — the two states are now visually identical.
+    `isOpen` is still set by the app (kept only so the state machine
+    reaches `OpenIdle`, the source state `RefreshPulse`'s trigger
+    transition needs) but no longer drives any visible motion.
+    `RefreshPulse` itself (the small in-place bounce on content swap while
+    already open) is untouched — the one motion still owned by Rive,
+    unrelated to open/close position.
+  - **`CardPanel`'s container now owns position** via `transform:
+    translateY(...)`, toggled between `0` (open) and `100%` (fully
+    off-screen, and the default from construction — synchronous, so there
+    is no dependency on Rive/state-machine timing for the old first-load
+    flash class of bug at all) with a `300ms cubic-bezier(0.32, 0.72, 0,
+    1)` transition for the settle animation, disabled during an active
+    drag so the transform tracks the finger with zero lag.
+  - **Drag-to-dismiss**: pointerdown/move/up/cancel on the container,
+    pointer-captured for the gesture's lifetime. A move under `12px` stays
+    a tap candidate (forwarded into the artboard as before, for the close
+    button); at or past it, the gesture is a confirmed drag and artboard
+    forwarding is suspended for the rest of it. Release past 25% of the
+    sheet's own height, or a downward velocity over `0.5px/ms`, commits to
+    close (via the same `closeHandler` callback the authored close button
+    uses — one app-level close path regardless of gesture); otherwise it
+    snaps back open.
+  - **Close-button reliability bug, self-inflicted and fixed same-session**:
+    the initial `12px` tap/drag threshold intermittently ate the close
+    button's clicks. `Card_Close_Button_Container`'s hit area is ~30×30
+    artboard units (≈33px on screen) — under Apple's 44pt minimum target
+    size — and ordinary finger jitter while aiming at a small target can
+    exceed almost any generic threshold. Fixed with a permanent no-drag
+    zone (top-right corner, `x ≥ 80%`, `y ≤ 15%` of the container) rather
+    than further threshold tuning: a gesture starting there can never be
+    promoted to a drag, however far it wanders. The grabber handle
+    (top-center, ~45–55% x) is well clear of this zone and unaffected.
+  - **Width bug fixed alongside**: `CARD_CSS_WIDTH` was
+    `min(92vw, 350px)` — capped at 350px regardless of viewport, leaving
+    visible side gaps on any phone wider than ~380px. Changed to `100vw`;
+    the now-unneeded `left:50%;transform:translateX(-50%)` centering was
+    dropped for a plain `left:0`.
+  - **Still open**: despite the fix above, the Card is still reported not
+    filling the screen width on-device. Verified both halves of the
+    obvious explanation are *not* it — the compiled bundle's `cssText`
+    string is confirmed `width:100vw;left:0` with no trace of the old
+    value, and the Rive artwork's own `Card_Body` spans the full 0–350 of
+    the 350-wide artboard (no internal inset baked into the asset either).
+    Root cause not yet found; paused pending a fresh on-device screenshot.
+
   **Exit condition:** the `8thwall-test` rig passes the same functional
   bar as `bench-test` — markers persist on tracked content, tapping opens
   the correct card — on a real device, with the root cause of the
