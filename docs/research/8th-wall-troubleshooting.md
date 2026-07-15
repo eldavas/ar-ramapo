@@ -892,8 +892,39 @@ solid raster spans 0–785 of 786 — full width at all three test viewports.
 Reproduce the underlying asset behavior in isolation with
 `tools/inspect_card_growth.mjs`.
 
-One consequence to keep in mind: with Hug + long content the card is
-simply *taller* (677px on a 393×852 viewport for H=604) — that is the
-design working as intended, with drag-to-dismiss as the escape hatch —
-but content long enough to out-grow the screen should eventually get an
-authored max-height + internal scroll/clip decision in the asset.
+### Follow-up, same day: 90%-viewport height cap (clip, not shrink)
+
+With Hug + long content the card is simply *taller* (677px on a 393×852
+viewport for H=604) — mostly the design working as intended, but on a
+small screen the bottom-anchored container can out-grow the viewport
+and push its TOP edge off screen, taking the grabber, title, and close
+button with it (measured: H=669 on a 320×568 viewport → 611px natural
+height, top at −43px).
+
+`CardPanel` now caps the container at
+`CARD_MAX_VIEWPORT_HEIGHT_FRACTION` (0.9) of `window.innerHeight`,
+resolved in the same `syncAspectToArtboard()` pass. The critical detail
+is WHAT gets capped: **the container only**. The canvas keeps its
+natural aspect-true height inside it and the container's
+`overflow:hidden` clips the sheet's bottom — shrinking the canvas box
+to the capped height instead would recreate this very section's
+letterbox (canvas aspect ≠ artboard aspect is the whole bug). Because
+the sync pass also tracks viewport dimensions, rotation and iOS
+URL-bar collapse re-resolve the cap automatically.
+
+Input-mapping consequence, fixed in the same pass: pointer→artboard
+forwarding and the close button's no-drag zone previously measured the
+*container* rect, which was safe only while canvas == container. Under
+the cap the canvas is taller, so both now measure the **canvas** rect —
+the box the renderer actually maps artboard space onto. Drag
+close-threshold (25%) stays container-based on purpose: it is a gesture
+against the visible sheet, not against the (partly clipped) artwork.
+
+Verified with the same end-to-end probe: on a 320×568 viewport with
+real sheet content, container height pins to 511.2px (= 0.9 × 568),
+the canvas keeps 551.9px, backing stays aspect-matched (640×1103), and
+the raster remains solid edge-to-edge; the two larger viewports stay in
+the uncapped regime, byte-identical to the width fix's behavior.
+Content clipped by the cap is simply not reachable today — if that ever
+matters in the field, the next step is an authored internal
+scroll/max-height decision in the asset, not more app-side geometry.

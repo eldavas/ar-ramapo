@@ -1057,6 +1057,13 @@ schema above.
     content at 320/393/430px viewports: raster solid to both edges
     where the same content letterboxed 72–627/700 before. Full
     narrative, math, and probe tooling: troubleshooting doc §12.
+  - **Height cap follow-up**: the sheet is now capped at 90% of the
+    viewport height — container-only clip (canvas keeps its aspect-true
+    natural height; shrinking it would recreate the letterbox), pointer
+    mapping and the close button's no-drag zone re-anchored to the
+    canvas rect accordingly. Protects grabber/title/close button on
+    small screens, where tall Hug content used to push the container's
+    top edge above the viewport. Troubleshooting doc §12 follow-up.
 
   **Exit condition:** the `8thwall-test` rig passes the same functional
   bar as `bench-test` — markers persist on tracked content, tapping opens

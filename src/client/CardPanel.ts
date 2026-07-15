@@ -28,6 +28,15 @@ const CARD_CSS_WIDTH = '100vw';
 const CARD_ARTBOARD_WIDTH = 350;
 const CARD_ARTBOARD_HEIGHT = 480;
 const MAX_BACKING_SCALE = 2;
+// Height cap: the sheet never covers more than this fraction of the
+// viewport. Without it, a Hug-grown artboard on a small screen pushes the
+// container's top edge ABOVE the viewport (bottom-anchored box taller
+// than the screen), cutting off the grabber, title, and close button.
+// The cap clips the container only — the canvas keeps its natural
+// aspect-true height inside it (see syncAspectToArtboard), because
+// shrinking the canvas box instead would re-create the §12 Fit.contain
+// letterbox this file just fixed.
+const CARD_MAX_VIEWPORT_HEIGHT_FRACTION = 0.9;
 
 // Slide is app-owned (container transform), not Rive-owned — see the class
 // doc comment. The curve matches the deceleration most native bottom
@@ -159,11 +168,15 @@ export class CardPanel {
   private lastMoveY = 0;
   private lastMoveTime = 0;
 
-  // Last artboard bounds height the container/backing were sized for.
-  // Seeded with the design height; the first Advance replaces it with the
+  // Inputs the container/backing were last sized for. Bounds height is
+  // seeded with the design height; the first Advance replaces it with the
   // real Hug-resolved height (the placeholder content resolves to ~408,
-  // not 480, so the very first frame already re-syncs).
+  // not 480, so the very first frame already re-syncs). Viewport values
+  // are tracked too: the 90% height cap and the natural CSS height both
+  // depend on them (rotation, iOS URL-bar collapse).
   private appliedBoundsHeight = CARD_ARTBOARD_HEIGHT;
+  private appliedViewportWidth = 0;
+  private appliedViewportHeight = 0;
 
   constructor(riveFile: RiveFile, private readonly imageSlot: CardImageSlot) {
     this.container = document.createElement('div');
@@ -173,8 +186,13 @@ export class CardPanel {
     // transform starts at translateY(100%) — fully below the viewport —
     // synchronously, before Rive even loads, so there is no first-load
     // flash regardless of any Rive/state-machine timing.
+    // overflow:hidden — inert while the canvas fills the container
+    // (100%/100%), load-bearing when the 90% height cap is active and the
+    // canvas is deliberately TALLER than the container: the container is
+    // the clip window, so the sheet's visible bottom edge always tracks
+    // the container (screen bottom when open, mid-drag positions too).
     this.container.style.cssText =
-      'position:fixed;left:0;bottom:0;' +
+      'position:fixed;left:0;bottom:0;overflow:hidden;' +
       `width:${CARD_CSS_WIDTH};aspect-ratio:${CARD_ARTBOARD_WIDTH}/${CARD_ARTBOARD_HEIGHT};` +
       `z-index:20;pointer-events:none;touch-action:none;transform:translateY(100%);` +
       `transition:${SLIDE_TRANSITION};`;
@@ -215,7 +233,11 @@ export class CardPanel {
           'card container, forwarded into the artboard'
       );
       if (!this.rive.isReady) return;
-      const rect = this.container.getBoundingClientRect();
+      // CANVAS rect, not container rect: the renderer maps artboard space
+      // onto the canvas box, and under the 90% height cap the canvas is
+      // taller than the (clipping) container — container-relative math
+      // would land taps below their true artboard point.
+      const rect = this.rive.canvas.getBoundingClientRect();
       if (rect.width === 0 || rect.height === 0) return;
 
       const canvasX = ((event.clientX - rect.left) / rect.width) * this.rive.canvasWidth;
@@ -238,7 +260,12 @@ export class CardPanel {
       this.lastMoveTime = this.dragStartTime;
       this.isDragging = false;
 
-      const rect = this.container.getBoundingClientRect();
+      // Canvas rect for the same reason as forwardPointer: the no-drag
+      // zone protects the authored close button, whose position is
+      // card-relative — under the height cap the card (canvas) is taller
+      // than the container, and container fractions would stretch the
+      // zone off the button.
+      const rect = this.rive.canvas.getBoundingClientRect();
       const xFraction = rect.width > 0 ? (event.clientX - rect.left) / rect.width : 0;
       const yFraction = rect.height > 0 ? (event.clientY - rect.top) / rect.height : 0;
       this.dragEligible = !(
@@ -336,10 +363,23 @@ export class CardPanel {
   }
 
   /**
-   * Re-derives the container's CSS aspect and the canvas backing store
-   * from the live artboard bounds, so canvas aspect === artboard aspect
-   * and Fit.contain fills the full width by construction. Cheap no-op
-   * (two float compares) on the frames where bounds didn't change.
+   * Re-derives the container's CSS box and the canvas backing store from
+   * the live artboard bounds, so canvas aspect === artboard aspect and
+   * Fit.contain fills the full width by construction. Two regimes:
+   *
+   * - Natural height fits under 90% of the viewport: container carries
+   *   the artboard aspect, canvas fills it (the original width fix).
+   * - It doesn't: container height is pinned to the 90% cap and the
+   *   canvas keeps its natural aspect-true height inside it — clipped by
+   *   the container's overflow:hidden, NEVER shrunk to the capped box,
+   *   because a canvas box with the wrong aspect is exactly the §12
+   *   letterbox. Bottom-anchored + top-aligned canvas means the clip
+   *   eats the sheet's bottom; grabber/title/close button stay on screen
+   *   (pre-cap, tall content pushed them above the viewport top).
+   *
+   * Cheap no-op (float compares) on frames where nothing changed;
+   * viewport dimensions participate because both the cap and the natural
+   * CSS height move with them (rotation, iOS URL-bar collapse).
    */
   private syncAspectToArtboard(): void {
     if (!this.rive.isReady) return;
@@ -347,16 +387,39 @@ export class CardPanel {
     const width = bounds.maxX - bounds.minX;
     const height = bounds.maxY - bounds.minY;
     if (width <= 0 || height <= 0) return;
-    if (Math.abs(height - this.appliedBoundsHeight) < 0.5) return;
+    if (
+      Math.abs(height - this.appliedBoundsHeight) < 0.5 &&
+      window.innerWidth === this.appliedViewportWidth &&
+      window.innerHeight === this.appliedViewportHeight
+    ) {
+      return;
+    }
     this.appliedBoundsHeight = height;
-    this.container.style.aspectRatio = `${width} / ${height}`;
+    this.appliedViewportWidth = window.innerWidth;
+    this.appliedViewportHeight = window.innerHeight;
+
+    const canvas = this.rive.canvas;
+    const naturalCssHeight = (height / width) * window.innerWidth;
+    const maxCssHeight = window.innerHeight * CARD_MAX_VIEWPORT_HEIGHT_FRACTION;
+    const capped = naturalCssHeight > maxCssHeight;
+    if (capped) {
+      this.container.style.aspectRatio = '';
+      this.container.style.height = `${maxCssHeight}px`;
+      canvas.style.height = `${naturalCssHeight}px`;
+    } else {
+      this.container.style.height = '';
+      this.container.style.aspectRatio = `${width} / ${height}`;
+      canvas.style.height = '100%';
+    }
     const backingScale = Math.min(window.devicePixelRatio || 1, MAX_BACKING_SCALE);
-    // Through Rive's resize path (reads the just-reflowed CSS box) so its
-    // renderer alignment state stays coherent.
+    // Through Rive's resize path (reads the CANVAS's just-reflowed CSS
+    // box — the aspect-true one, capped or not) so its renderer alignment
+    // state stays coherent.
     this.rive.resizeDrawingSurface(backingScale);
     console.log(
       `[${traceT()}] [Card] artboard bounds ${width.toFixed(0)}x${height.toFixed(0)} — ` +
-        `container aspect + canvas backing re-synced (${this.rive.canvasWidth}x${this.rive.canvasHeight})`
+        `re-synced${capped ? ` (height capped at ${maxCssHeight.toFixed(0)}px, canvas ${naturalCssHeight.toFixed(0)}px clipped)` : ''} ` +
+        `backing=${this.rive.canvasWidth}x${this.rive.canvasHeight}`
     );
   }
 

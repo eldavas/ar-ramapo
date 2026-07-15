@@ -64,11 +64,15 @@ async function probeOne({ label, w, h }) {
     for (let i = 0; i < 50 && container.style.pointerEvents !== 'auto'; i++) await sleep(200);
     await sleep(1200); // content applied + Advance re-sync + resize settled
     const tapRect = container.getBoundingClientRect();
+    const tapCanvasRect = canvas ? canvas.getBoundingClientRect() : null;
     afterTap = {
       cardOpened: container.style.pointerEvents === 'auto',
       containerAspectRatio: container.style.aspectRatio,
+      containerStyleHeight: container.style.height,
       containerRect: { width: tapRect.width, height: tapRect.height },
+      canvasCssRect: tapCanvasRect ? { width: tapCanvasRect.width, height: tapCanvasRect.height } : null,
       canvasBacking: canvas ? `${canvas.width}x${canvas.height}` : null,
+      viewportHeight: win().innerHeight,
     };
   }
 
