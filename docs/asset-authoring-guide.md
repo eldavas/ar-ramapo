@@ -107,8 +107,14 @@ to the projected hotspot point):
 
 Author states to tolerate any flag combination and rapid toggling.
 
-**Artboard `Card`** — author at 350×480 (bottom-sheet portrait; rendered
-`min(92vw, 350px)` wide, bottom-center, aspect-ratio locked to the artboard).
+**Artboard `Card`** — author at 350×480 design size (bottom-sheet
+portrait; rendered full-width at the bottom of the screen). The
+artboard's Auto Layout height is **Hug and that is load-bearing**: the
+runtime lets the artboard grow/shrink with the bound content, and
+`CardPanel` re-syncs its CSS aspect and canvas backing from the live
+bounds every frame (troubleshooting doc §12). Keep width fixed at 350;
+changing the height sizing mode away from Hug is a contract change, not
+a cosmetic one.
 At rest (`isOpen` false) it must show nothing — "closed" is an artboard
 state, not a hidden canvas:
 

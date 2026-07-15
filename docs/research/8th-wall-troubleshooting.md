@@ -798,3 +798,102 @@ to `public/assets/bench-ui.riv`, and bump the manifest version on every
 entry that serves it (`bench-test`, `8thwall-test`) per §E. Then re-run
 `node tools/inspect_rive_ui.mjs` — the healthy signature is a non-zero
 state-machine pixel count — before spending any on-device session.
+
+## 12. The Card width bug (2026-07-14): Hug-height artboard × Fit.contain
+
+### Symptom
+
+On-device, the open Card renders visibly narrower than the screen —
+camera feed showing through symmetric side margins (~10% of the viewport
+per side on the captured example) — while the card's container div
+provably spans the full `100vw`.
+
+### Wrong turn first, recorded on purpose
+
+A first investigation pass measured the DOM (container rect == viewport
+at 320/393/430px), the computed styles (no max-width, no ancestor
+transform), and the rendered raster (solid pixels edge-to-edge at
+devicePixelRatio 1 AND 3) and concluded the shipped code could not
+produce margins — verdict "stale bundle on the device". That verdict was
+wrong, and the miss is instructive: **every one of those measurements ran
+with the placeholder text runs** (`Title` / `Subtitle` / `Paragraph`).
+The bug only exists with real content. Any future Card rendering probe
+must load sheet-length text before measuring.
+
+### The telemetry that broke the case
+
+The `[Card] open(...)` log line prints the artboard bounds. Across three
+different hotspots' real content it read **350×408, 350×604, 350×669** —
+the artboard's HEIGHT tracks the content. Two facts combine from there:
+
+1. **The `Card` artboard's Auto Layout height is authored as Hug.** Its
+   bounds re-resolve to the content height on the frame after any text
+   run changes (grows past 480 for real paragraphs, and also *shrinks* —
+   the placeholder content resolves to ~408). The artboard's design
+   width/height properties stay 350×480; only `bounds` moves.
+2. **`@rive-app/canvas` renders with `Fit.Contain` + `Alignment.Center`
+   by default** (`Layout` constructor defaults; `RiveController` passes
+   no layout). Contain against the app's fixed-aspect canvas
+   (350×480 × backingScale) letterboxes any artboard whose aspect no
+   longer matches.
+
+For bounds `350×H` with `H > 480`, contain becomes height-limited and
+the drawn artboard occupies a fixed **fraction `480/H` of the canvas
+width**, centered: H=604 → 79.5% wide → ~10.3% margins per side (the
+captured screenshot); H=669 → ~14% per side; H=408 → full width but a
+vertical dead band instead (the fixed 350/480 CSS aspect is wrong in
+both directions once the artboard hugs).
+
+Reproduced headlessly (Card + `CardMachine`, 700×960 canvas, setting
+only the `body` text run):
+
+| body content | artboard bounds | solid raster columns (of 700) |
+|---|---|---|
+| `Paragraph` (placeholder) | 350×407.6 | 0–699 (full width) |
+| sheet-length paragraph | 350×603.6 | **72–627** (≈10.3%/side letterbox) |
+| placeholder again | 350×407.6 | 0–699 (reversible) |
+
+Cross-validation: manually overriding the container in devtools to
+`width:125vw; left:-49px` made the card fill the screen exactly —
+because 125% ≈ 604/480, the geometric inverse of the letterbox, and
+−49px re-centers the 25vw overflow. (Constant-based, so it broke the
+other content lengths; kept here as confirmation, not as a fix.)
+
+Asset-structure notes from a direct object-level inspection of the
+binary (`tools/dump_riv_objects.py`), for whoever edits this file next:
+the white background is painted by the **unnamed root LayoutComponent's
+own background fill** (white, corner radius 24), not by a Shape, and
+spans the full 0–350 in artboard space (its serialized 347×520 / y=999
+design values are overridden by the layout at runtime). No
+ClippingShape objects exist in the artboard. `Card_Body` and
+`Card_Close_Button_Container` no longer exist as names — the redesign
+left the body container unnamed and the tap listener is
+`Card_Close_Button`.
+
+### The fix (code-side, keeping Hug)
+
+Hug is desirable — the sheet sizes itself to its content — so the stale
+half of the contract was `CardPanel`'s fixed 350/480 assumption, not the
+asset. `CardPanel.syncAspectToArtboard()` now re-derives the container's
+CSS `aspect-ratio` and the canvas backing store from the live artboard
+bounds, on the runtime's `Advance` event (layout results are never fresh
+synchronously after `setTextRunValue`). Canvas aspect == artboard aspect
+means `Fit.contain` fills the width by construction, for every content
+length. Backing resize goes through Rive's own
+`resizeDrawingSurfaceToCanvas(pixelRatio)` so renderer alignment state
+stays coherent; input mapping (`mapCanvasPointToArtboard`) needs no
+change — it mirrors the same contain math with live canvas dimensions.
+
+Verified end-to-end (`tools/run_width_probe.mjs`, which now also taps a
+real marker so the card opens with real sheet content): with the same
+long content that letterboxed to columns 72–627 before, container aspect
+re-syncs to `350/603.611`, backing to 786×1355 (aspect-matched), and the
+solid raster spans 0–785 of 786 — full width at all three test viewports.
+Reproduce the underlying asset behavior in isolation with
+`tools/inspect_card_growth.mjs`.
+
+One consequence to keep in mind: with Hug + long content the card is
+simply *taller* (677px on a 393×852 viewport for H=604) — that is the
+design working as intended, with drag-to-dismiss as the escape hatch —
+but content long enough to out-grow the screen should eventually get an
+authored max-height + internal scroll/clip decision in the asset.

@@ -207,6 +207,25 @@ export class RiveController {
     });
   }
 
+  /**
+   * Subscribes to the runtime's per-frame Advance event — the only point
+   * where Auto Layout results (artboard bounds on a Hug-sized artboard)
+   * are guaranteed fresh. Text-run writes do NOT recompute layout
+   * synchronously, so bounds read right after setText are stale.
+   */
+  onAdvance(handler: () => void): void {
+    this.rive.on(EventType.Advance, () => handler());
+  }
+
+  /**
+   * Resizes the canvas backing store to its current CSS box × pixelRatio,
+   * through Rive's own resize path so the renderer's alignment state stays
+   * coherent (a bare canvas.width write would leave a stale draw).
+   */
+  resizeDrawingSurface(pixelRatio: number): void {
+    this.rive.resizeDrawingSurfaceToCanvas(pixelRatio);
+  }
+
   /** Stops the render loop, releases the file handle, removes the canvas. */
   dispose(): void {
     this.rive.cleanup();

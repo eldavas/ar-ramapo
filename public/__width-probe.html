@@ -1,0 +1,182 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Card width probe (temporary instrumentation)</title>
+<style>body { margin: 0; background: #222; } iframe { border: 0; display: block; }</style>
+<script>
+// Card width diagnostic (AR_SYSTEM.md §G Phase 6 — see
+// tools/run_width_probe.mjs, its runner and docs). Loads the REAL app
+// (same origin, so the iframe DOM is reachable) in iframes sized like
+// device viewports, clicks through the arrival gate, waits for CardPanel's
+// container (the only z-index:20 div), and reports every sizing fact that
+// could constrain the Card's width — DOM and canvas raster both. Inert
+// unless the runner's collector is listening on 127.0.0.1:4600; kept in
+// /public because it must be same-origin with the app it measures.
+const COLLECTOR = 'http://127.0.0.1:4600/report';
+const SIZES = [
+  { label: 'iPhone-SE 320x568', w: 320, h: 568 },
+  { label: 'iPhone-14Pro 393x852', w: 393, h: 852 },
+  { label: 'iPhone-15ProMax 430x932', w: 430, h: 932 },
+];
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function probeOne({ label, w, h }) {
+  const frame = document.createElement('iframe');
+  frame.width = w;
+  frame.height = h;
+  frame.src = '/?fakegeo=1&fakear=1';
+  document.body.appendChild(frame);
+
+  const doc = () => frame.contentDocument;
+  const win = () => frame.contentWindow;
+
+  // 1. Arrival gate: click the "Find it" button when it appears.
+  for (let i = 0; i < 100; i++) {
+    const button = [...doc().querySelectorAll('button')].find((b) => b.textContent === 'Find it');
+    if (button) { button.click(); break; }
+    await sleep(200);
+  }
+
+  // 2. Wait for CardPanel's container: the only fixed div at z-index 20.
+  let container = null;
+  for (let i = 0; i < 150; i++) {
+    container = [...doc().querySelectorAll('div')].find((d) => d.style.zIndex === '20');
+    if (container) break;
+    await sleep(200);
+  }
+  if (!container) {
+    return { label, error: 'CardPanel container (z-index:20 div) never appeared' };
+  }
+  await sleep(500); // let the canvas mount + first layout settle
+
+  const canvas = container.querySelector('canvas');
+  await sleep(1000); // a few rendered frames
+
+  // 3. Open the card with REAL sheet content: dispatch a pointerup on a
+  // marker element (MarkerLayer fires its tap handler on pointerup at the
+  // DOM level — no visibility/hit-testing required for a direct dispatch).
+  // Long real content is what makes the Hug-height artboard grow past 480
+  // and exposes the Fit.contain horizontal letterbox this probe hunts.
+  let afterTap = null;
+  const marker = doc().querySelector('[role="button"]');
+  if (marker) {
+    marker.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, clientX: 0, clientY: 0 }));
+    for (let i = 0; i < 50 && container.style.pointerEvents !== 'auto'; i++) await sleep(200);
+    await sleep(1200); // content applied + Advance re-sync + resize settled
+    const tapRect = container.getBoundingClientRect();
+    afterTap = {
+      cardOpened: container.style.pointerEvents === 'auto',
+      containerAspectRatio: container.style.aspectRatio,
+      containerRect: { width: tapRect.width, height: tapRect.height },
+      canvasBacking: canvas ? `${canvas.width}x${canvas.height}` : null,
+    };
+  }
+
+  // Raster inspection: where does the drawn artwork actually START and END
+  // horizontally inside the backing store? Transparent side columns here
+  // are invisible to every DOM measurement but read as "margins" on screen.
+  let raster = null;
+  if (canvas) {
+    try {
+      const ctx = canvas.getContext('2d');
+      const { width: cw, height: ch } = canvas;
+      const data = ctx.getImageData(0, 0, cw, ch).data;
+      let minX = cw, maxX = -1, opaque = 0;
+      let solidMinX = cw, solidMaxX = -1;
+      for (let y = 0; y < ch; y++) {
+        for (let x = 0; x < cw; x++) {
+          const alpha = data[(y * cw + x) * 4 + 3];
+          if (alpha > 8) {
+            opaque++;
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+          }
+          if (alpha > 200) {
+            if (x < solidMinX) solidMinX = x;
+            if (x > solidMaxX) solidMaxX = x;
+          }
+        }
+      }
+      // Solid (alpha>200) extents per row at 25/50/75% height: a soft
+      // shadow can reach x=0 while the card BODY is inset — only a
+      // per-row solid scan can tell those apart.
+      const rowSolid = [0.25, 0.5, 0.75].map((f) => {
+        const y = Math.floor(ch * f);
+        let lo = -1, hi = -1;
+        for (let x = 0; x < cw; x++) {
+          if (data[(y * cw + x) * 4 + 3] > 200) { if (lo === -1) lo = x; hi = x; }
+        }
+        return { yFraction: f, solidStartX: lo, solidEndX: hi };
+      });
+      raster = {
+        backingStore: `${cw}x${ch}`,
+        opaquePixels: opaque,
+        drawnMinX: minX,
+        drawnMaxX: maxX,
+        solidMinX,
+        solidMaxX,
+        rowSolid,
+      };
+    } catch (error) {
+      raster = { error: String(error) };
+    }
+  }
+
+  const rect = container.getBoundingClientRect();
+  const canvasRect = canvas ? canvas.getBoundingClientRect() : null;
+  const cs = win().getComputedStyle(container);
+  const bodyCs = win().getComputedStyle(doc().body);
+  return {
+    label,
+    viewport: {
+      innerWidth: win().innerWidth,
+      innerHeight: win().innerHeight,
+      clientWidth: doc().documentElement.clientWidth,
+      devicePixelRatio: win().devicePixelRatio,
+      visualViewportWidth: win().visualViewport ? win().visualViewport.width : null,
+      visualViewportScale: win().visualViewport ? win().visualViewport.scale : null,
+    },
+    container: {
+      rect: { left: rect.left, right: rect.right, width: rect.width, height: rect.height },
+      computed: {
+        width: cs.width,
+        maxWidth: cs.maxWidth,
+        minWidth: cs.minWidth,
+        left: cs.left,
+        right: cs.right,
+        position: cs.position,
+        aspectRatio: cs.aspectRatio,
+        transform: cs.transform,
+        boxSizing: cs.boxSizing,
+      },
+      cssTextInline: container.style.cssText,
+      parentTag: container.parentElement ? container.parentElement.tagName : null,
+    },
+    canvas: canvas
+      ? {
+          rect: { left: canvasRect.left, width: canvasRect.width, height: canvasRect.height },
+          attrWidth: canvas.width,
+          attrHeight: canvas.height,
+          computedWidth: win().getComputedStyle(canvas).width,
+          cssTextInline: canvas.style.cssText,
+        }
+      : null,
+    raster,
+    afterTap,
+    bodyTransform: bodyCs.transform,
+    htmlTransform: win().getComputedStyle(doc().documentElement).transform,
+  };
+}
+
+addEventListener('DOMContentLoaded', async () => {
+  const results = [];
+  for (const size of SIZES) {
+    try {
+      results.push(await probeOne(size));
+    } catch (error) {
+      results.push({ label: size.label, error: String(error) });
+    }
+  }
+  await fetch(COLLECTOR, { method: 'POST', body: JSON.stringify(results, null, 2) }).catch(() => {});
+});
+</script>

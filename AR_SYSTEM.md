@@ -1022,13 +1022,41 @@ schema above.
     visible side gaps on any phone wider than ~380px. Changed to `100vw`;
     the now-unneeded `left:50%;transform:translateX(-50%)` centering was
     dropped for a plain `left:0`.
-  - **Still open**: despite the fix above, the Card is still reported not
-    filling the screen width on-device. Verified both halves of the
-    obvious explanation are *not* it — the compiled bundle's `cssText`
-    string is confirmed `width:100vw;left:0` with no trace of the old
-    value, and the Rive artwork's own `Card_Body` spans the full 0–350 of
-    the 350-wide artboard (no internal inset baked into the asset either).
-    Root cause not yet found; paused pending a fresh on-device screenshot.
+  - **Width-bug follow-up (2026-07-14, second pass): not reproducible in
+    the current build — every layer measured full-width.** A new probe
+    harness (`tools/run_width_probe.mjs` + `public/__width-probe.html`)
+    loads the real app at 320/393/430-px viewports in headless Chrome,
+    walks the arrival gate, and measures the whole chain. Results, at
+    devicePixelRatio 1 AND 3 (the dpr≥2 path is the on-device
+    `backingScale=2` / 700×960-canvas condition):
+    container `getBoundingClientRect()` = exactly the viewport width at
+    every size (`left:0`, no max/min-width, no ancestor transform, body
+    parent); canvas CSS box likewise; and the rendered raster itself is
+    solid (alpha>200) from column 0 to the last column on every sampled
+    row — so no CSS constraint, no Fit/alignment letterboxing, and no
+    artwork inset (a soft shadow reaching x=0 over an inset body was
+    explicitly ruled out by the per-row solid scan). With the DOM, the
+    backing store, and the pixels all edge-to-edge, there is nothing left
+    in the shipped code that can produce side margins.
+    That pass's "stale bundle" verdict was **wrong** — its measurements
+    all ran with placeholder text. See the third-pass entry below.
+  - **Width bug RESOLVED (third pass, same day): Hug-height artboard ×
+    Fit.contain letterbox — fixed in `CardPanel`.** The `Card` artboard's
+    Auto Layout height is authored as Hug, so its bounds track the
+    content (`350×408/604/669` measured across real sheet rows) while
+    `CardPanel` assumed a fixed 350×480 canvas; `@rive-app/canvas`'s
+    default `Fit.Contain` then letterboxes the taller artboard
+    horizontally — visible width fraction = `480/H`, ≈10% camera-feed
+    margins per side at H≈604, none at all with short/placeholder
+    content (which is why the second pass measured clean).
+    `CardPanel.syncAspectToArtboard()` now re-derives the container's
+    CSS aspect-ratio and the canvas backing from the live artboard
+    bounds on the runtime's Advance event, so canvas aspect ==
+    artboard aspect and contain fills the width for every content
+    length. Verified end-to-end with a real marker tap + real sheet
+    content at 320/393/430px viewports: raster solid to both edges
+    where the same content letterboxed 72–627/700 before. Full
+    narrative, math, and probe tooling: troubleshooting doc §12.
 
   **Exit condition:** the `8thwall-test` rig passes the same functional
   bar as `bench-test` — markers persist on tracked content, tapping opens

@@ -17,9 +17,13 @@ const TEXT_RUN_BODY = 'body';
 const EVENT_CLOSE_REQUESTED = 'closeRequested';
 export const CARD_IMAGE_ASSET_NAME = 'cardImage';
 
-// Authored artboard size (350×480 portrait bottom sheet) — the CSS box
-// keeps this aspect and the backing store renders it at up to 2× for
-// retina sharpness.
+// Authored artboard DESIGN size (350×480 portrait bottom sheet) — only the
+// initial CSS aspect and backing store, valid until the first frame. The
+// Card artboard's Auto Layout height is authored as Hug: at runtime its
+// bounds height tracks the content (measured 408–669 across real sheet
+// rows), and syncAspectToArtboard() re-derives the CSS aspect and backing
+// from the live bounds every time they change. The backing renders at up
+// to 2× for retina sharpness.
 const CARD_CSS_WIDTH = '100vw';
 const CARD_ARTBOARD_WIDTH = 350;
 const CARD_ARTBOARD_HEIGHT = 480;
@@ -154,6 +158,12 @@ export class CardPanel {
   private dragEligible = true;
   private lastMoveY = 0;
   private lastMoveTime = 0;
+
+  // Last artboard bounds height the container/backing were sized for.
+  // Seeded with the design height; the first Advance replaces it with the
+  // real Hug-resolved height (the placeholder content resolves to ~408,
+  // not 480, so the very first frame already re-syncs).
+  private appliedBoundsHeight = CARD_ARTBOARD_HEIGHT;
 
   constructor(riveFile: RiveFile, private readonly imageSlot: CardImageSlot) {
     this.container = document.createElement('div');
@@ -314,6 +324,40 @@ export class CardPanel {
         this.closeHandler?.();
       }
     });
+    // The Card artboard's Auto Layout height is Hug: every content change
+    // (open() setting text runs) re-resolves the artboard bounds on a later
+    // frame, never synchronously — so this listens to the runtime's own
+    // Advance tick instead of hooking open(). Without the re-sync, the
+    // default Fit.contain letterboxes the now-taller artboard horizontally
+    // inside the fixed-aspect canvas: visible width fraction = 480/H, i.e.
+    // ~10% camera-feed margins per side at H≈604 (troubleshooting doc §12).
+    this.syncAspectToArtboard();
+    this.rive.onAdvance(() => this.syncAspectToArtboard());
+  }
+
+  /**
+   * Re-derives the container's CSS aspect and the canvas backing store
+   * from the live artboard bounds, so canvas aspect === artboard aspect
+   * and Fit.contain fills the full width by construction. Cheap no-op
+   * (two float compares) on the frames where bounds didn't change.
+   */
+  private syncAspectToArtboard(): void {
+    if (!this.rive.isReady) return;
+    const bounds = this.rive.bounds;
+    const width = bounds.maxX - bounds.minX;
+    const height = bounds.maxY - bounds.minY;
+    if (width <= 0 || height <= 0) return;
+    if (Math.abs(height - this.appliedBoundsHeight) < 0.5) return;
+    this.appliedBoundsHeight = height;
+    this.container.style.aspectRatio = `${width} / ${height}`;
+    const backingScale = Math.min(window.devicePixelRatio || 1, MAX_BACKING_SCALE);
+    // Through Rive's resize path (reads the just-reflowed CSS box) so its
+    // renderer alignment state stays coherent.
+    this.rive.resizeDrawingSurface(backingScale);
+    console.log(
+      `[${traceT()}] [Card] artboard bounds ${width.toFixed(0)}x${height.toFixed(0)} — ` +
+        `container aspect + canvas backing re-synced (${this.rive.canvasWidth}x${this.rive.canvasHeight})`
+    );
   }
 
   detach(): void {
@@ -346,7 +390,15 @@ export class CardPanel {
           ? 'already open, firing refresh pulse'
           : 'opening: sliding up, pointerEvents=auto (container now intercepts every tap in its box)') +
         ` | artboard bounds=${(bounds.maxX - bounds.minX).toFixed(0)}x${(bounds.maxY - bounds.minY).toFixed(0)}` +
-        ` container=${this.container.getBoundingClientRect().width.toFixed(0)}x${this.container.getBoundingClientRect().height.toFixed(0)}`
+        ` container=${this.container.getBoundingClientRect().width.toFixed(0)}x${this.container.getBoundingClientRect().height.toFixed(0)}` +
+        // viewport + backing alongside the container: one line decides the
+        // width-bug class on a device capture. container < viewport = a
+        // real layout constraint (report the numbers); equal but margins
+        // visible = artwork/raster (tools/run_width_probe.mjs measures
+        // that); this segment absent entirely = the device loaded a stale
+        // bundle (the 2026-07-14 "not full width" report's likely cause).
+        ` viewport=${window.innerWidth}x${window.innerHeight}` +
+        ` canvasBacking=${this.rive.canvasWidth}x${this.rive.canvasHeight} dpr=${window.devicePixelRatio}`
     );
     this.rive.setText(TEXT_RUN_TITLE, content.title);
     this.rive.setText(TEXT_RUN_SUBTITLE, content.subtitle ?? '');
