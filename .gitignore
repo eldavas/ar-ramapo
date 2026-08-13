@@ -3,5 +3,6 @@ node_modules/
 .DS_Store
 .env
 dist/
-cad-source/
+cad-source/*
+!cad-source/handoff/
 __pycache__/
