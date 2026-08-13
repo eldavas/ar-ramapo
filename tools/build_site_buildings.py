@@ -37,6 +37,22 @@ Still entirely missing: the raised enclosed pedestrian walkway linking the
 residences to the events building — not present in this DWG on any layer,
 needs a separate source.
 
+REVISION (2026-08-13): added a placeholder mounting ledge + 4 QR-plaque
+markers around the terrain footprint (AR_SYSTEM.md §A/§E four-plaque
+design). The physical model has a blank border where the real "RAMAPO
+SITE" title block/scale bar sit today (see the reference photo in this
+session) and where the 4 real plaques will mount — confirmed this is
+fabrication-only information, absent from every DXF layer (only 3 of 16
+layers carry any geometry at all: topo, buildings, laser-cut grid; topo
+contour data was independently confirmed to reach every crop edge with no
+reserved gap). User confirmed the ledge runs uniformly on all 4 sides (so
+the equal-width-on-every-side geometry below is real, not a placeholder
+assumption) but the exact width is still pending the coworker's answer;
+`LEDGE_WIDTH_M` below is a best guess, not a measurement — treat the
+ledge/plaque geometry in this file as visual placeholders only, each
+flagged with a `placeholder` userData key, and swap `LEDGE_WIDTH_M` (and
+re-run) the moment the real number lands.
+
 SCOPE: no hotspots, not wired into the experience manifest — same staging
 caveat as build_site_terrain.py.
 """
@@ -61,6 +77,25 @@ BUILDING_COLOR_PLACEHOLDER = (0.90, 0.55, 0.15, 1.0)  # still estimated
 USERDATA_BUILDING_ID_KEY = "buildingId"
 USERDATA_HEIGHT_ESTIMATED_KEY = "heightEstimated"
 USERDATA_MATCHED_NAME_KEY = "matchedName"
+
+IN_TO_M = 0.0254
+
+# --- Ledge + QR-plaque placeholders (AR_SYSTEM.md §A/§E four-plaque design)
+# NOT sourced from the DWG — see the REVISION (2026-08-13) note above. Real
+# board material at true physical size, so these are converted straight
+# from inches/mm, NOT through FT_TO_MODEL_M (that factor is for the 1:960
+# geographic terrain only).
+LEDGE_WIDTH_M = 3.0 * IN_TO_M  # best guess from the reference photo — PLACEHOLDER, not measured
+LEDGE_THICKNESS_M = 0.01       # visual thickness only; top face sits flush with terrain Z=0
+
+PLAQUE_SIZE_M = 0.05           # reuses build_bench_scene.py's bench-test 50mm plaque convention
+PLAQUE_THICKNESS_M = 0.002     # matches build_bench_scene.py's PLAQUE_THICKNESS
+
+LEDGE_COLOR = (0.78, 0.71, 0.58, 1.0)              # lighter than terrain — visually distinct band
+PLAQUE_PLACEHOLDER_COLOR = (1.0, 0.05, 0.75, 1.0)  # loud magenta — unmistakably not final artwork
+
+USERDATA_PLACEHOLDER_KEY = "placeholder"
+USERDATA_PLAQUE_SIDE_KEY = "plaqueSide"
 
 
 def link(obj: bpy.types.Object) -> bpy.types.Object:
@@ -155,6 +190,87 @@ def build_buildings(data: dict) -> list:
     return objects
 
 
+def build_ledge_and_plaques(terrain_data: dict) -> tuple:
+    """Placeholder mounting ledge + 4 QR-plaque markers around the terrain
+    footprint. Width/thickness/plaque size are all best-guess constants
+    (see REVISION 2026-08-13 in the module docstring) pending the
+    coworker's real measurement — everything built here carries a
+    `placeholder` userData flag so it's unmistakable on later inspection.
+    Deliberately does NOT compute manifest-ready originOffsetMeters/
+    rotationYawDeg (§E blocks those on the real measurement too; this
+    script doesn't get ahead of that)."""
+    width_ft, depth_ft = terrain_data["crop_size_ft"]
+    ft_to_model_m = terrain_data["ft_to_model_m"]
+    width_m = width_ft * ft_to_model_m
+    depth_m = depth_ft * ft_to_model_m
+    L = LEDGE_WIDTH_M
+
+    # 4 strips tiling the border with no gaps/overlaps: front/back extend
+    # past the corners, left/right fill just the remaining depth span.
+    strips = {
+        "front": ((-L, width_m + L), (0.0, L)),
+        "back": ((-L, width_m + L), (-depth_m - L, -depth_m)),
+        "left": ((-L, 0.0), (-depth_m, 0.0)),
+        "right": ((width_m, width_m + L), (-depth_m, 0.0)),
+    }
+
+    bm = bmesh.new()
+    base_faces = []
+    for (x0, x1), (y0, y1) in strips.values():
+        v0 = bm.verts.new((x0, y0, 0.0))
+        v1 = bm.verts.new((x1, y0, 0.0))
+        v2 = bm.verts.new((x1, y1, 0.0))
+        v3 = bm.verts.new((x0, y1, 0.0))
+        base_faces.append(bm.faces.new((v0, v1, v2, v3)))
+    extrude = bmesh.ops.extrude_face_region(bm, geom=base_faces)
+    new_verts = [g for g in extrude["geom"] if isinstance(g, bmesh.types.BMVert)]
+    bmesh.ops.translate(bm, vec=(0.0, 0.0, LEDGE_THICKNESS_M), verts=new_verts)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+
+    mesh = bpy.data.meshes.new("site_ledge")
+    bm.to_mesh(mesh)
+    bm.free()
+
+    ledge = bpy.data.objects.new("site_ledge", mesh)
+    ledge.data.materials.append(make_material("mat_site_ledge", LEDGE_COLOR))
+    ledge[USERDATA_PLACEHOLDER_KEY] = True
+    link(ledge)
+
+    # One QR-plaque placeholder centered on each side's ledge strip.
+    plaque_group = make_empty("Plaques")
+    plaque_centers = {
+        "front": (width_m / 2.0, L / 2.0),
+        "back": (width_m / 2.0, -depth_m - L / 2.0),
+        "left": (-L / 2.0, -depth_m / 2.0),
+        "right": (width_m + L / 2.0, -depth_m / 2.0),
+    }
+    plaques = []
+    for side, (cx, cy) in plaque_centers.items():
+        pbm = bmesh.new()
+        bmesh.ops.create_cube(pbm, size=1.0)
+        bmesh.ops.scale(pbm, vec=(PLAQUE_SIZE_M, PLAQUE_SIZE_M, PLAQUE_THICKNESS_M), verts=pbm.verts)
+        bmesh.ops.translate(
+            pbm, vec=(cx, cy, LEDGE_THICKNESS_M + PLAQUE_THICKNESS_M / 2.0), verts=pbm.verts
+        )
+        pmesh = bpy.data.meshes.new(f"plaque_{side}")
+        pbm.to_mesh(pmesh)
+        pbm.free()
+
+        pobj = bpy.data.objects.new(f"plaque_{side}", pmesh)
+        pobj.data.materials.append(make_material(f"mat_plaque_{side}", PLAQUE_PLACEHOLDER_COLOR))
+        pobj.parent = plaque_group
+        pobj[USERDATA_PLACEHOLDER_KEY] = True
+        pobj[USERDATA_PLAQUE_SIDE_KEY] = side
+        link(pobj)
+        plaques.append(pobj)
+
+    print(
+        f"  built ledge (width {LEDGE_WIDTH_M / IN_TO_M:.1f} in, PLACEHOLDER) "
+        f"+ {len(plaques)} plaque placeholders (one per side, PLACEHOLDER)"
+    )
+    return ledge, plaque_group
+
+
 def build_scene() -> None:
     bpy.ops.wm.read_factory_settings(use_empty=True)
     scene = bpy.context.scene
@@ -173,6 +289,10 @@ def build_scene() -> None:
     buildings_group = build_buildings(buildings_data)
     if buildings_group:
         buildings_group[0].parent.parent = origin
+
+    ledge, plaque_group = build_ledge_and_plaques(terrain_data)
+    ledge.parent = origin
+    plaque_group.parent = origin
 
     bpy.context.view_layer.update()
 
