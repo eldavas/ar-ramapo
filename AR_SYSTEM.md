@@ -717,10 +717,20 @@ schema above.
   the screen-space/world-space taxonomy (§F, also recorded 2026-08-10):
     - *Building color/material highlight on tap* — world-space. Needs a
       hotspot-to-building association at the asset level (a new `userData`
-      key on the hotspot, per the Golden Rule — not yet designed in the
-      schema) so the runtime can identify and tint the specific mesh being
-      explored. Otherwise cheap: a one-time material swap, no sustained
-      per-frame cost.
+      key on the hotspot, per the Golden Rule) so the runtime can identify
+      and tint the specific mesh being explored. **Asset-level schema
+      designed and first-pass built 2026-08-13**: `tools/build_site_buildings.py`
+      now authors a `hotspot_*` empty per building with a real matched
+      name (12 of 21 — see the digital-twin sourcing notes for which),
+      each carrying `buildingId` (the association key), plus `label`/
+      `contentKey` for the future Card. The other 9 buildings (no real
+      name yet) intentionally have no hotspot. `riveArtboard`/
+      `riveStateMachine` are still unset — no Card/Marker UI has been
+      designed for buildings yet, and the runtime tap-handler that reads
+      `buildingId` to actually tint a mesh doesn't exist yet either; this
+      closes the asset-schema gap only, not the interaction itself.
+      Otherwise cheap: a one-time material swap, no sustained per-frame
+      cost.
     - *Contour-constrained particle "pulse" animation*, traveling along a
       topographic elevation line on tap/proximity — world-space, and
       explicitly **not** a Rive capability regardless of how the idea is

@@ -53,11 +53,29 @@ ledge/plaque geometry in this file as visual placeholders only, each
 flagged with a `placeholder` userData key, and swap `LEDGE_WIDTH_M` (and
 re-run) the moment the real number lands.
 
-SCOPE: no hotspots, not wired into the experience manifest — same staging
-caveat as build_site_terrain.py.
+REVISION (2026-08-13, later same day): added `hotspot_*` empties for the
+12 buildings with real matched names (AR_SYSTEM.md §G's "building
+highlight-on-tap" forward design, first pass — first of the three
+candidate content/animation additions listed there, and the design notes'
+"not yet designed in the schema" gap is what this closes). Per the Golden
+Rule (§E), each hotspot is a separate empty (never the building mesh
+itself — a co-located hotspot mesh would self-occlude in
+`HotspotProjector`), parented to its building the same way
+`build_bench_scene.py` parents `hotspot_domino_N` to its domino, carrying
+`buildingId` (the new hotspot->building association key) plus
+`label`/`contentKey` for the future Card. The other 9 buildings (no real
+name, still on the flat placeholder height) intentionally get no hotspot
+yet — a deliberate first pass, not an oversight; `riveArtboard`/
+`riveStateMachine` are also deliberately omitted, since no Card/Marker UI
+has been designed for buildings yet and inventing placeholder Rive
+bindings would be fabricated data with no artboard behind it.
+
+SCOPE: hotspots exist on the 12 named buildings only, not wired into the
+experience manifest — same staging caveat as build_site_terrain.py.
 """
 
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -96,6 +114,12 @@ PLAQUE_PLACEHOLDER_COLOR = (1.0, 0.05, 0.75, 1.0)  # loud magenta — unmistakab
 
 USERDATA_PLACEHOLDER_KEY = "placeholder"
 USERDATA_PLAQUE_SIDE_KEY = "plaqueSide"
+
+# --- Building hotspots (AR_SYSTEM.md §E Golden Rule, §G building
+# highlight-on-tap forward design) ---
+HOTSPOT_PREFIX = "hotspot_"
+USERDATA_LABEL_KEY = "label"
+USERDATA_CONTENT_KEY = "contentKey"
 
 
 def link(obj: bpy.types.Object) -> bpy.types.Object:
@@ -188,6 +212,43 @@ def build_buildings(data: dict) -> list:
           f"{matched} with real table heights (blue), "
           f"{len(objects) - matched} on the flat placeholder (orange)")
     return objects
+
+
+def slugify(text: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", text.strip().lower()).strip("-")
+
+
+def build_building_hotspots(data: dict, building_objects: list) -> list:
+    """One hotspot_* empty per building with a real matched name (12 of 21
+    — see REVISION 2026-08-13 in the module docstring). Positioned at each
+    building's roof-center (footprint centroid, base_z + height) so the
+    HotspotProjector's screen marker sits over the visible building.
+    Parented to its building object, mirroring build_bench_scene.py's
+    `hotspot.parent = domino` — building objects have identity transform
+    (mesh data already holds absolute coordinates), so the hotspot's
+    `.location` is both its local and world position either way."""
+    by_id = {obj.name: obj for obj in building_objects}
+    hotspots = []
+    for b in data["buildings"]:
+        name = b.get("matched_name")
+        if not name:
+            continue
+        footprint = b["footprint_m"]
+        cx = sum(p[0] for p in footprint) / len(footprint)
+        cy = sum(p[1] for p in footprint) / len(footprint)
+        cz = b["base_z_m"] + b["height_m"]
+
+        hotspot = make_empty(f"{HOTSPOT_PREFIX}{b['id']}")
+        hotspot.parent = by_id[b["id"]]
+        hotspot.location = (cx, cy, cz)
+        hotspot[USERDATA_LABEL_KEY] = name
+        hotspot[USERDATA_CONTENT_KEY] = f"site-building-{slugify(name)}"
+        hotspot[USERDATA_BUILDING_ID_KEY] = b["id"]
+        hotspots.append(hotspot)
+
+    print(f"  built {len(hotspots)} building hotspots (named buildings only; "
+          f"{len(data['buildings']) - len(hotspots)} unnamed buildings skipped for now)")
+    return hotspots
 
 
 def build_ledge_and_plaques(terrain_data: dict) -> tuple:
@@ -289,6 +350,8 @@ def build_scene() -> None:
     buildings_group = build_buildings(buildings_data)
     if buildings_group:
         buildings_group[0].parent.parent = origin
+
+    build_building_hotspots(buildings_data, buildings_group)
 
     ledge, plaque_group = build_ledge_and_plaques(terrain_data)
     ledge.parent = origin

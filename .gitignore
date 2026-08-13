@@ -6,3 +6,4 @@ dist/
 cad-source/*
 !cad-source/handoff/
 __pycache__/
+*.blend1
