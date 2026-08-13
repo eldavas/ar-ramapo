@@ -102,6 +102,12 @@ HEIGHT_TABLE = [
 
 
 def derive_crop_rectangle(msp):
+    """Returns (origin_x, origin_y, angle_rad, width_ft, depth_ft, u_sign).
+    Origin corner and u_sign: see extract_site_terrain.py's identical
+    function — both scripts must derive the exact same origin/axes for
+    terrain and buildings to align, kept as duplicated logic rather than
+    a shared import (matches this project's existing split-script
+    convention)."""
     lines = [e for e in msp if e.dxftype() == "LINE" and e.dxf.layer == CROP_LAYER]
     if not lines:
         raise RuntimeError(f"no LINE entities on layer {CROP_LAYER!r} — crop rectangle undetectable")
@@ -126,11 +132,12 @@ def derive_crop_rectangle(msp):
     ref_x, ref_y = next(iter(pts))
     best = min(pts, key=lambda p: ((p[0] - ref_x) * ux + (p[1] - ref_y) * uy,
                                     (p[0] - ref_x) * vx + (p[1] - ref_y) * vy))
-    return best[0], best[1], angle, width_ft, depth_ft
+    ox, oy = best[0] + width_ft * ux, best[1] + width_ft * uy
+    return ox, oy, angle, width_ft, depth_ft, -1.0
 
 
-def to_local_uv(x, y, ox, oy, angle):
-    ux, uy = math.cos(angle), math.sin(angle)
+def to_local_uv(x, y, ox, oy, angle, u_sign=1.0):
+    ux, uy = u_sign * math.cos(angle), u_sign * math.sin(angle)
     vx, vy = -math.sin(angle), math.cos(angle)
     dx, dy = x - ox, y - oy
     return dx * ux + dy * uy, dx * vx + dy * vy
@@ -173,7 +180,7 @@ def nearest_terrain_z_m(terrain_verts_m, x_m, y_m):
 def main():
     doc = ezdxf.readfile(str(DXF_PATH))
     msp = doc.modelspace()
-    ox, oy, angle, width_ft, depth_ft = derive_crop_rectangle(msp)
+    ox, oy, angle, width_ft, depth_ft, u_sign = derive_crop_rectangle(msp)
 
     terrain = json.loads(TERRAIN_JSON.read_text())
     min_elev_ft = terrain["min_elevation_ft"]
@@ -191,7 +198,7 @@ def main():
         dim_a, dim_b = obb_dims(pts_dwg)
         if dim_a < dim_b:
             dim_a, dim_b = dim_b, dim_a
-        uv = [to_local_uv(x, y, ox, oy, angle) for x, y in pts_dwg]
+        uv = [to_local_uv(x, y, ox, oy, angle, u_sign) for x, y in pts_dwg]
         centroid_u = sum(u for u, _ in uv) / len(uv)
         centroid_v = sum(v for _, v in uv) / len(uv)
         centroid_m = (centroid_u * FT_TO_MODEL_M, centroid_v * FT_TO_MODEL_M)

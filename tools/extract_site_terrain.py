@@ -70,9 +70,22 @@ PAD_FT = 150.0
 
 
 def derive_crop_rectangle(msp):
-    """Returns (origin_x, origin_y, angle_rad, width_ft, depth_ft) for the
-    panel footprint, read from the 00 LASER CUT layer's 7 grid lines (3
-    dividers spanning the depth, 4 spanning the width) rather than assumed."""
+    """Returns (origin_x, origin_y, angle_rad, width_ft, depth_ft, u_sign)
+    for the panel footprint, read from the 00 LASER CUT layer's 7 grid
+    lines (3 dividers spanning the depth, 4 spanning the width) rather
+    than assumed.
+
+    Origin corner (2026-08-13): confirmed against the reference photo
+    (RAMAPO SITE plaque corner) by cross-referencing the real building
+    cluster position — the buildings hug the SAME v=0 edge the corner
+    below sits on, at the OPPOSITE u end, matching the photo's bare-ridge
+    gap on the RAMAPO SITE side vs. the building-covered far end of that
+    edge. `u_sign=-1.0` mirrors u only (v is untouched: the origin sits on
+    the same v=0 edge as the panel-grid's naturally-derived corner, so
+    every v value is identical either way — only which end of that edge is
+    u=0 changes). This can't be expressed as a single rotation `angle`
+    (u flips, v doesn't — a reflection, not a rotation), hence the
+    separate `u_sign` every `to_local_uv` call must multiply in."""
     lines = [e for e in msp if e.dxftype() == "LINE" and e.dxf.layer == CROP_LAYER]
     if not lines:
         raise RuntimeError(f"no LINE entities on layer {CROP_LAYER!r} — crop rectangle undetectable")
@@ -100,11 +113,14 @@ def derive_crop_rectangle(msp):
     ref_x, ref_y = next(iter(pts))
     best = min(pts, key=lambda p: ((p[0] - ref_x) * ux + (p[1] - ref_y) * uy,
                                     (p[0] - ref_x) * vx + (p[1] - ref_y) * vy))
-    return best[0], best[1], angle, width_ft, depth_ft
+    # `best` is the panel-grid corner on the buildings' end of the v=0
+    # edge; the RAMAPO SITE corner is the other end of that same edge.
+    ox, oy = best[0] + width_ft * ux, best[1] + width_ft * uy
+    return ox, oy, angle, width_ft, depth_ft, -1.0
 
 
-def to_local_uv(x, y, ox, oy, angle):
-    ux, uy = math.cos(angle), math.sin(angle)
+def to_local_uv(x, y, ox, oy, angle, u_sign=1.0):
+    ux, uy = u_sign * math.cos(angle), u_sign * math.sin(angle)
     vx, vy = -math.sin(angle), math.cos(angle)
     dx, dy = x - ox, y - oy
     return dx * ux + dy * uy, dx * vx + dy * vy
@@ -145,9 +161,10 @@ def main():
     doc = ezdxf.readfile(str(DXF_PATH))
     msp = doc.modelspace()
 
-    ox, oy, angle, width_ft, depth_ft = derive_crop_rectangle(msp)
-    print(f"crop origin: ({ox:.3f}, {oy:.3f})  bearing: {math.degrees(angle):.4f} deg  "
-          f"size: {width_ft:.1f} x {depth_ft:.1f} ft")
+    ox, oy, angle, width_ft, depth_ft, u_sign = derive_crop_rectangle(msp)
+    print(f"crop origin (RAMAPO SITE plaque corner): ({ox:.3f}, {oy:.3f})  "
+          f"v-axis reference bearing: {math.degrees(angle):.4f} deg  "
+          f"u_sign: {u_sign:+.0f}  size: {width_ft:.1f} x {depth_ft:.1f} ft")
 
     proxy = next(e for e in msp if e.dxftype() == "ACAD_PROXY_ENTITY" and e.dxf.layer == TOPO_LAYER)
     virtual = list(proxy.virtual_entities())
@@ -163,7 +180,7 @@ def main():
     pts_before = pts_after = 0
     for poly in all_polys:
         elev_ft = round(poly.vertices[0].dxf.location.z, 1)
-        uv_chain = [to_local_uv(v.dxf.location.x, v.dxf.location.y, ox, oy, angle) for v in poly.vertices]
+        uv_chain = [to_local_uv(v.dxf.location.x, v.dxf.location.y, ox, oy, angle, u_sign) for v in poly.vertices]
         in_padded = [
             (u, v) for u, v in uv_chain
             if -PAD_FT <= u <= width_ft + PAD_FT and -depth_ft - PAD_FT <= v <= PAD_FT
@@ -216,7 +233,10 @@ def main():
         "scale_note": "1 model inch = 80 real feet (1:960), confirmed exact from panel-grid geometry",
         "ft_to_model_m": FT_TO_MODEL_M,
         "crop_origin_dwg": [ox, oy],
+        "crop_origin_note": "RAMAPO SITE plaque corner (confirmed against reference photo 2026-08-13)",
         "crop_bearing_deg": math.degrees(angle),
+        "crop_bearing_note": "v-axis reference angle, NOT the true +u bearing — see u_sign",
+        "crop_u_sign": u_sign,
         "crop_size_ft": [width_ft, depth_ft],
         "min_elevation_ft": float(min_elev),
         "max_elevation_ft": float(max_elev),
