@@ -36,6 +36,14 @@ Two spatial invariants anchor the entire content pipeline:
   the scene graph.** All model geometry, offsets, and interaction nodes are
   authored relative to that origin so the tracking engine's computed world
   coordinate system and the authored scene coincide by construction.
+  **Forward-looking amendment (recorded 2026-08-10, not yet built — see §E
+  and the Phase 3 production-swap design notes in §G):** the production
+  Ramapo site model is planned to carry **four plaques, one per side**,
+  which supersedes this rule for that experience only — `bench-test` and
+  `proxy-target` keep the single-plaque-center origin unchanged. For the
+  four-plaque experience, the origin becomes a fixed reference corner of
+  the site-model footprint instead of a plaque center, and each plaque's
+  position/mount rotation is authored as an offset from that corner.
 
 **What this is NOT:**
 - Not a WebXR-first product. WebXR is an optional enhancement path that may
@@ -209,6 +217,61 @@ routing, nothing else**:
   engine path, §F). An entry declares this XOR `placement`, never both.
 - `version: string` — bumped on any asset change, never silently replaced.
 
+### Multi-target plaques (forward design, Phase 3 production extension — not yet built, recorded 2026-08-10)
+
+For experiences with more than one physical tracking plaque — the planned
+production Ramapo layout, one plaque per side of the site model (§A) — the
+single `mindTargetUrl`/`imageTargetUrl` fields above are insufficient (they
+assume exactly one target per experience, with its center as the origin).
+An entry needing multiple plaques declares an optional `targets: PlaqueTarget[]`
+instead, XOR with the singular fields, mirroring the existing dual-engine
+optional-field pattern rather than introducing a new one:
+
+```
+targets?: Array<{
+  mindTargetIndex?: number;        // MindAR: index within one multi-image
+                                    // .mind bundle (compiler upload order)
+  imageTargetUrl?: string;         // 8th Wall: this plaque's compiled
+                                    // image-target JSON
+  imageTargetName?: string;        // 8th Wall: the target `name` carried
+                                    // on Xr8ImageTrackedEvent — matches it
+                                    // to this entry at runtime
+  physicalTargetWidthMeters: number;
+  originOffsetMeters: { x: number; z: number };  // this plaque's position,
+                                                  // measured from the §A
+                                                  // reference corner
+  rotationYawDeg: number;          // corrects this plaque's physical mount
+                                    // rotation so content anchors
+                                    // identically in world space regardless
+                                    // of which plaque triggered tracking
+}>
+```
+
+Design constraints, decided ahead of the actual numbers (still blocked on
+the physical panel-footprint measurement — see the digital-twin sourcing
+work):
+
+- **Runtime resolution**: whichever plaque is currently tracked reports an
+  index (MindAR `Controller.onUpdate`'s `targetIndex`) or a name (8th
+  Wall's `Xr8ImageTrackedEvent.name`) — the runtime looks up the matching
+  `targets[]` entry and composes its `rotationYawDeg` + `originOffsetMeters`
+  with the tracked pose *before* mounting content, so the same building
+  anchors to the same real-world spot no matter which of the four plaques a
+  visitor scanned. This closes the "no per-target routing built yet" gap
+  already flagged in `docs/asset-authoring-guide.md` §3.3.
+- **The four plaque images must be visually distinct from each other, not
+  rotated copies of one design.** Feature-based tracking (both MindAR and
+  8th Wall) is generally in-plane rotation-invariant — if all four plaques
+  used identical artwork, the tracker could not tell which physical plaque
+  is in view, and the offset-resolution step above would have no reliable
+  input. Each plaque's illustration also independently needs the §3.1
+  asset-authoring-guide tracking-quality properties (asymmetric,
+  non-repeating detail) — the two requirements compose, they don't
+  conflict.
+- **All four plaques decode to the identical experience URL.** Which
+  plaque is in use is resolved entirely by tracking identity (above), never
+  by the QR payload — there is no `?side=` query param or per-plaque URL.
+
 ### Manifest exposure: `GET /api/manifest`
 
 Native clients (the future iOS App Clip) must resolve assets through the
@@ -313,6 +376,29 @@ schema above.
   named constant in the runtime that consumes it, validated by the Phase 3
   bench-test (MindAR) or by on-device Phase 6 testing (8th Wall), and never
   derived ad hoc at call sites.
+- **Every new visual overlay is classified as screen-space or world-space
+  before it's designed further — a taxonomy, not a per-feature decision
+  (recorded 2026-08-10).**
+  - **Screen-space / Rive-owned**: flat, always camera-facing, never
+    depth-tested against scene geometry. This is Rive's actual capability
+    — a 2D vector/state-machine runtime with no true 3D scene or camera
+    system — used today for the hotspot marker and Card panel (§E).
+    Correct only for content with no real position on the physical model
+    (e.g. clouds, general sky-birds not tied to a ground position) or
+    content that is deliberately UI, not world content.
+  - **World-space / three.js-owned**: part of the tracked scene graph, so
+    it gets correct perspective, occlusion by real scene geometry, and
+    parallax for free from the render engine, exactly like the buildings
+    and terrain already do. Required for anything tied to a real position
+    on the model — a building material highlight, particles constrained to
+    a topographic contour line, cars on roads, pedestrians on sidewalks.
+  - Rive cannot substitute for the world-space category under any
+    circumstances, regardless of how flat or lowfi the target art style
+    is — **art style and rendering category are independent decisions.** A
+    flat, silhouette-styled car is still world-space content (typically a
+    camera-facing billboarded sprite authored *in* the three.js scene, not
+    in a `.riv` file) if it needs to sit at a real position and be occluded
+    by a building.
 
 ---
 
@@ -608,6 +694,86 @@ schema above.
     beta if fast pans feel draggy).
 
   No iOS work. No WebXR work.
+
+  **Production-swap design notes (recorded 2026-08-10, forward-looking —
+  not yet built, beyond this phase's original exit condition above).**
+  Decisions made ahead of the actual production build, during the
+  digital-twin sourcing work, so they aren't re-derived later. None of this
+  blocks Phase 3 close; it's scoped for whenever the production swap
+  happens, and it means the original exit condition's "zero
+  application-code change" framing no longer holds in full for the
+  four-plaque production experience specifically — `bench-test` and
+  `proxy-target` are unaffected.
+
+  **Tracking/origin architecture (not a content addition) — fully designed
+  in §A/§E, cross-referenced here only:** four tracking plaques, one per
+  side of the site model, replacing the single-plaque origin for this
+  experience. The physical layout, manifest schema (`targets[]`),
+  origin-corner convention, and per-plaque `rotationYawDeg` correction are
+  designed in §A/§E above — still blocked on the physical panel-footprint
+  measurement before real offset numbers can be computed.
+
+  **Three candidate content/animation additions**, each classified per
+  the screen-space/world-space taxonomy (§F, also recorded 2026-08-10):
+    - *Building color/material highlight on tap* — world-space. Needs a
+      hotspot-to-building association at the asset level (a new `userData`
+      key on the hotspot, per the Golden Rule — not yet designed in the
+      schema) so the runtime can identify and tint the specific mesh being
+      explored. Otherwise cheap: a one-time material swap, no sustained
+      per-frame cost.
+    - *Contour-constrained particle "pulse" animation*, traveling along a
+      topographic elevation line on tap/proximity — world-space, and
+      explicitly **not** a Rive capability regardless of how the idea is
+      sometimes described elsewhere; it needs a genuine three.js particle
+      system. Data source already exists: the site DWG decode found 425
+      `POLYLINE` contour entities across 49 elevations (digital-twin
+      sourcing work) — these would need to survive the terrain-authoring
+      pipeline as traversable point sequences, not just baked into static
+      mesh geometry the way `tools/build_bench_scene.py`-style scripts
+      author meshes today. Real performance risk, not just a note: this
+      project has already hit on-device thermal throttling from tracking +
+      rendering alone (Phase 6 progress above); a live simulation adds
+      sustained cost on the same budget. Bounded/occasional trigger, so
+      cheaper than the item below.
+    - *Ambient background loop* — cars, pedestrians, birds, clouds,
+      continuous from scene load, not interaction-triggered. World-space
+      for anything tied to a real ground position (cars on roads, people
+      on sidewalks — needs correct occlusion behind buildings);
+      screen-space is viable only for content with no fixed position
+      relative to the model (clouds, and possibly birds if they drift
+      generally overhead rather than track specific ground positions).
+      Proposed implementation for the world-space actors: camera-facing
+      billboarded sprites — flat/lowfi silhouette art direction, small
+      textures, near-zero geometry — positioned in the three.js scene
+      graph, never Rive, despite the flat art style (§F: art style and
+      rendering category are independent). Of the three additions, this is
+      the highest sustained performance cost — always-on, multiple
+      concurrent actors — versus the other two, which are one-time or
+      bounded/occasional.
+    - *Procedural contour-line surface treatment* (recorded 2026-08-12,
+      deferred until the terrain mesh is actually integrated into an
+      experience) — the physical model's fine engraved/printed topo lines
+      turned out to be a material concern, not a geometry one: the first
+      working terrain mesh (see the digital-twin sourcing notes) has
+      correct shape and full elevation coverage but is flat-shaded gray,
+      missing the contour-line look entirely. Proposed fix is a procedural
+      height-based contour shader (`fract(height / interval)` thresholded
+      near zero — a standard topographic-shading technique) rather than
+      baking/UV-texturing the original polylines onto the mesh, since it
+      reproduces the lines directly from the geometry with no separate
+      texture asset and can't drift out of sync if the mesh changes later.
+      **Must be a three.js runtime material, not a Blender-only preview
+      material** — a Blender shader wouldn't carry over to the actual app.
+      World-space per the §F taxonomy (it's textural detail on real scene
+      geometry, not UI).
+    - **Open, undecided:** whether cars/pedestrians are authored at true
+      1:960 scale (near-invisible, well under 2 mm) or intentionally
+      exaggerated for legibility — unlike the terrain itself, which is
+      confirmed true-scale, no vertical exaggeration (digital-twin sourcing
+      work). Also open: whether the source DWG has road-centerline or
+      sidewalk layers for these actors to follow — not yet checked (the
+      existing decode only confirmed the `A-BLDG-OUTL` and
+      `CG-TOPO-Site Model` layers).
 
 - **Phase 4 — Native iOS App Clip. (OPEN)**
   Goal: the iOS delivery path promised in §A — a native App Clip
