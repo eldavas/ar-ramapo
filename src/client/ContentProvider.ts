@@ -10,14 +10,22 @@
  */
 
 export interface CardContent {
-  title: string;
+  /**
+   * Absent/empty when the sheet row's title cell is blank — a real,
+   * incomplete-editorial-content state, not an error (§C: distinct from a
+   * missing/unknown contentKey, which still throws — see getContent()).
+   * The Card clears the title run rather than inventing placeholder text
+   * (same "absence stays absent" contract as subtitle/imageUrl below).
+   */
+  title?: string;
   /**
    * Optional secondary line rendered between the title and body (the
    * Card's `subtitle` text run — e.g. a date, category, or short tag).
    * Absent/empty clears the run rather than leaving stale content.
    */
   subtitle?: string;
-  body: string;
+  /** Same absent/empty contract as title — see its doc comment. */
+  body?: string;
   /**
    * Optional image for the Card's `cardImage` slot. Root-relative /public
    * paths are the recommended form (no CORS involved); absolute https URLs
@@ -59,9 +67,14 @@ const COLUMN_IMAGE_URL = 'imageUrl';
  * Phase 5 test loop.
  *
  * Expected sheet shape: first row is the header — contentKey | title |
- * subtitle | body | imageUrl — one row per hotspot below it. subtitle is
- * optional, same as imageUrl. Column order is free; columns are matched by
- * header label.
+ * subtitle | body | imageUrl — one row per hotspot below it. Column order
+ * is free; columns are matched by header label. The four content columns
+ * (title/subtitle/body/imageUrl) must each exist as a HEADER, but a row's
+ * individual CELLS in them may be blank — that's incomplete editorial
+ * content (CardContent leaves the field absent), not a resolution error.
+ * Only contentKey is required per row (blank-key rows are skipped as
+ * spacer rows) and only an unknown contentKey, a missing column, or an
+ * unreachable/malformed source throw ContentResolutionError.
  *
  * The gviz response is JSON wrapped in
  * `google.visualization.Query.setResponse(…)`; long-stable but
@@ -194,18 +207,24 @@ export class GoogleSheetContentProvider implements ContentProvider {
         );
       }
 
+      // title/body are structurally required COLUMNS (requireColumn above —
+      // a sheet reshaped without them is a real error) but NOT required
+      // per-ROW values: a row with the key present and an editorial cell
+      // still blank is incomplete content, not a resolution failure — same
+      // "read as absent, never throw" treatment already given to the
+      // optional subtitle/imageUrl columns below (§C: this is intentional
+      // tolerance for incomplete editorial data, not laundering a real
+      // error — see getContent()'s contentKey-not-found path, unchanged).
       const title = readCell(row, titleIndex);
       const body = readCell(row, bodyIndex);
-      if (title === undefined || body === undefined) {
-        throw new ContentResolutionError(
-          `Sheet row for contentKey "${key}" (row ${rowNumber + 2}) is missing a ${COLUMN_TITLE} or ` +
-            `${COLUMN_BODY} value — both are required.`
-        );
-      }
-
       const subtitle = subtitleIndex === -1 ? undefined : readCell(row, subtitleIndex);
       const imageUrl = imageIndex === -1 ? undefined : readCell(row, imageIndex);
-      entries.set(key, { title, body, ...(subtitle !== undefined && { subtitle }), ...(imageUrl !== undefined && { imageUrl }) });
+      entries.set(key, {
+        ...(title !== undefined && { title }),
+        ...(subtitle !== undefined && { subtitle }),
+        ...(body !== undefined && { body }),
+        ...(imageUrl !== undefined && { imageUrl }),
+      });
     }
     return entries;
   }

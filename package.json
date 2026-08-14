@@ -13,7 +13,8 @@
     "build": "tsc && vite build",
     "dev:client": "vite build --watch",
     "typecheck": "tsc --noEmit && tsc --noEmit -p src/client/tsconfig.json",
-    "start": "node dist/server.js"
+    "start": "node dist/server.js",
+    "test": "tsc --ignoreConfig --module nodenext --moduleResolution nodenext --target es2022 --strict --types node --outDir .tmp-test src/client/ContentProvider.ts src/client/ContentProvider.test.ts && (node --test .tmp-test/ContentProvider.test.js; code=$?; rm -rf .tmp-test; exit $code)"
   },
   "dependencies": {
     "@8thwall/engine-binary": "^1.0.0",

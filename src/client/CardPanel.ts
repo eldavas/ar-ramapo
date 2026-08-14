@@ -463,9 +463,12 @@ export class CardPanel {
         ` viewport=${window.innerWidth}x${window.innerHeight}` +
         ` canvasBacking=${this.rive.canvasWidth}x${this.rive.canvasHeight} dpr=${window.devicePixelRatio}`
     );
-    this.rive.setText(TEXT_RUN_TITLE, content.title);
+    // title/body may now be absent (incomplete editorial content —
+    // ContentProvider.ts's CardContent doc comment), same "clear the run
+    // rather than invent placeholder text" treatment subtitle already had.
+    this.rive.setText(TEXT_RUN_TITLE, content.title ?? '');
     this.rive.setText(TEXT_RUN_SUBTITLE, content.subtitle ?? '');
-    this.rive.setText(TEXT_RUN_BODY, content.body);
+    this.rive.setText(TEXT_RUN_BODY, content.body ?? '');
     if (content.imageUrl !== undefined) {
       this.imageSlot.setImage(content.imageUrl).catch((error: unknown) => {
         console.error('[CardPanel] card image failed to load:', error);
