@@ -164,3 +164,81 @@ test('an event for an unconfigured target name is ignored (group stays unacquire
   });
   assert.equal(anchor.isTracking(), false);
 });
+
+// --- Pose-plausibility gating (2026-08-14 physical-device fix) -----------
+//
+// First real hardware test showed the world anchor drifting/jumping and
+// briefly appearing at a drastically wrong scale — traced to applyPose()
+// previously trusting every single raw tracked sample unconditionally, on
+// both 'found' and every per-frame 'updated' (docs/research/
+// 8th-wall-troubleshooting.md §10 already logged the underlying engine
+// phenomenon in isolation: a re-detection converging onto a bad pose,
+// scale ratio 2.12, and staying there for ~a minute). These tests build a
+// deliberately implausible event (correct rotation, but a scale far
+// outside SCALE_MISMATCH_TOLERANCE of physicalTargetWidthMeters) and
+// verify the anchor's transform is unaffected by it once a good anchor
+// already exists — the anchor holds its last known-good pose instead of
+// jumping to the bad one.
+
+function withScale(event: Xr8ImageTrackedEvent, scale: number): Xr8ImageTrackedEvent {
+  return { ...event, scale };
+}
+
+test('an implausible-scale updated sample is rejected — anchor holds its last known-good pose', () => {
+  const goodPos = new THREE.Vector3(1.2, 0, -3.4);
+  const goodQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), 0.37);
+  const badPos = new THREE.Vector3(50, 12, -80); // physically implausible jump
+  const badQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), 1.1);
+
+  const session = new FakeSession();
+  const scene = new THREE.Scene();
+  const anchor = new ImageTargetAnchorSource(session as never, scene, [FRONT]);
+
+  // Establish a good anchor first.
+  session.fire('found', simulateEventFor(FRONT.name, FRONT, goodPos, goodQuat));
+  assertVectorClose(anchor.group.position, goodPos);
+  assertQuatClose(anchor.group.quaternion, goodQuat);
+
+  // A bad-scale 'updated' sample (ratio = 3x tolerance) must not move it,
+  // even though its position/rotation would otherwise place the anchor
+  // somewhere completely different.
+  const badEvent = withScale(
+    simulateEventFor(FRONT.name, FRONT, badPos, badQuat),
+    FRONT.physicalTargetWidthMeters * 3
+  );
+  session.fire('updated', badEvent);
+  assertVectorClose(anchor.group.position, goodPos);
+  assertQuatClose(anchor.group.quaternion, goodQuat);
+
+  // A bad-scale re-detection ('found' after being already acquired) must
+  // be rejected the same way — not just 'updated'.
+  session.fire('found', badEvent);
+  assertVectorClose(anchor.group.position, goodPos);
+  assertQuatClose(anchor.group.quaternion, goodQuat);
+
+  // A subsequent GOOD sample still applies normally — rejection is
+  // per-sample, not a permanent lockout.
+  const recoveredPos = new THREE.Vector3(2.0, 0, -1.0);
+  const recoveredQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -0.5);
+  session.fire('updated', simulateEventFor(FRONT.name, FRONT, recoveredPos, recoveredQuat));
+  assertVectorClose(anchor.group.position, recoveredPos);
+  assertQuatClose(anchor.group.quaternion, recoveredQuat);
+});
+
+test('the very first acquisition applies even with an implausible scale — bootstrap must not hang forever', () => {
+  const session = new FakeSession();
+  const scene = new THREE.Scene();
+  const anchor = new ImageTargetAnchorSource(session as never, scene, [FRONT]);
+
+  const pos = new THREE.Vector3(1.2, 0, -3.4);
+  const quat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), 0.37);
+  const badFirstEvent = withScale(
+    simulateEventFor(FRONT.name, FRONT, pos, quat),
+    FRONT.physicalTargetWidthMeters * 3
+  );
+  session.fire('found', badFirstEvent);
+
+  assert.equal(anchor.group.visible, true); // acquired, not stuck waiting forever
+  assertVectorClose(anchor.group.position, pos);
+  assertQuatClose(anchor.group.quaternion, quat);
+});

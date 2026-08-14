@@ -52,11 +52,48 @@ const SCALE_MISMATCH_TOLERANCE = 0.25; // ±25%
 const SCALE_MISMATCH_WARN_INTERVAL_MS = 1000;
 let lastScaleMismatchWarnMs = 0;
 
-function anchorScaleForEvent(
-  event: Xr8ImageTrackedEvent,
-  physicalTargetWidthMeters: number
-): number {
-  const ratio = event.scale / physicalTargetWidthMeters;
+function scaleRatio(event: Xr8ImageTrackedEvent, physicalTargetWidthMeters: number): number {
+  return event.scale / physicalTargetWidthMeters;
+}
+
+/**
+ * First real physical-device test (2026-08-14) surfaced a world anchor that
+ * drifts/jumps and briefly appears at a drastically wrong scale/distance
+ * after tracking correctly at first. Root cause, confirmed against this
+ * file's pre-existing behavior and telemetry (docs/research/
+ * 8th-wall-troubleshooting.md §4/§10) rather than assumed: applyPose() —
+ * below — has always applied every single raw tracked pose (both `found`
+ * and every `updated`, i.e. every frame the target is visible) directly to
+ * the world anchor with zero plausibility check. §10 of that log already
+ * captured this engine-level failure mode in isolation, before it had a
+ * user-facing consequence: "one of the sessions... converged its
+ * re-detections onto a bad pose (scale=0.106 m, ratio 2.12...) and stayed
+ * there for ~a minute" — filed as "watch, no action" at the time because
+ * nothing downstream depended on anchor stability yet. It does now. The
+ * composition math itself (offset/rotation per plaque) is independently
+ * verified correct by ImageTargetAnchorSource.test.ts and is NOT the
+ * defect — every glitchy reading was being composed correctly and then
+ * applied anyway.
+ *
+ * This is not "add damping until it looks better": it reuses the ratio the
+ * code already computes for the scale-mismatch warning above as a
+ * plausibility gate on whether to trust a given tracked sample at all, not
+ * a smoothing/lerp of good and bad samples together. A ratio far from 1
+ * means the engine's own absolute-scale estimate for this reading hasn't
+ * converged (or is actively bad) — exactly the condition the warning
+ * already names, previously logged and ignored, now acted on: once a good
+ * anchor exists, an implausible reading is rejected outright (the anchor
+ * holds its last known-good transform, exactly as it already does across a
+ * real `imagelost`) rather than teleporting the whole scene to a bad pose.
+ * The very first acquisition always applies regardless — there is no prior
+ * good anchor to fall back to, and refusing to ever place the scene would
+ * be worse than an imperfect first placement.
+ */
+function isPoseTrustworthy(ratio: number): boolean {
+  return Math.abs(ratio - 1) <= SCALE_MISMATCH_TOLERANCE;
+}
+
+function warnIfScaleMismatch(event: Xr8ImageTrackedEvent, physicalTargetWidthMeters: number, ratio: number): void {
   if (Math.abs(ratio - 1) > SCALE_MISMATCH_TOLERANCE) {
     const now = performance.now();
     if (now - lastScaleMismatchWarnMs > SCALE_MISMATCH_WARN_INTERVAL_MS) {
@@ -64,10 +101,18 @@ function anchorScaleForEvent(
       console.warn(
         `[${traceT()}] [ImageTarget] scale mismatch: engine sees ${event.scale.toFixed(3)} m, ` +
           `manifest declares ${physicalTargetWidthMeters} m (ratio ${ratio.toFixed(2)}). ` +
-          'Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong.'
+          'Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. ' +
+          'Pose sample rejected — anchor holds its last known-good transform.'
       );
     }
   }
+}
+
+function anchorScaleForEvent(): number {
+  // Under scale:'absolute' the GLB mounts at scale 1 always — event.scale
+  // is never a render multiplier (see the class doc comment above). The
+  // mismatch warning/rejection now happens earlier, in onImageEvent, before
+  // applyPose is even called for an untrustworthy sample.
   return 1;
 }
 
@@ -111,10 +156,14 @@ function formatPose(event: Xr8ImageTrackedEvent): string {
  * `targets` map) re-snaps the mount group to that plaque's own
  * offset/rotation-corrected pose, correcting accumulated SLAM drift
  * whenever the user glances back at whichever plaque is currently in
- * view. After imagelost the group simply stops receiving snaps — SLAM
- * world tracking (disableWorldTracking: false in EightWallSession) keeps
- * the frozen world pose valid, so content persists while the user walks
- * around the model. Scan any one plaque once, walk around.
+ * view — PROVIDED the sample passes isPoseTrustworthy() (below): a reading
+ * whose engine-reported scale is implausible is rejected outright instead
+ * of applied, so a single bad frame can no longer move the anchor (see that
+ * function's doc comment for the on-device evidence this responds to).
+ * After imagelost the group simply stops receiving snaps — SLAM world
+ * tracking (disableWorldTracking: false in EightWallSession) keeps the
+ * frozen world pose valid, so content persists while the user walks around
+ * the model. Scan any one plaque once, walk around.
  *
  * onOriginChanged fires only on RE-detection (imagefound after a lost,
  * once already acquired) — a discontinuity where the pose may visibly
@@ -224,23 +273,35 @@ export class ImageTargetAnchorSource implements AnchorSource {
       case 'found': {
         if (event === null || target === undefined) return;
         const wasAcquired = this.acquired;
+        const ratio = scaleRatio(event, target.physicalTargetWidthMeters);
+        // First-ever acquisition always applies — there is no prior
+        // known-good anchor to fall back to (see isPoseTrustworthy's doc
+        // comment).
+        const trustworthy = !wasAcquired || isPoseTrustworthy(ratio);
         console.log(
           `[${traceT()}] [ImageTarget] FOUND "${event.name}"\n` +
             `  scale=${event.scale.toFixed(3)}m ${formatPose(event)}\n` +
             `  acquired: ${wasAcquired} -> true` +
             (wasAcquired
-              ? ' (re-detection — firing onOriginChanged, pose discontinuity)'
+              ? trustworthy
+                ? ' (re-detection — firing onOriginChanged, pose discontinuity)'
+                : ' (re-detection REJECTED — scale ratio outside tolerance, keeping previous anchor)'
               : ' (first acquire — group visible, resolving acquire())')
         );
-        this.applyPose(event, target);
         this.imageVisible = true;
+        if (trustworthy) {
+          this.applyPose(event, target);
+        } else {
+          warnIfScaleMismatch(event, target.physicalTargetWidthMeters, ratio);
+        }
         if (!this.acquired) {
           this.acquired = true;
           this.group.visible = true;
           this.acquireResolve?.();
           this.acquireResolve = null;
-        } else {
-          // Re-detection after a lost = pose discontinuity.
+        } else if (trustworthy) {
+          // Re-detection after a lost = pose discontinuity (only when the
+          // anchor actually moved — a rejected sample changed nothing).
           for (const handler of this.originChangedHandlers) {
             handler();
           }
@@ -257,7 +318,12 @@ export class ImageTargetAnchorSource implements AnchorSource {
                 `scale=${event.scale.toFixed(3)}m ${formatPose(event)}`
             );
           }
-          this.applyPose(event, target);
+          const ratio = scaleRatio(event, target.physicalTargetWidthMeters);
+          if (isPoseTrustworthy(ratio)) {
+            this.applyPose(event, target);
+          } else {
+            warnIfScaleMismatch(event, target.physicalTargetWidthMeters, ratio);
+          }
           this.imageVisible = true;
         }
         break;
@@ -310,6 +376,6 @@ export class ImageTargetAnchorSource implements AnchorSource {
       .set(event.position.x, event.position.y, event.position.z)
       .sub(this.scratchOffset);
 
-    this.group.scale.setScalar(anchorScaleForEvent(event, target.physicalTargetWidthMeters));
+    this.group.scale.setScalar(anchorScaleForEvent());
   }
 }

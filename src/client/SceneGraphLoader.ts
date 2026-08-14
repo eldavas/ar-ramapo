@@ -57,6 +57,70 @@ export const HOTSPOT_NODE_PREFIX = 'hotspot_';
  */
 const HOTSPOT_HOST_DEBUG_COLOR = 0xff0000;
 
+/**
+ * The single terrain mesh authored by tools/build_site_buildings.py /
+ * build_site_terrain.py (Blender object name `site_terrain`, confirmed to
+ * survive glTF export verbatim). This is the ONLY node this loader
+ * identifies by a fixed literal name rather than a prefix/userData
+ * convention — a structural role (there is exactly one terrain mesh per
+ * scene), the same class of fixed name HOTSPOT_NODE_PREFIX already is, not
+ * a content lookup the Golden Rule forbids.
+ */
+const TERRAIN_NODE_NAME = 'site_terrain';
+
+/**
+ * Real-hardware finding (2026-08-14, first physical test): the terrain
+ * rendered solid black on-device. Root cause, confirmed against the shipped
+ * asset and runtime config (not assumed): every mesh in site-scene.glb —
+ * terrain, buildings, ledge, plaque placeholders — is authored in Blender
+ * with a plain Principled BSDF ("use_nodes = True", a lit/PBR material;
+ * tools/build_site_buildings.py's make_material()), which glTF export turns
+ * into a lit THREE.MeshStandardMaterial. Neither tracking engine's runtime
+ * scene ever adds a THREE.Light: 8th Wall's XrController.configure() sets
+ * `enableLighting: false` explicitly (EightWallSession.ts) and MindAR's
+ * ARSessionManager never adds one either. Under zero light, a
+ * MeshStandardMaterial renders solid black regardless of its authored
+ * baseColorFactor — verified directly against the shipped
+ * public/assets/site-scene.glb: mat_site_terrain's baseColorFactor is an
+ * ordinary opaque tan `[0.55, 0.52, 0.45, 1]`, no alphaMode, no emissive —
+ * not a black or transparent material as authored. The only reason the 12
+ * hotspot-hosting buildings were ever visible is the debug tint above,
+ * which happens to be unlit for exactly this reason. Every OTHER mesh
+ * (terrain, the 9 non-hotspot buildings, the ledge, the 4 plaque
+ * placeholders) was rendering black for the same underlying reason — masked
+ * during desk verification because DevSimSession.ts (the ?fakear=1 desk
+ * bypass) adds real THREE.Light objects the real device path never gets.
+ *
+ * Fix lives here, not in the Blender pipeline: this is a rendering-strategy
+ * decision (lit-vs-unlit), not an authoring defect — the authored colors
+ * are correct and this loader already owns exactly this class of decision
+ * for the hotspot debug tint. Every mesh gets rewrapped in an unlit
+ * MeshBasicMaterial that preserves its own authored color, so buildings/
+ * ledge/plaques render visibly instead of black; the terrain mesh
+ * specifically is made fully transparent instead — the physical 3D-printed
+ * model already has a real terrain surface visible through the camera feed,
+ * so the digital terrain mesh's only real job is to give
+ * HotspotProjector's occlusion raycast a surface to test against (the
+ * `occluders` array below), not to be seen. transparent+opacity:0 (not
+ * `mesh.visible = false`) keeps the mesh eligible for THREE.Raycaster,
+ * which tests geometry only and ignores material opacity — occlusion
+ * behavior is unaffected; depthWrite:false additionally keeps the invisible
+ * terrain from fighting the depth buffer against any future transparent
+ * content placed near Z=0.
+ */
+function applyUnlitRenderingMaterial(mesh: THREE.Mesh): void {
+  if (mesh.name === TERRAIN_NODE_NAME) {
+    mesh.material = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false });
+    return;
+  }
+  const source = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
+  const baseColor =
+    source !== undefined && 'color' in source
+      ? (source as THREE.MeshStandardMaterial).color
+      : new THREE.Color(0xffffff);
+  mesh.material = new THREE.MeshBasicMaterial({ color: baseColor });
+}
+
 export interface Hotspot {
   name: string;
   node: THREE.Object3D;
@@ -114,6 +178,7 @@ export class SceneGraphLoader {
     gltf.scene.traverse((node) => {
       if ((node as THREE.Mesh).isMesh) {
         occluders.push(node);
+        applyUnlitRenderingMaterial(node as THREE.Mesh);
       }
       if (node.name.startsWith(HOTSPOT_NODE_PREFIX)) {
         hotspots.push({
@@ -126,6 +191,10 @@ export class SceneGraphLoader {
     });
 
     for (const hotspot of hotspots) {
+      // Runs after applyUnlitRenderingMaterial above — the debug tint fully
+      // replaces the material (same as it always did), so a hotspot host's
+      // final material is red regardless of ordering; non-hotspot meshes
+      // keep their own unlit, authored-color material from the pass above.
       tintNearestMeshAncestor(hotspot.node, root);
     }
 

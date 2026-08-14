@@ -167,6 +167,13 @@ export class CardPanel {
   private dragEligible = true;
   private lastMoveY = 0;
   private lastMoveTime = 0;
+  // Set once a gesture moves past DRAG_TAP_THRESHOLD_PX without ever being
+  // promoted to a dismiss-drag (see handlePointerMove) — i.e. a native
+  // content-scroll happened instead. Distinct from isDragging: it survives
+  // a gesture the container never captured, so pointerup can tell "content
+  // scroll released here" apart from "a genuine tap", which isDragging
+  // alone cannot (isDragging only tracks gestures THIS class intercepted).
+  private hadSignificantMove = false;
 
   // Inputs the container/backing were last sized for. Bounds height is
   // seeded with the design height; the first Advance replaces it with the
@@ -186,15 +193,21 @@ export class CardPanel {
     // transform starts at translateY(100%) — fully below the viewport —
     // synchronously, before Rive even loads, so there is no first-load
     // flash regardless of any Rive/state-machine timing.
-    // overflow:hidden — inert while the canvas fills the container
-    // (100%/100%), load-bearing when the 90% height cap is active and the
-    // canvas is deliberately TALLER than the container: the container is
-    // the clip window, so the sheet's visible bottom edge always tracks
-    // the container (screen bottom when open, mid-drag positions too).
+    // overflow-y:auto (was hidden) — inert while the canvas fills the
+    // container (100%/100%: nothing to scroll), load-bearing when the 90%
+    // height cap is active and the canvas is deliberately TALLER than the
+    // container: content beyond the container's bottom edge used to be
+    // permanently clipped and unreachable (bug: long Card content had no
+    // way to be read past the cap) — auto-scroll makes that same clip
+    // window scrollable instead of a hard cutoff. touch-action:pan-y (was
+    // none) lets the browser own vertical panning by default; attach()'s
+    // gesture handlers only preventDefault/setPointerCapture once a
+    // gesture is positively identified as a dismiss-drag (scrollTop===0
+    // and pulling down), so a genuine content-scroll is never hijacked.
     this.container.style.cssText =
-      'position:fixed;left:0;bottom:0;overflow:hidden;' +
+      'position:fixed;left:0;bottom:0;overflow-y:auto;-webkit-overflow-scrolling:touch;' +
       `width:${CARD_CSS_WIDTH};aspect-ratio:${CARD_ARTBOARD_WIDTH}/${CARD_ARTBOARD_HEIGHT};` +
-      `z-index:20;pointer-events:none;touch-action:none;transform:translateY(100%);` +
+      `z-index:20;pointer-events:none;touch-action:pan-y;transform:translateY(100%);` +
       `transition:${SLIDE_TRANSITION};`;
 
     const backingScale = Math.min(window.devicePixelRatio || 1, MAX_BACKING_SCALE);
@@ -252,13 +265,18 @@ export class CardPanel {
 
     const handlePointerDown = (event: PointerEvent): void => {
       event.stopPropagation();
-      event.preventDefault();
-      this.container.setPointerCapture(event.pointerId);
+      // No preventDefault/setPointerCapture here (unlike before): the
+      // gesture might turn out to be a native content-scroll (see
+      // handlePointerMove), and capturing/preventing at pointerdown would
+      // suppress the browser's own scroll handling before we can tell the
+      // two apart. Both are applied later, only once a gesture is
+      // positively identified as a dismiss-drag.
       this.dragStartY = event.clientY;
       this.dragStartTime = performance.now();
       this.lastMoveY = event.clientY;
       this.lastMoveTime = this.dragStartTime;
       this.isDragging = false;
+      this.hadSignificantMove = false;
 
       // Canvas rect for the same reason as forwardPointer: the no-drag
       // zone protects the authored close button, whose position is
@@ -280,10 +298,25 @@ export class CardPanel {
       const deltaY = event.clientY - this.dragStartY;
 
       if (!this.isDragging) {
-        if (!this.dragEligible || Math.abs(deltaY) < DRAG_TAP_THRESHOLD_PX) return; // still a tap candidate
-        console.log(`[${traceT()}] [Card] drag threshold crossed — suspending artboard forwarding`);
+        if (Math.abs(deltaY) < DRAG_TAP_THRESHOLD_PX) return; // still a tap candidate
+        this.hadSignificantMove = true;
+        // Promote to an app-owned dismiss-drag only when there is nothing
+        // left to scroll UP into (scrollTop<=0) and the finger is pulling
+        // DOWN past the threshold — the same gesture a native "pull to
+        // dismiss" bottom sheet uses to distinguish itself from ordinary
+        // scrolling. Anywhere else (mid-scroll, or scrolled content
+        // pulling further down into itself), this is content scroll: leave
+        // it alone, let the browser's native overflow-y:auto handle it.
+        if (!this.dragEligible || this.container.scrollTop > 0 || deltaY <= DRAG_TAP_THRESHOLD_PX) {
+          return;
+        }
+        console.log(
+          `[${traceT()}] [Card] drag threshold crossed at scrollTop=0 — ` +
+            'suspending artboard forwarding, taking over from native scroll'
+        );
         this.isDragging = true;
         this.container.style.transition = 'none';
+        this.container.setPointerCapture(event.pointerId);
       }
 
       event.stopPropagation();
@@ -296,9 +329,8 @@ export class CardPanel {
 
     const handlePointerUp = (event: PointerEvent): void => {
       event.stopPropagation();
-      event.preventDefault();
-
       if (this.isDragging) {
+        event.preventDefault();
         const elapsedMs = Math.max(1, performance.now() - this.lastMoveTime);
         const velocity = (event.clientY - this.lastMoveY) / elapsedMs; // px/ms, + = downward
         const deltaY = Math.max(0, event.clientY - (this.dragStartY ?? event.clientY));
@@ -320,14 +352,19 @@ export class CardPanel {
         } else {
           this.container.style.transform = 'translateY(0)';
         }
-      } else {
-        // A genuine tap: forward the paired pointerUp for the artboard's
-        // click detection (the close button).
+      } else if (!this.hadSignificantMove) {
+        // A genuine tap (never moved past the threshold, whether or not it
+        // could have scrolled): forward the paired pointerUp for the
+        // artboard's click detection (the close button). A released
+        // content-scroll (hadSignificantMove but never promoted to
+        // isDragging) deliberately does NOT reach here — forwarding it
+        // would fire a spurious tap wherever the finger happened to lift.
         forwardPointer(event, false);
       }
 
       this.dragStartY = null;
       this.isDragging = false;
+      this.hadSignificantMove = false;
     };
 
     const handlePointerCancel = (): void => {
@@ -337,6 +374,7 @@ export class CardPanel {
       }
       this.dragStartY = null;
       this.isDragging = false;
+      this.hadSignificantMove = false;
     };
 
     this.container.addEventListener('pointerdown', handlePointerDown);
@@ -474,6 +512,12 @@ export class CardPanel {
         console.error('[CardPanel] card image failed to load:', error);
       });
     }
+
+    // Every open (fresh or content swap while already open) starts
+    // scrolled to the top — otherwise a short article opened right after a
+    // long, scrolled-down one would render with its header already
+    // scrolled out of view.
+    this.container.scrollTop = 0;
 
     if (this.open_) {
       this.rive.fireTrigger(TRIGGER_REFRESH);
