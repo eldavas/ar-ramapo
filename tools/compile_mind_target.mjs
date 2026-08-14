@@ -14,7 +14,12 @@
  * here is reachable off-machine or after the run.
  *
  * Run:  node tools/compile_mind_target.mjs
- * Requires tools/plaque/bench-plaque.png (tools/build_plaque.py).
+ *       node tools/compile_mind_target.mjs <input.png> <output.mind>
+ * Requires tools/plaque/bench-plaque.png (tools/build_plaque.py) when run
+ * with no arguments; an explicit input/output pair compiles any single
+ * plaque image the same way (e.g. the 4 site plaques from
+ * tools/build_site_plaques.py) — same compiler, same headless-Chrome
+ * harness, one call per image.
  */
 
 import http from 'node:http';
@@ -26,8 +31,9 @@ import os from 'node:os';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const MINDAR_DIST = path.join(repoRoot, 'node_modules/mind-ar/dist');
-const PLAQUE_PNG = path.join(repoRoot, 'tools/plaque/bench-plaque.png');
-const OUTPUT = path.join(repoRoot, 'public/assets/bench-target.mind');
+const [inputArg, outputArg] = process.argv.slice(2);
+const PLAQUE_PNG = inputArg ? path.resolve(inputArg) : path.join(repoRoot, 'tools/plaque/bench-plaque.png');
+const OUTPUT = outputArg ? path.resolve(outputArg) : path.join(repoRoot, 'public/assets/bench-target.mind');
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const TIMEOUT_MS = 10 * 60 * 1000;
 

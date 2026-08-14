@@ -43,16 +43,26 @@ const STATE_MACHINE_NAME = 'State Machine 1';
 // architecture review's routing-structure finding. Selecting *which*
 // experience loads is a later phase.
 //
-// Phase 3: bench-test is live — its assets (bench-scene.glb,
-// bench-target.mind) are in /public/assets and the spatial pipeline below
-// activates on any experience that declares modelUrl. Flip back to
-// 'proxy-target' to run the pre-Phase-3 anchored-plane experience.
+// Phase 3: bench-test's assets (bench-scene.glb, bench-target.mind) are in
+// /public/assets and the spatial pipeline below activates on any
+// experience that declares modelUrl. Flip to 'proxy-target' to run the
+// pre-Phase-3 anchored-plane experience; flip to 'bench-test' or
+// '8thwall-test' to resume the synthetic-rig coordinate/engine validation
+// rigs (AR_SYSTEM.md §G) — no other change needed for any of these.
 //
-// Phase 2C (TEMPORARY, for the 8th Wall infrastructure walkthrough): set to
-// '8thwall-test' to route through runEightWallExperience() instead of the
-// MindAR path. Flip back to 'bench-test' to resume the MindAR/Rive-Listener
-// verification this repo was mid-way through — no other change needed.
-const ACTIVE_TARGET_ID = '8thwall-test';
+// 2026-08-14 (§G Phase 3 production-swap, physical-targeting pass): live
+// production default is 'site-front' — the real digital-twin site-scene
+// tracked off the real printed "front" plaque (tools/plaque/site/
+// plaque-front.png -> site-front-target.mind), MindAR engine (the
+// original, still-active engine — no GPS/geofence dependency, matches
+// bench-test's proven path). 'site-back'/'site-left'/'site-right' are the
+// other 3 real plaques, same architecture, swap in the same way. All 4
+// anchor the FULL site-scene centered on whichever single plaque is
+// scanned (§A's original single-plaque-center rule) — NOT yet the
+// calibrated four-plaque shared-origin position, which stays blocked on
+// the physical panel-footprint measurement (manifest.ts's site-* entries
+// have the full rationale).
+const ACTIVE_TARGET_ID = 'site-front';
 
 // 8th Wall desk-testing bypasses — query params, not build flags, so the
 // same deployed build is testable on any device without rebuilding. Inert

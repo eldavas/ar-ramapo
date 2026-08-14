@@ -191,4 +191,81 @@ export const experienceManifest: ExperienceManifest[] = [
     // still-open sheet-content gap noted there).
     version: '0.2.1',
   },
+  // ---------------------------------------------------------------------
+  // Real physical-targeting entries for the 4 site plaques (AR_SYSTEM.md §G
+  // Phase 3 production-swap notes, 2026-08-14). Each of tools/plaque/site/
+  // plaque-{front,back,left,right}.png is compiled into its own single-
+  // image .mind target (tools/compile_mind_target.mjs <png> <mind> — the
+  // same compiler bench-target.mind uses, now parameterized for any image)
+  // and gets its own manifest entry — the existing single-plaque MindAR
+  // architecture (§A's original rule: the QR plaque center is the scene's
+  // absolute origin) applied 4 times, NOT the four-plaque shared-corner
+  // design in §A/§E's "Multi-target plaques" section. That design needs
+  // `targets[]`, which exists in neither this manifest type nor the
+  // runtime (`ImageTargetAnchorSource` takes one `primaryName`;
+  // `ARSessionManager.start()` takes one fixed `.mind` anchor index —
+  // confirmed by reading both, and by docs/asset-authoring-guide.md §3.3:
+  // "there is no per-target routing built yet"). Building that now would be
+  // new, unverified AR-runtime engineering for numbers
+  // (originOffsetMeters/rotationYawDeg) that are still genuinely unknown,
+  // pending the physical panel-footprint measurement (see
+  // cad-source/handoff/README.md's "Known open item"). Four independent
+  // entries need none of that: each anchors the FULL site-scene centered on
+  // whichever single plaque was scanned — a real test of tracking +
+  // rendering + hotspots + content with real printed artwork, deliberately
+  // decoupled from the still-pending shared-origin calibration.
+  //
+  // KNOWN LIMITATION, not fixable in software: scanning any plaque other
+  // than the one the physical model happens to be centered on will NOT
+  // line up AR content with real printed structures — that alignment is
+  // exactly what the blocked four-plaque design would fix. A physical
+  // design gap, not a bug.
+  {
+    targetId: 'site-front',
+    riveUrl: '/assets/bench-ui.riv',
+    modelUrl: '/assets/site-scene.glb',
+    usdzUrl: '/assets/site-scene.usdz',
+    mindTargetUrl: '/assets/site-front-target.mind',
+    trackingImageUrl: '/assets/site-front-plaque.png',
+    contentUrl: 'https://docs.google.com/spreadsheets/d/1O4Zq8ggc7TgjKZIuUtufO-G9hJiK2KalJpD2Cux2sN8/gviz/tq?tqx=out:json',
+    // Matches the printed plaque's real, fabricated size — tools/build_site_plaques.py's
+    // SIZE_MM constant. Unlike the ledge width/plaque position, this
+    // dimension isn't a guess: it's simply what the plaques are printed
+    // at (tools/plaque/site/print-sheet.html), 1024px/50mm ≈ 520dpi.
+    physicalTargetWidthMeters: 0.05,
+    version: '0.1.0',
+  },
+  {
+    targetId: 'site-back',
+    riveUrl: '/assets/bench-ui.riv',
+    modelUrl: '/assets/site-scene.glb',
+    usdzUrl: '/assets/site-scene.usdz',
+    mindTargetUrl: '/assets/site-back-target.mind',
+    trackingImageUrl: '/assets/site-back-plaque.png',
+    contentUrl: 'https://docs.google.com/spreadsheets/d/1O4Zq8ggc7TgjKZIuUtufO-G9hJiK2KalJpD2Cux2sN8/gviz/tq?tqx=out:json',
+    physicalTargetWidthMeters: 0.05,
+    version: '0.1.0',
+  },
+  {
+    targetId: 'site-left',
+    riveUrl: '/assets/bench-ui.riv',
+    modelUrl: '/assets/site-scene.glb',
+    usdzUrl: '/assets/site-scene.usdz',
+    mindTargetUrl: '/assets/site-left-target.mind',
+    trackingImageUrl: '/assets/site-left-plaque.png',
+    contentUrl: 'https://docs.google.com/spreadsheets/d/1O4Zq8ggc7TgjKZIuUtufO-G9hJiK2KalJpD2Cux2sN8/gviz/tq?tqx=out:json',
+    physicalTargetWidthMeters: 0.05,
+    version: '0.1.0',
+  },
+  {
+    targetId: 'site-right',
+    riveUrl: '/assets/bench-ui.riv',
+    modelUrl: '/assets/site-scene.glb',
+    usdzUrl: '/assets/site-scene.usdz',
+    mindTargetUrl: '/assets/site-right-target.mind',
+    trackingImageUrl: '/assets/site-right-plaque.png',
+    contentUrl: 'https://docs.google.com/spreadsheets/d/1O4Zq8ggc7TgjKZIuUtufO-G9hJiK2KalJpD2Cux2sN8/gviz/tq?tqx=out:json',
+    physicalTargetWidthMeters: 0.05,
+    version: '0.1.0',
+  },
 ];
