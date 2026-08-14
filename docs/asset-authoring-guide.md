@@ -125,10 +125,20 @@ state, not a hidden canvas:
 | Trigger input | `refresh` | quick content pulse fired when content swaps while already open; must be a visual no-op if fired mid-Enter |
 | Text run | `title` | at the artboard root, exported name, non-empty placeholder value |
 | Text run | `subtitle` | optional secondary line (e.g. a date/category tag) between title and body; may be set to an empty string — author it to collapse gracefully when blank |
-| Text run | `body` | same as `title`; give it a fixed-size text area with clip/ellipsis — sheet content length is unbounded |
+| Text run | `body` | same as `title`; sheet content length is unbounded — don't clip/ellipsis it in the artboard, the runtime handles overflow (below) |
 | Referenced image asset | `cardImage` | mark the image **Referenced** (not Embedded) with this exact asset name; the runtime substitutes its bitmap from the content source's `imageUrl` |
 | Rive Event | `closeRequested` | type General, fired by the authored close button's listener. The button must NOT change `isOpen` itself — the app owns that state and answers the event |
 | Fonts | embedded | export with fonts embedded; the runtime is self-hosted and referenced fonts would fail to resolve |
+
+**Scrolling long content (2026-08-14):** the Card artboard has no
+authored scroll/clip mechanism (confirmed via
+`tools/dump_riv_objects.py` — no `ClippingShape` component exists on it)
+and none is required — `CardPanel.ts` scrolls the whole rendered sheet
+natively (`overflow-y:auto` on the container) once content grows past the
+90%-viewport height cap, so a long `body` is reachable by scrolling rather
+than silently cut off. This is app-owned, not something to author in
+Rive; don't add clip/scroll components to the Card artboard to "fix"
+overflow — the runtime already handles it (troubleshooting doc §12/§13).
 
 **Hotspot custom properties (scene asset side):** each `hotspot_*` node
 carries `label`, `contentKey`, `riveArtboard` (`Marker`), and

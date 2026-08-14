@@ -740,6 +740,10 @@ values) and stayed there for ~a minute. Same §5 churn family — if
 misplaced content is ever observed on screen, correlate with these
 lines before suspecting the render pipeline.
 
+**No longer watch-only (2026-08-14):** this exact phenomenon became a
+real, user-facing bug once a production experience depended on anchor
+stability — see §13.
+
 ---
 
 ## 11. Root cause found (2026-07-10): the Card artboard's `Closed` state
@@ -928,3 +932,61 @@ the uncapped regime, byte-identical to the width fix's behavior.
 Content clipped by the cap is simply not reachable today — if that ever
 matters in the field, the next step is an authored internal
 scroll/max-height decision in the asset, not more app-side geometry.
+
+**Update (2026-08-14): it did matter in the field — first physical test,
+real building copy exceeded the cap with no way to read the rest.**
+Re-checked "an authored internal scroll/max-height decision in the asset"
+directly against the shipped `bench-ui.riv` (`tools/dump_riv_objects.py`):
+no `ClippingShape`/scroll component exists on the Card artboard — still a
+single monolithic raster, header and body baked into one canvas. Rather
+than author that structure (no Rive-editor access in this pass, and
+splitting header/body into separately-clipped regions is new UI
+architecture), the fix landed code-side without touching the asset:
+`CardPanel.ts`'s container now natively scrolls the whole sheet
+(`overflow-y:auto`, was `hidden`), with the existing drag-to-dismiss
+gesture only taking over when already scrolled to the top and pulling
+further down. Full detail, the runtime verification numbers, and why this
+doesn't conflict with "no more app-side geometry": AR_SYSTEM.md §G Phase
+3, "Progress (2026-08-14, first real physical-device test)", bug 2.
+
+---
+
+## 13. Terrain rendered black + world anchor drift/scale jumps (2026-08-14,
+first real physical-device test) — two more bugs, both root-caused and
+fixed; full detail lives in AR_SYSTEM.md, cross-referenced here so anyone
+starting from this file's chronology doesn't miss them.
+
+**Terrain black:** not a material authoring defect (`mat_site_terrain`'s
+`baseColorFactor` is an ordinary opaque tan, verified directly against the
+shipped GLB) — every mesh in `site-scene.glb` uses a lit PBR material and
+neither tracking engine's runtime scene ever adds a `THREE.Light`
+(`enableLighting: false` for 8th Wall, no light in MindAR's
+`ARSessionManager` either). Only the 12 hotspot-hosting buildings were
+ever visible, via `SceneGraphLoader`'s existing unlit debug tint — masked
+in all prior desk verification because `DevSimSession.ts`'s `?fakear=1`
+bypass adds real lights the device path never gets. Fixed in
+`SceneGraphLoader.ts`: every mesh becomes an unlit `MeshBasicMaterial`
+preserving its authored color; `site_terrain` specifically goes fully
+transparent instead (the physical model already has a real terrain
+surface visible through the camera) while staying in `occluders` for
+`HotspotProjector`'s raycast, which ignores material opacity entirely.
+
+**World anchor drift/scale jumps (priority bug):** `ImageTargetAnchorSource
+.applyPose()` has always applied every raw tracked pose — `found` and
+every per-frame `updated` — directly to the world anchor with zero
+plausibility check. §10 above already logged the exact underlying engine
+phenomenon in isolation ("converged its re-detections onto a bad pose...
+and stayed there for ~a minute") — filed as watch-only because nothing
+depended on anchor stability yet. It does now. The pose-composition math
+itself (verified by `ImageTargetAnchorSource.test.ts`) was never the
+defect. Fixed by promoting the already-computed scale-mismatch ratio
+(§4 above) from a log-only warning to an actual accept/reject gate: once
+a good anchor exists, a sample whose scale ratio falls outside
+`SCALE_MISMATCH_TOLERANCE` is rejected outright, holding the last
+known-good transform instead of jumping to an implausible one. The very
+first acquisition still always applies (no fallback to fall back to).
+
+Both fixes, verification numbers, and the still-open hardware-only gaps
+(`TARGET_FRAME_TO_WORLD_FIX` and the per-plaque mount rotation remain
+"best inference, validate on device" — unchanged by this pass): AR_SYSTEM.md
+§G Phase 3, "Progress (2026-08-14, first real physical-device test)".

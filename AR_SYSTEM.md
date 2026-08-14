@@ -1020,6 +1020,131 @@ schema above.
   input, exactly like every other placeholder-derived number in this
   project already is.
 
+  **Progress (2026-08-14, first real physical-device test): three bugs
+  found on real hardware, all fixed at the runtime layer, none required
+  touching the tracking architecture, MarkerLayer, or Rive assets.**
+
+  1. **Terrain rendered solid black.** Root cause confirmed against the
+     shipped asset, not assumed: every mesh in `site-scene.glb` (terrain,
+     buildings, ledge, plaque placeholders) is authored with a lit
+     Principled BSDF material (`tools/build_site_buildings.py`'s
+     `make_material()`), which glTF export turns into a lit
+     `THREE.MeshStandardMaterial`. Neither tracking engine's runtime scene
+     ever adds a `THREE.Light` — 8th Wall's `XrController.configure()` sets
+     `enableLighting: false` explicitly, MindAR's `ARSessionManager` never
+     added one either. Under zero light a `MeshStandardMaterial` renders
+     solid black regardless of its authored color — verified directly
+     against `public/assets/site-scene.glb`: `mat_site_terrain`'s
+     `baseColorFactor` is an ordinary opaque tan `[0.55, 0.52, 0.45, 1]`,
+     not black or transparent as authored. The only reason the 12
+     hotspot-hosting buildings were ever visible is `SceneGraphLoader`'s
+     existing debug tint, which happens to be unlit for exactly this
+     reason. Masked during all prior desk verification because
+     `DevSimSession.ts` (the `?fakear=1` bypass) adds real
+     `THREE.AmbientLight`/`THREE.DirectionalLight` objects the real device
+     path never gets — a real gap in the verification methodology, now
+     also fixed by testing material state directly rather than only
+     smoke-testing DevSim. Fix (`SceneGraphLoader.ts`): every mesh is
+     rewrapped in an unlit `MeshBasicMaterial` preserving its own authored
+     color (buildings/ledge/plaques now render visibly instead of black);
+     the mesh literally named `site_terrain` (a fixed structural name, the
+     same class of lookup `HOTSPOT_NODE_PREFIX` already is) is made fully
+     transparent (`opacity: 0, depthWrite: false`) instead — the physical
+     3D-printed model already has a real terrain surface visible through
+     the camera passthrough, so the digital terrain mesh's only job is to
+     give `HotspotProjector`'s occlusion raycast a surface to test against
+     (`Raycaster` tests geometry only, ignoring material opacity, so
+     occlusion is unaffected). Verified at runtime (headless Chrome,
+     `window.__debugScene` traversal, temporary/removed before commit):
+     `site_terrain` is `MeshBasicMaterial, transparent=true, opacity=0`;
+     every other mesh (including the 9 previously-invisible non-hotspot
+     buildings) is `MeshBasicMaterial` with its real authored color; zero
+     black meshes remain.
+  2. **Card content longer than the 90%-viewport height cap had no way to
+     be read.** `docs/research/8th-wall-troubleshooting.md` §12 already
+     named this precisely: "the next step is an authored internal
+     scroll/max-height decision in the asset, not more app-side geometry."
+     Confirmed directly (not assumed stale) via `tools/dump_riv_objects.py`
+     against the shipped `bench-ui.riv`: the Card artboard has no
+     `ClippingShape`/scroll component authored — a single monolithic
+     raster with a header (title/subtitle/close button) and body baked
+     into the one canvas. Without Rive-editor access to author a
+     within-artboard scroll region, and since re-authoring the Card into
+     separately-clipped header/body regions would be new UI architecture
+     (out of scope for a surgical fix), the fix is code-side and does not
+     touch the asset: `CardPanel.ts`'s container switches from
+     `overflow:hidden`/`touch-action:none` (content beyond the cap was
+     permanently unreachable) to `overflow-y:auto`/`touch-action:pan-y`,
+     letting the browser natively scroll the same single canvas — the
+     whole sheet (header included) scrolls together, the same pattern
+     several production bottom-sheet UIs use. The existing drag-to-dismiss
+     gesture is preserved by gating its promotion: a vertical drag is only
+     ever taken over as an app-owned dismiss when `container.scrollTop`
+     is already `0` and the finger is pulling further down past the
+     threshold (mirroring the standard native "pull to dismiss" pattern);
+     any other vertical drag is left entirely to native scroll.
+     `container.scrollTop` resets to `0` on every `open()` so a short
+     article opened after a scrolled long one never starts pre-scrolled.
+     Verified at runtime (headless Chrome, synthetic short/medium/long
+     content via a temporary/removed `window.__debugCard` hook): short
+     content has `scrollHeight === clientHeight` (no scroll, unaffected);
+     long content is genuinely scrollable (`scrollHeight` up to 5602px vs.
+     a 681px cap), a programmatic `scrollTop = 80` reads back exactly `80`
+     (real native scroll, not just CSS), the maximum reachable
+     `scrollTop` lands exactly at `scrollHeight − clientHeight` (the true
+     end of the content is reachable), `close()` still works after
+     scrolling, and re-opening resets `scrollTop` to `0`. **Not verifiable
+     in software:** whether the scrollTop-gated dismiss-vs-scroll
+     disambiguation feels correct against a real finger's touch gesture on
+     iOS Safari — a hardware-only validation gap, same category as the
+     tracking glue transforms below.
+  3. **AR content drifted, jumped, and briefly appeared at a drastically
+     wrong scale after tracking correctly at first — the priority bug.**
+     Root cause, confirmed against this file's own pre-existing telemetry
+     rather than assumed: `ImageTargetAnchorSource.applyPose()` has always
+     applied every single raw tracked pose (`found` AND every `updated`,
+     i.e. every frame the target is visible) directly to the world anchor
+     with zero plausibility check.
+     `docs/research/8th-wall-troubleshooting.md` §10 already captured this
+     exact engine-level failure mode in isolation, before it had a
+     user-facing consequence: "one of the sessions... converged its
+     re-detections onto a bad pose (scale=0.106 m, ratio 2.12...) and
+     stayed there for ~a minute" — filed as "watch, no action" at the
+     time. The pose-composition math itself (per-plaque offset/rotation)
+     is independently verified correct by
+     `ImageTargetAnchorSource.test.ts` and was NOT the defect — every
+     glitchy engine reading was being composed correctly and then applied
+     anyway. Fix reuses the ratio the code already computes for its
+     existing scale-mismatch warning (`event.scale` vs.
+     `physicalTargetWidthMeters`) as a plausibility gate, not a new
+     smoothing/damping layer: once a good anchor exists, a sample whose
+     ratio falls outside `SCALE_MISMATCH_TOLERANCE` (±25%) is rejected
+     outright — the anchor holds its last known-good transform, exactly
+     as it already does across a real `imagelost`, instead of teleporting
+     the whole scene to an implausible pose. The very first acquisition
+     always applies regardless (no prior good anchor to fall back to;
+     refusing to ever place the scene would be worse than an imperfect
+     first placement). Verified by two new unit tests in
+     `ImageTargetAnchorSource.test.ts` (14 total, up from 12): a
+     deliberately implausible-scale `updated` AND re-detection `found`
+     sample is rejected while an existing good anchor holds, a subsequent
+     good sample still applies normally (rejection is per-sample, not a
+     lockout), and the very first acquisition applies even with a bad
+     scale (bootstrap can't hang forever). **Not verifiable in software,
+     unchanged by this fix:** whether `TARGET_FRAME_TO_WORLD_FIX` and the
+     per-plaque mount-rotation assumption hold on a real mount — the same
+     hardware-only gap already on record before this pass.
+
+  All three fixes verified together end-to-end (headless Chrome,
+  `?fakegeo=1&fakear=1&debug=1`, real compiled assets) at 320×568,
+  393×852, and 430×932: 12 hotspots discovered, zero console exceptions,
+  full tap → content → Card open → close (tap-outside) chain intact at
+  every size. `npm run typecheck`/`build`/`test` clean (14/14 unit tests).
+  No change to `TARGET_FRAME_TO_WORLD_FIX`, the multi-target composition
+  formula, `MarkerLayer`, `RiveController`, `HotspotProjector`, or any
+  `.riv`/`.glb` asset file — every fix lives in the loading/normalization
+  or gesture-handling layer that already owned this class of decision.
+
 - **Phase 4 — Native iOS App Clip. (OPEN)**
   Goal: the iOS delivery path promised in §A — a native App Clip
   (Swift / SwiftUI / ARKit / RealityKit / Rive iOS runtime) that consumes
