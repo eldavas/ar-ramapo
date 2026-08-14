@@ -65,10 +65,27 @@ itself — a co-located hotspot mesh would self-occlude in
 `buildingId` (the new hotspot->building association key) plus
 `label`/`contentKey` for the future Card. The other 9 buildings (no real
 name, still on the flat placeholder height) intentionally get no hotspot
-yet — a deliberate first pass, not an oversight; `riveArtboard`/
-`riveStateMachine` are also deliberately omitted, since no Card/Marker UI
-has been designed for buildings yet and inventing placeholder Rive
-bindings would be fabricated data with no artboard behind it.
+yet — a deliberate first pass, not an oversight.
+
+REVISION (2026-08-13, third pass, manifest swap follow-up): this
+docstring previously said `riveArtboard`/`riveStateMachine` were
+"deliberately omitted... since no Card/Marker UI has been designed for
+buildings yet and inventing placeholder Rive bindings would be fabricated
+data with no artboard behind it." That premise turned out to be stale,
+not a real blocker: `bench-ui.riv` (`tools/inspect_rive_ui.mjs` ground
+truth) contains exactly one Marker artboard/MarkerMachine state machine
+and one Card artboard/CardMachine state machine, both fully
+content-agnostic (Marker's only inputs are isSelected/isDimmed; Card
+renders whatever title/body/image the contentKey resolves to). Every
+hotspot this project has ever authored — all 4 `build_bench_scene.py`
+dominoes — binds the identical literal "Marker"/"MarkerMachine", so there
+is no per-content-type Marker to design; assigning the same shared,
+already-existing artboard here is reusing the established UI, not
+fabricating a new one. The content sheet (bench-test's `contentUrl`) was
+independently confirmed to already carry rows for all 12
+`site-building-*` contentKeys this script generates. `hotspot_*` empties
+now carry `riveArtboard`/`riveStateMachine` = "Marker"/"MarkerMachine",
+same as every other hotspot in the codebase.
 
 SCOPE: hotspots exist on the 12 named buildings only, not wired into the
 experience manifest — same staging caveat as build_site_terrain.py.
@@ -120,6 +137,16 @@ USERDATA_PLAQUE_SIDE_KEY = "plaqueSide"
 HOTSPOT_PREFIX = "hotspot_"
 USERDATA_LABEL_KEY = "label"
 USERDATA_CONTENT_KEY = "contentKey"
+USERDATA_ARTBOARD_KEY = "riveArtboard"
+USERDATA_STATE_MACHINE_KEY = "riveStateMachine"
+
+# Same shared Marker artboard/state machine every hotspot in this project
+# binds (see build_bench_scene.py's DOMINOES) — bench-ui.riv's Marker is a
+# generic, content-agnostic pin (isSelected/isDimmed only), not authored
+# per content type, so building hotspots reuse it as-is rather than
+# needing a new artboard.
+HOTSPOT_RIVE_ARTBOARD = "Marker"
+HOTSPOT_RIVE_STATE_MACHINE = "MarkerMachine"
 
 
 def link(obj: bpy.types.Object) -> bpy.types.Object:
@@ -244,6 +271,8 @@ def build_building_hotspots(data: dict, building_objects: list) -> list:
         hotspot[USERDATA_LABEL_KEY] = name
         hotspot[USERDATA_CONTENT_KEY] = f"site-building-{slugify(name)}"
         hotspot[USERDATA_BUILDING_ID_KEY] = b["id"]
+        hotspot[USERDATA_ARTBOARD_KEY] = HOTSPOT_RIVE_ARTBOARD
+        hotspot[USERDATA_STATE_MACHINE_KEY] = HOTSPOT_RIVE_STATE_MACHINE
         hotspots.append(hotspot)
 
     print(f"  built {len(hotspots)} building hotspots (named buildings only; "

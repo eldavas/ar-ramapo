@@ -107,8 +107,8 @@ export const experienceManifest: ExperienceManifest[] = [
     // silently.
     targetId: 'bench-test',
     riveUrl: '/assets/bench-ui.riv',
-    modelUrl: '/assets/bench-scene.glb',
-    usdzUrl: '/assets/bench-scene.usdz',
+    modelUrl: '/assets/site-scene.glb',
+    usdzUrl: '/assets/site-scene.usdz',
     mindTargetUrl: '/assets/bench-target.mind',
     trackingImageUrl: '/assets/bench-plaque.png',
     // Phase 5 external-content source (§E): a Google Sheet with header row
@@ -136,7 +136,21 @@ export const experienceManifest: ExperienceManifest[] = [
     // 120×120 square) plus Card title/subtitle text runs restored;
     // bench-scene.glb hotspot anchors moved from each domino's volumetric
     // center to its top-Y (§G Phase 6, 2026-07-14 on-device findings).
-    version: '0.4.2',
+    // 0.5.0: modelUrl/usdzUrl swapped from bench-scene.* to the digital-twin
+    // handoff bundle's site-scene.* (cad-source/handoff/, copied into
+    // /public/assets). mindTargetUrl/trackingImageUrl/physicalTargetWidthMeters
+    // are still bench-plaque's (5cm QR) — the real 4-plaque tracking swap is
+    // a separate, not-yet-built step (§E).
+    // 0.5.1: site-scene.glb re-exported — hotspot_building_* nodes now carry
+    // riveArtboard/riveStateMachine ("Marker"/"MarkerMachine", the same
+    // shared values every hotspot in this project binds; see
+    // tools/build_site_buildings.py's 2026-08-13 third-pass revision note).
+    // Fixes the 0.5.0 MarkerLayer.requireString crash. STILL OPEN: 8 of the
+    // 12 site-building-* rows in the content sheet above are missing a body
+    // value, which makes GoogleSheetContentProvider fail its (session-wide,
+    // eager) parse for every contentKey, not just the incomplete rows — a
+    // content-authoring gap in the sheet, not a code or asset defect.
+    version: '0.5.1',
   },
   {
     // Phase 2C: 8th Wall test entry (AR_SYSTEM.md's 8th-wall decision
@@ -149,7 +163,7 @@ export const experienceManifest: ExperienceManifest[] = [
     // the MindAR path with zero manifest changes.
     targetId: '8thwall-test',
     riveUrl: '/assets/bench-ui.riv',
-    modelUrl: '/assets/bench-scene.glb',
+    modelUrl: '/assets/site-scene.glb',
     placement: 'image',
     // Compiled from bench-plaque.png with `npx @8thwall/image-target-cli`
     // (single-source artwork rule, §E/§F) — regenerate if the plaque art
@@ -171,6 +185,10 @@ export const experienceManifest: ExperienceManifest[] = [
     contentUrl: 'https://docs.google.com/spreadsheets/d/1O4Zq8ggc7TgjKZIuUtufO-G9hJiK2KalJpD2Cux2sN8/gviz/tq?tqx=out:json',
     // 0.1.1: same shared-asset fix as bench-test 0.4.2 (bench-ui.riv Card
     // visibility + Marker anchoring, bench-scene.glb top-Y hotspots).
-    version: '0.1.1',
+    // 0.2.0: modelUrl swapped bench-scene.glb -> site-scene.glb.
+    // 0.2.1: same site-scene.glb re-export as bench-test 0.5.1 above
+    // (riveArtboard/riveStateMachine added to the building hotspots; same
+    // still-open sheet-content gap noted there).
+    version: '0.2.1',
   },
 ];
