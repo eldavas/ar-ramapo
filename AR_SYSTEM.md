@@ -832,6 +832,69 @@ schema above.
   (`src/client/ContentProvider.test.ts`, run via `npm test` — Node's
   built-in `node:test`, no new dependency) cover both sides of that line.
 
+  **Progress (2026-08-14): real physical targeting wired for all 4 site
+  plaques — a test-harness extension of the swap above, still explicitly
+  NOT the calibrated four-plaque production design.** The 4 plaque images
+  (`tools/plaque/site/plaque-{front,back,left,right}.png`,
+  `tools/build_site_plaques.py`) are each compiled into their own
+  single-image `.mind` target (`tools/compile_mind_target.mjs`, now
+  parameterized — `node tools/compile_mind_target.mjs <png> <mind>` — so it
+  compiles any plaque image, not only `bench-plaque.png`) and get their own
+  manifest entry: `site-front`/`site-back`/`site-left`/`site-right`, each
+  MindAR, each pointing at the real digital-twin `site-scene.glb`/`.usdz`,
+  `bench-ui.riv`, and the already-populated content sheet — same
+  architecture as `bench-test`, applied 4 times with real artwork instead
+  of the synthetic bench plaque. `ACTIVE_TARGET_ID` (the sole
+  experience-selection mechanism today, `src/client/main.ts`) is now
+  `'site-front'` — the live production default.
+
+  **Explicitly NOT built, and correctly so:** the four-plaque shared-corner
+  design (§A/§E's `targets[]`). Confirmed by reading the runtime, not
+  assumed: `ImageTargetAnchorSource` takes one `primaryName`;
+  `ARSessionManager.start()` takes one fixed `.mind` anchor index;
+  docs/asset-authoring-guide.md §3.3 already recorded "no per-target
+  routing built yet." Building that now would be new, unverified
+  multi-target AR-runtime engineering for `originOffsetMeters`/
+  `rotationYawDeg` numbers that are still genuinely unknown — the physical
+  panel-footprint measurement (`LEDGE_WIDTH_M`, `cad-source/handoff/
+  README.md`'s "Known open item") remains unmeasured. Each of the 4 new
+  entries instead anchors the FULL site-scene centered on whichever single
+  plaque is scanned (§A's original single-plaque-center rule) — a real
+  test of tracking + rendering + hotspots + content with real printed
+  artwork, correctly decoupled from the still-blocked shared-origin
+  calibration. **Known limitation, physical not software:** scanning any
+  plaque other than the one the (not-yet-fabricated) physical model
+  happens to be centered on will not line up AR content with real printed
+  structures — that alignment is exactly what the blocked design would
+  fix.
+
+  **Verified in software** (headless Chrome + CDP, real app + real
+  compiled assets): all 4 manifest entries resolve; `GET /api/manifest`
+  and HTTP HEAD on all 8 new asset files (4 `.mind`, 4 `.png`) return 200
+  with byte-exact `Content-Length`; with `--use-fake-device-for-media-
+  stream` (MindAR's `getUserMedia()` has no query-param bypass, unlike the
+  8th Wall path's `?fakear=1`), all 4 targets start a MindAR session,
+  load `site-scene.glb` under the MindAR glue transform, and discover all
+  12 hotspots with zero exceptions — `HotspotProjector` correctly reports
+  `tracking=false` throughout, since a fake camera feed has no real
+  plaque to match against. `npm run typecheck`/`build`/`test` clean.
+  **Requires physical validation, not verifiable in software:** whether
+  the printed artwork actually tracks reliably under a real camera (glare,
+  print DPI, lighting) — the entire point of testing physical prints — and
+  the full tap → content → Card chain against real MindAR tracking (the
+  shared downstream pipeline itself was already verified end-to-end with
+  the same `site-scene.glb`/hotspots/content sheet via the 8th Wall
+  `?fakear=1` path above; only the MindAR-specific bootstrap is new here).
+
+  Printable plaque size (50mm, `tools/build_site_plaques.py`'s `SIZE_MM`)
+  and QR-within-plaque placement are real, current values, not
+  placeholders — that's what's actually printed on
+  `tools/plaque/site/print-sheet.html`. Physical dimensions and exact QR
+  placement per plaque: `docs/asset-authoring-guide.md` §3.5. What
+  remains a placeholder, unchanged by this pass: `LEDGE_WIDTH_M`, plaque
+  *position on the model* (as opposed to plaque print size), and every
+  number the four-plaque shared-origin design needs.
+
 - **Phase 4 — Native iOS App Clip. (OPEN)**
   Goal: the iOS delivery path promised in §A — a native App Clip
   (Swift / SwiftUI / ARKit / RealityKit / Rive iOS runtime) that consumes

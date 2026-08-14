@@ -234,6 +234,87 @@ note in the architecture review; each anchor still needs to be wired up in
    photo of the image on a screen behaves differently than a printed
    marker under real lighting.
 
+### 3.5 Physical dimensions — the 4 site plaques and the digital-twin model
+
+Recorded 2026-08-14 alongside wiring the 4 real site-plaque targets
+(`site-front`/`site-back`/`site-left`/`site-right`, AR_SYSTEM.md §G Phase
+3). Everything below is either a real, currently-printed value or is
+explicitly marked placeholder — nothing here is rounded or invented; where
+a number derives from model data or a script constant, that source is
+named so it can be re-derived if the source changes.
+
+**Each of the 4 plaques** (`tools/build_site_plaques.py`):
+
+| Property | Value | Source |
+|---|---|---|
+| Plaque size | 50 × 50 mm | `SIZE_MM` — real, matches what's printed |
+| Artwork resolution | 1024 × 1024 px (≈520 dpi at 50mm) | `SIZE_PX` |
+| QR payload | `https://ar-ramapo.onrender.com` (same URL, all 4 — §A: identity is resolved by tracking, never the QR payload) | `AR_EXPERIENCE_URL` |
+| `physicalTargetWidthMeters` | 0.05 | matches plaque size exactly (manifest.ts `site-*` entries) |
+
+**QR position within each 50mm plaque** (identical layout on all 4 —
+computed from `tools/build_site_plaques.py`'s own `mm()`/QR-placement
+math, not measured by hand):
+
+| Measurement | Value |
+|---|---:|
+| QR size (incl. quiet-zone border) | 30.71 mm (629 px) |
+| From left edge | 9.62 mm |
+| From right edge | 9.67 mm |
+| From top edge | 8.98 mm |
+| From bottom edge | 10.30 mm |
+| QR center from left edge | 24.98 mm |
+| QR center from top edge | 24.34 mm |
+
+(Left/right and top/bottom aren't perfectly symmetric — the QR module
+count doesn't divide the plaque evenly at this scale/error-correction
+level; both are correct as computed, not a rounding artifact.) Each
+side's distinguishing corner mark (triangle/circle/diamond, one shape per
+corner) is a 9mm bounding box inset from its corner — see
+`draw_corner_shape()`/`corner_origin()` in the same script if you need its
+exact placement too.
+
+**The digital-twin model** (`cad-source/handoff/site_terrain.json` /
+`site_buildings.json`, real DWG-derived data — not placeholder):
+
+| Element | Width (X) | Depth (Y) | Height (Z) |
+|---|---:|---:|---:|
+| Terrain footprint | 1606.55 mm | 1343.03 mm | 0–152.4 mm relief |
+| Tallest building (top, above the Z=0 terrain plane) | — | — | 105.25 mm |
+
+Terrain relief (0–152.4mm) is true-scale, no vertical exaggeration —
+converted directly from the source DWG's real elevation range (450–930 ft)
+by the same `ft_to_model_m` factor as the horizontal footprint.
+
+**PLACEHOLDER, not yet measured** (`tools/build_site_buildings.py`'s
+`LEDGE_WIDTH_M`, `cad-source/handoff/README.md`'s "Known open item"): the
+mounting ledge around the terrain is currently authored at a 3-inch
+(76.2mm) *guess*, giving a placeholder total footprint (terrain + ledge on
+all 4 sides) of **1758.95 × 1495.43 mm**. This number moves once the real
+ledge width lands — swap `LEDGE_WIDTH_M` and re-run
+`tools/export_handoff_bundle.py`.
+
+**Plaque position on the model — PLACEHOLDER, derived from the ledge
+guess above, not a real measurement.** Each plaque's center, relative to
+`AR_World_Origin` (extracted from `site-scene.glb`'s own plaque mesh
+bounds, which trace exactly back to `build_site_buildings.py`'s
+`plaque_centers` dict — not independently invented):
+
+| Plaque | X from origin | Y from origin (north) |
+|---|---:|---:|
+| front | 803.27 mm | 38.10 mm |
+| back | 803.27 mm | 1381.13 mm |
+| left | −38.10 mm | 671.51 mm |
+| right | 1644.65 mm | 671.51 mm |
+
+**Not available, not invented:** each plaque's mounting rotation
+(`rotationYawDeg`). The 4 placeholder plaque volumes in `site-scene.glb`
+are flat magenta slabs lying on top of the ledge (viewed from above), not
+upright wall-mounted plaques — no facing direction has been authored yet,
+so there is nothing to extract. This, plus the ledge-width measurement
+above, is what the four-plaque `targets[]` design (AR_SYSTEM.md §A/§E)
+is still blocked on.
+
 ---
 
 ## 4. Registering a new experience in the manifest

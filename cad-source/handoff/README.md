@@ -28,15 +28,29 @@ Regenerate all of it with:
 - **`site-scene.glb` / `site-scene.usdz`** — quick-preview exports (e.g.
   `qlmanage -p` on macOS, or drag into any glTF viewer) without opening
   Blender at all. As of 2026-08-13 these are also copied into
-  `/public/assets/` and loaded by the real app — `bench-test`/
-  `8thwall-test` (`packages/experience-manifest/manifest.ts`) point their
-  `modelUrl`/`usdzUrl` here for on-device testing against the real
-  digital-twin mesh. That's a test-harness swap on those two existing
-  targetIds, not the four-plaque production experience (§A/§E) — the
-  tracking plaque/target is still `bench-test`'s own 5cm QR, unrelated to
-  this scene's 4 placeholder plaques above. Re-run
-  `export_handoff_bundle.py` after any scene change and copy the two
-  files into `/public/assets/` again to update what the app serves.
+  `/public/assets/` and loaded by the real app: `bench-test`/`8thwall-test`
+  (`packages/experience-manifest/manifest.ts`) point their `modelUrl`/
+  `usdzUrl` here, still tracking off `bench-test`'s own synthetic 5cm QR —
+  unrelated to this scene's 4 placeholder plaque *markers* below. As of
+  2026-08-14, `site-front`/`site-back`/`site-left`/`site-right` also point
+  here, tracking off the 4 **real** printed plaques instead
+  (`tools/plaque/site/`, see below) — still none of these five is the
+  four-plaque shared-origin production experience (§A/§E), which needs
+  `targets[]` and stays blocked on this file's "Known open item". Re-run
+  `export_handoff_bundle.py` after any scene change and copy the two files
+  into `/public/assets/` again to update what the app serves.
+
+  **Two different things are both called "plaque" here, don't conflate
+  them:** the 4 magenta boxes described above are placeholder *markers* —
+  flat volumes at the model's own scale, standing in for where plaques
+  will eventually mount, with no real artwork on their faces. The actual
+  printable QR artwork (`tools/plaque/site/plaque-{front,back,left,right}.png`,
+  `tools/build_site_plaques.py`) is a separate, independently-scaled
+  1024×1024px asset — it doesn't live in this scene at all, and its 50mm
+  print size and QR-in-plaque placement are real, current values, not
+  placeholders (unlike the markers' *position*, which is ledge-width-
+  dependent and still a guess). Full physical dimensions:
+  `docs/asset-authoring-guide.md` §3.5.
 
 ## What's NOT here, on purpose
 
