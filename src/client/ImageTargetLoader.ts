@@ -1,3 +1,4 @@
+import type { PlaqueTarget } from '../../packages/experience-manifest/manifest.js';
 import type { Xr8ImageTargetDataEntry } from './types/xr8.js';
 
 export interface LoadedImageTargets {
@@ -8,6 +9,68 @@ export interface LoadedImageTargets {
    * never silently mismatch a hardcoded string.
    */
   primaryName: string;
+}
+
+/** One `targets[]` entry, resolved to the tracked-event `name` it fires under. */
+export interface ResolvedPlaqueTarget {
+  name: string;
+  physicalTargetWidthMeters: number;
+  originOffsetMeters: { x: number; z: number };
+  rotationYawDeg: number;
+}
+
+export interface LoadedMultiImageTargets {
+  /** Every plaque's image-target data, merged — handed to XrController.configure() as one array. */
+  imageTargetData: Xr8ImageTargetDataEntry[];
+  /** Resolved per-plaque config, keyed by the same `name` Xr8ImageTrackedEvent carries. */
+  targetsByName: Map<string, ResolvedPlaqueTarget>;
+}
+
+/**
+ * Multi-plaque counterpart to loadImageTargetData() below (§E "Multi-target
+ * plaques"): fetches every targets[] entry's own imageTargetUrl in
+ * parallel, merges their (possibly multi-entry, see loadImageTargetData's
+ * own doc comment) imageTargetData arrays into one, and resolves each to
+ * the manifest's originOffsetMeters/rotationYawDeg via `imageTargetName`
+ * (explicit) or the compiled target's own `name` (default — the common
+ * case, since image-target-cli names the target after its own output
+ * folder, which is the manifest's targetId-derived convention).
+ */
+export async function loadImageTargetDataForTargets(
+  targets: readonly PlaqueTarget[]
+): Promise<LoadedMultiImageTargets> {
+  const imageTargetData: Xr8ImageTargetDataEntry[] = [];
+  const targetsByName = new Map<string, ResolvedPlaqueTarget>();
+
+  const loaded = await Promise.all(
+    targets.map(async (target, index) => {
+      if (target.imageTargetUrl === undefined) {
+        throw new ImageTargetLoadError(
+          `targets[${index}] has no imageTargetUrl — required for every 8th Wall plaque target.`
+        );
+      }
+      return { target, index, loaded: await loadImageTargetData(target.imageTargetUrl) };
+    })
+  );
+
+  for (const { target, index, loaded: entryData } of loaded) {
+    const name = target.imageTargetName ?? entryData.primaryName;
+    if (targetsByName.has(name)) {
+      throw new ImageTargetLoadError(
+        `targets[${index}] resolves to name "${name}", already used by another entry in this ` +
+          'experience — Xr8ImageTrackedEvent.name would be ambiguous between them.'
+      );
+    }
+    targetsByName.set(name, {
+      name,
+      physicalTargetWidthMeters: target.physicalTargetWidthMeters,
+      originOffsetMeters: target.originOffsetMeters,
+      rotationYawDeg: target.rotationYawDeg,
+    });
+    imageTargetData.push(...entryData.imageTargetData);
+  }
+
+  return { imageTargetData, targetsByName };
 }
 
 export class ImageTargetLoadError extends Error {

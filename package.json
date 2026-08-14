@@ -14,7 +14,7 @@
     "dev:client": "vite build --watch",
     "typecheck": "tsc --noEmit && tsc --noEmit -p src/client/tsconfig.json",
     "start": "node dist/server.js",
-    "test": "tsc --ignoreConfig --module nodenext --moduleResolution nodenext --target es2022 --strict --types node --outDir .tmp-test src/client/ContentProvider.ts src/client/ContentProvider.test.ts && (node --test .tmp-test/ContentProvider.test.js; code=$?; rm -rf .tmp-test; exit $code)"
+    "test": "tsc --ignoreConfig --module nodenext --moduleResolution nodenext --target es2022 --lib es2022,dom --strict --skipLibCheck --types node --outDir .tmp-test src/client/ContentProvider.ts src/client/ContentProvider.test.ts src/client/ImageTargetAnchorSource.ts src/client/ImageTargetAnchorSource.test.ts src/client/ImageTargetLoader.ts src/client/EightWallSession.ts src/client/AnchorSource.ts src/client/TraceLog.ts src/client/types/xr8.ts src/client/types/engine-binary.d.ts packages/experience-manifest/manifest.ts && (node --test .tmp-test/src/client/ContentProvider.test.js .tmp-test/src/client/ImageTargetAnchorSource.test.js; code=$?; rm -rf .tmp-test; exit $code)"
   },
   "dependencies": {
     "@8thwall/engine-binary": "^1.0.0",

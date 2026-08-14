@@ -69,6 +69,9 @@ export function resolveExperience(targetId: string): ExperienceManifest {
   if (entry.mindTargetUrl !== undefined) {
     assertValidAssetUrl(entry.targetId, 'mindTargetUrl', entry.mindTargetUrl);
   }
+  if (entry.imageTargetUrl !== undefined) {
+    assertValidAssetUrl(entry.targetId, 'imageTargetUrl', entry.imageTargetUrl);
+  }
   if (entry.trackingImageUrl !== undefined) {
     assertValidAssetUrl(entry.targetId, 'trackingImageUrl', entry.trackingImageUrl);
   }
@@ -76,11 +79,53 @@ export function resolveExperience(targetId: string): ExperienceManifest {
     assertValidContentUrl(entry.targetId, entry.contentUrl);
   }
 
+  if (entry.targets !== undefined) {
+    if (entry.mindTargetUrl !== undefined || entry.imageTargetUrl !== undefined) {
+      throw new ManifestResolutionError(
+        `experience-manifest entry "${entry.targetId}" declares both targets[] and a singular ` +
+          'mindTargetUrl/imageTargetUrl — these are XOR (AR_SYSTEM.md §E "Multi-target plaques").'
+      );
+    }
+    if (entry.targets.length === 0) {
+      throw new ManifestResolutionError(
+        `experience-manifest entry "${entry.targetId}" declares an empty targets[] array.`
+      );
+    }
+    for (const [index, plaqueTarget] of entry.targets.entries()) {
+      const label = `targets[${index}]`;
+      if (plaqueTarget.imageTargetUrl !== undefined) {
+        assertValidAssetUrl(entry.targetId, `${label}.imageTargetUrl`, plaqueTarget.imageTargetUrl);
+      }
+      const width = plaqueTarget.physicalTargetWidthMeters;
+      if (!Number.isFinite(width) || width <= 0) {
+        throw new ManifestResolutionError(
+          `experience-manifest entry "${entry.targetId}" ${label} has an invalid ` +
+            `physicalTargetWidthMeters: ${JSON.stringify(width)}. Must be a positive number of meters.`
+        );
+      }
+      const { x, z } = plaqueTarget.originOffsetMeters;
+      if (!Number.isFinite(x) || !Number.isFinite(z)) {
+        throw new ManifestResolutionError(
+          `experience-manifest entry "${entry.targetId}" ${label} has a non-finite ` +
+            `originOffsetMeters: ${JSON.stringify(plaqueTarget.originOffsetMeters)}.`
+        );
+      }
+      if (!Number.isFinite(plaqueTarget.rotationYawDeg)) {
+        throw new ManifestResolutionError(
+          `experience-manifest entry "${entry.targetId}" ${label} has a non-finite ` +
+            `rotationYawDeg: ${JSON.stringify(plaqueTarget.rotationYawDeg)}.`
+        );
+      }
+    }
+  }
+
   // physicalTargetWidthMeters is the sole scale bridge between
   // meter-authored content and the tracking engines (AR_SYSTEM.md §E/§F) —
   // an entry that declares spatial content without it would render at a
-  // meaningless scale, so fail resolution instead.
-  if (entry.modelUrl !== undefined) {
+  // meaningless scale, so fail resolution instead. targets[] entries carry
+  // their own per-plaque width instead (validated above), so they're
+  // exempt from this top-level check.
+  if (entry.modelUrl !== undefined && entry.targets === undefined) {
     const width = entry.physicalTargetWidthMeters;
     if (width === undefined || !Number.isFinite(width) || width <= 0) {
       throw new ManifestResolutionError(

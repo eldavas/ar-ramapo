@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { AnchorSource, OriginKind } from './AnchorSource.js';
 import type { EightWallSession, ImageEventKind } from './EightWallSession.js';
+import type { ResolvedPlaqueTarget } from './ImageTargetLoader.js';
 import type { Xr8ImageTrackedEvent } from './types/xr8.js';
 import { traceT } from './TraceLog.js';
 
@@ -70,6 +71,22 @@ function anchorScaleForEvent(
   return 1;
 }
 
+/**
+ * Per-plaque yaw correction, applied AFTER the fixed TARGET_FRAME_TO_WORLD_FIX
+ * above — that fix handles "flat marker in general"; this handles "this
+ * specific plaque's own mount rotation relative to the model's reference
+ * orientation" (§E "Multi-target plaques"; ResolvedPlaqueTarget.rotationYawDeg
+ * doc comment has the full derivation). Identity (0°) for a single-target
+ * experience, which is exactly today's pre-multi-target behavior — see the
+ * single-element-array note on the constructor.
+ */
+function yawCorrectionQuaternion(rotationYawDeg: number): THREE.Quaternion {
+  return new THREE.Quaternion().setFromAxisAngle(
+    new THREE.Vector3(0, 1, 0),
+    THREE.MathUtils.degToRad(rotationYawDeg)
+  );
+}
+
 /** Compact pose formatter for the telemetry lines below. */
 function formatPose(event: Xr8ImageTrackedEvent): string {
   const p = event.position;
@@ -81,16 +98,23 @@ function formatPose(event: Xr8ImageTrackedEvent): string {
 }
 
 /**
- * AnchorSource whose origin is the printed QR plaque on the fixed
- * 3D-printed model, tracked as an 8th Wall image target.
+ * AnchorSource whose origin is a printed QR plaque on the fixed 3D-printed
+ * model, tracked as an 8th Wall image target — one or more plaques, per
+ * `targets` (§E "Multi-target plaques"). A single-target experience (e.g.
+ * 8thwall-test) is simply a one-element `targets` array with
+ * originOffsetMeters {x:0,z:0} and rotationYawDeg 0, which reduces
+ * applyPose()'s composition to exactly the pre-multi-target math (see its
+ * doc comment) — no behavior change for existing single-target callers.
  *
- * acquire() resolves on the FIRST imagefound; every subsequent
- * imagefound/imageupdated re-snaps the mount group to the tracked pose,
- * correcting accumulated SLAM drift whenever the user glances back at the
- * plaque. After imagelost the group simply stops receiving snaps — SLAM
+ * acquire() resolves on the FIRST imagefound of ANY configured plaque;
+ * every subsequent imagefound/imageupdated (of any plaque still in the
+ * `targets` map) re-snaps the mount group to that plaque's own
+ * offset/rotation-corrected pose, correcting accumulated SLAM drift
+ * whenever the user glances back at whichever plaque is currently in
+ * view. After imagelost the group simply stops receiving snaps — SLAM
  * world tracking (disableWorldTracking: false in EightWallSession) keeps
  * the frozen world pose valid, so content persists while the user walks
- * around the model. Scan once, walk around.
+ * around the model. Scan any one plaque once, walk around.
  *
  * onOriginChanged fires only on RE-detection (imagefound after a lost,
  * once already acquired) — a discontinuity where the pose may visibly
@@ -109,6 +133,8 @@ export class ImageTargetAnchorSource implements AnchorSource {
   private unsubscribe: (() => void) | null = null;
   private readonly originChangedHandlers: Array<() => void> = [];
   private readonly scratchQuat = new THREE.Quaternion();
+  private readonly scratchOffset = new THREE.Vector3();
+  private readonly targetsByName: ReadonlyMap<string, ResolvedPlaqueTarget>;
   // On-device telemetry (?debug=1, see the inline console in index.html),
   // instrumented for the troubleshooting doc §5–6 investigation: every
   // input that feeds the marker-visibility gate is logged on CHANGE, never
@@ -122,14 +148,10 @@ export class ImageTargetAnchorSource implements AnchorSource {
   constructor(
     private readonly session: EightWallSession,
     private readonly scene: THREE.Scene,
-    /**
-     * `name` from the compiled target JSON (ImageTargetLoader.primaryName)
-     * — events are filtered on it, so a renamed compile output can't
-     * silently mismatch.
-     */
-    private readonly targetName: string,
-    private readonly physicalTargetWidthMeters: number
+    /** One entry per plaque this experience should recognize (§E). */
+    targets: readonly ResolvedPlaqueTarget[]
   ) {
+    this.targetsByName = new Map(targets.map((target) => [target.name, target]));
     this.group.name = 'image-target-anchor';
     this.group.visible = false;
     this.scene.add(this.group);
@@ -137,8 +159,9 @@ export class ImageTargetAnchorSource implements AnchorSource {
   }
 
   acquire(): Promise<void> {
+    const names = [...this.targetsByName.keys()].join('", "');
     console.log(
-      `[${traceT()}] [ImageTargetAnchorSource] acquire() — waiting for first imagefound of "${this.targetName}"...`
+      `[${traceT()}] [ImageTargetAnchorSource] acquire() — waiting for first imagefound of any of "${names}"...`
     );
     // Re-acquire is a no-op by design: re-alignment is automatic on every
     // sighting of the plaque, so there is nothing to re-run.
@@ -192,10 +215,14 @@ export class ImageTargetAnchorSource implements AnchorSource {
   }
 
   private onImageEvent(kind: ImageEventKind, event: Xr8ImageTrackedEvent | null): void {
-    if (event !== null && event.name !== this.targetName) return;
+    // Ignore events for a target name outside this experience's `targets`
+    // — same filtering intent as the pre-multi-target single-name compare,
+    // now a map lookup instead of one equality check.
+    const target = event === null ? undefined : this.targetsByName.get(event.name);
+    if (event !== null && target === undefined) return;
     switch (kind) {
       case 'found': {
-        if (event === null) return;
+        if (event === null || target === undefined) return;
         const wasAcquired = this.acquired;
         console.log(
           `[${traceT()}] [ImageTarget] FOUND "${event.name}"\n` +
@@ -205,7 +232,7 @@ export class ImageTargetAnchorSource implements AnchorSource {
               ? ' (re-detection — firing onOriginChanged, pose discontinuity)'
               : ' (first acquire — group visible, resolving acquire())')
         );
-        this.applyPose(event);
+        this.applyPose(event, target);
         this.imageVisible = true;
         if (!this.acquired) {
           this.acquired = true;
@@ -221,7 +248,7 @@ export class ImageTargetAnchorSource implements AnchorSource {
         break;
       }
       case 'updated':
-        if (event !== null) {
+        if (event !== null && target !== undefined) {
           const now = performance.now();
           if (now - this.lastUpdatedLogMs > ImageTargetAnchorSource.UPDATED_LOG_INTERVAL_MS) {
             this.lastUpdatedLogMs = now;
@@ -230,13 +257,13 @@ export class ImageTargetAnchorSource implements AnchorSource {
                 `scale=${event.scale.toFixed(3)}m ${formatPose(event)}`
             );
           }
-          this.applyPose(event);
+          this.applyPose(event, target);
           this.imageVisible = true;
         }
         break;
       case 'lost':
         console.log(
-          `[${traceT()}] [ImageTarget] LOST "${event?.name ?? this.targetName}"\n` +
+          `[${traceT()}] [ImageTarget] LOST "${event?.name ?? '(unknown)'}"\n` +
             `  imageVisible: ${this.imageVisible} -> false; acquired stays ${this.acquired}\n` +
             '  pose frozen at last snap — SLAM world tracking persists it'
         );
@@ -252,10 +279,37 @@ export class ImageTargetAnchorSource implements AnchorSource {
     }
   }
 
-  private applyPose(event: Xr8ImageTrackedEvent): void {
-    this.group.position.set(event.position.x, event.position.y, event.position.z);
+  /**
+   * Composes the tracked plaque's pose with ITS OWN offset/rotation
+   * correction so the mounted site-scene's origin (never the tracked
+   * plaque itself, once originOffsetMeters is non-zero) ends up at the
+   * same world position/orientation regardless of which of the `targets`
+   * plaques fired (§E "Multi-target plaques" — "Runtime resolution").
+   *
+   * correctedQuat is "how the model's own local frame is oriented in
+   * world space, given this specific plaque's mount": the tracked
+   * rotation, the fixed flat-marker glue (TARGET_FRAME_TO_WORLD_FIX), then
+   * this plaque's own yaw correction relative to the other plaques. The
+   * model's world origin then sits `originOffsetMeters` away from the
+   * tracked plaque, in the model's own (now-known) orientation — so it's
+   * the tracked position MINUS that offset rotated into world space, not
+   * the tracked position itself (which is where the pre-multi-target code
+   * put it — correct only when offsetMeters is exactly {0,0}).
+   */
+  private applyPose(event: Xr8ImageTrackedEvent, target: ResolvedPlaqueTarget): void {
     this.scratchQuat.set(event.rotation.x, event.rotation.y, event.rotation.z, event.rotation.w);
-    this.group.quaternion.copy(this.scratchQuat).multiply(TARGET_FRAME_TO_WORLD_FIX);
-    this.group.scale.setScalar(anchorScaleForEvent(event, this.physicalTargetWidthMeters));
+    this.group.quaternion
+      .copy(this.scratchQuat)
+      .multiply(TARGET_FRAME_TO_WORLD_FIX)
+      .multiply(yawCorrectionQuaternion(target.rotationYawDeg));
+
+    this.scratchOffset
+      .set(target.originOffsetMeters.x, 0, target.originOffsetMeters.z)
+      .applyQuaternion(this.group.quaternion);
+    this.group.position
+      .set(event.position.x, event.position.y, event.position.z)
+      .sub(this.scratchOffset);
+
+    this.group.scale.setScalar(anchorScaleForEvent(event, target.physicalTargetWidthMeters));
   }
 }

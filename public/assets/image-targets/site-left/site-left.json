@@ -1,0 +1,23 @@
+{
+  "imagePath": "/assets/image-targets/site-left/site-left_luminance.png",
+  "metadata": null,
+  "name": "site-left",
+  "type": "PLANAR",
+  "properties": {
+    "left": 128,
+    "top": 0,
+    "width": 768,
+    "height": 1024,
+    "isRotated": true,
+    "originalWidth": 1024,
+    "originalHeight": 1024
+  },
+  "resources": {
+    "originalImage": "site-left_original.png",
+    "croppedImage": "site-left_cropped.png",
+    "thumbnailImage": "site-left_thumbnail.png",
+    "luminanceImage": "site-left_luminance.png"
+  },
+  "created": 1786733728129,
+  "updated": 1786733728129
+}

@@ -28,7 +28,11 @@ import { UxOverlay } from './UxOverlay.js';
 import { PlacementController } from './PlacementController.js';
 import { TapPlacedAnchorSource } from './TapPlacedAnchorSource.js';
 import { ImageTargetAnchorSource } from './ImageTargetAnchorSource.js';
-import { loadImageTargetData } from './ImageTargetLoader.js';
+import {
+  loadImageTargetData,
+  loadImageTargetDataForTargets,
+  type LoadedMultiImageTargets,
+} from './ImageTargetLoader.js';
 import { runRecordGeoMode } from './RecordGeoMode.js';
 import { traceT } from './TraceLog.js';
 
@@ -50,19 +54,21 @@ const STATE_MACHINE_NAME = 'State Machine 1';
 // '8thwall-test' to resume the synthetic-rig coordinate/engine validation
 // rigs (AR_SYSTEM.md §G) — no other change needed for any of these.
 //
-// 2026-08-14 (§G Phase 3 production-swap, physical-targeting pass): live
-// production default is 'site-front' — the real digital-twin site-scene
-// tracked off the real printed "front" plaque (tools/plaque/site/
-// plaque-front.png -> site-front-target.mind), MindAR engine (the
-// original, still-active engine — no GPS/geofence dependency, matches
-// bench-test's proven path). 'site-back'/'site-left'/'site-right' are the
-// other 3 real plaques, same architecture, swap in the same way. All 4
-// anchor the FULL site-scene centered on whichever single plaque is
-// scanned (§A's original single-plaque-center rule) — NOT yet the
-// calibrated four-plaque shared-origin position, which stays blocked on
-// the physical panel-footprint measurement (manifest.ts's site-* entries
-// have the full rationale).
-const ACTIVE_TARGET_ID = 'site-front';
+// 2026-08-14 (§G Phase 3 production-swap): live production default is
+// 'site' — the real four-plaque experience, 8th Wall, any of the 4 real
+// printed plaques (front/back/left/right) converges on the same
+// site-scene/hotspots/Marker/Card/content pipeline, each correctly offset
+// from the shared §A reference corner (not re-centered on itself) via
+// manifest.ts's `targets[]`. 'site-front'/'site-back'/'site-left'/
+// 'site-right' are a separate, single-engine (MindAR) validation harness —
+// same real plaque artwork and site-scene, but each independently
+// re-centers the WHOLE scene on itself (§A's original single-plaque-center
+// rule, not the calibrated four-plaque offsets) — kept for MindAR-specific
+// tracking-quality testing, never the production default. 'bench-test'/
+// '8thwall-test' remain the synthetic-rig coordinate/engine validation
+// rigs (AR_SYSTEM.md §G); 'proxy-target' the pre-Phase-3 anchored-plane
+// experience. Flip to any of these for that path — no other change needed.
+const ACTIVE_TARGET_ID = 'site';
 
 // 8th Wall desk-testing bypasses — query params, not build flags, so the
 // same deployed build is testable on any device without rebuilding. Inert
@@ -241,15 +247,51 @@ async function main(): Promise<void> {
 }
 
 /**
+ * Wraps a legacy single-`imageTargetUrl` experience (e.g. 8thwall-test) in
+ * the same LoadedMultiImageTargets shape `targets[]` experiences produce —
+ * a one-element map with identity offset/rotation, which
+ * ImageTargetAnchorSource.applyPose() composes down to exactly its
+ * pre-multi-target behavior (mount origin = tracked plaque position,
+ * verbatim). Keeps the single-target manifest fields (never deprecated —
+ * §E "Multi-target plaques" is additive, XOR with these, not a
+ * replacement) working through the same one code path below instead of a
+ * parallel branch.
+ */
+async function loadSingleImageTargetAsMulti(
+  imageTargetUrl: string,
+  experience: ExperienceManifest
+): Promise<LoadedMultiImageTargets> {
+  if (experience.physicalTargetWidthMeters === undefined) {
+    throw new Error(
+      `Experience "${experience.targetId}" declares placement "image" without physicalTargetWidthMeters.`
+    );
+  }
+  const loaded = await loadImageTargetData(imageTargetUrl);
+  return {
+    imageTargetData: loaded.imageTargetData,
+    targetsByName: new Map([
+      [
+        loaded.primaryName,
+        {
+          name: loaded.primaryName,
+          physicalTargetWidthMeters: experience.physicalTargetWidthMeters,
+          originOffsetMeters: { x: 0, z: 0 },
+          rotationYawDeg: 0,
+        },
+      ],
+    ]),
+  };
+}
+
+/**
  * 8th Wall execution path (AR_SYSTEM.md's 8th-wall decision record),
  * transplanted from the spike's own main.ts. Shares SceneGraphLoader,
  * MarkerLayer, CardPanel, ContentProvider, and HotspotProjector unmodified
  * with the MindAR path above — only the tracking/origin layer differs,
  * behind the AnchorSource seam (TapPlacedAnchorSource / ImageTargetAnchorSource).
  *
- * Not reachable today: no manifest entry declares `placement` yet, and the
- * DOM/#camerafeed canvas + /xr static route this needs are not wired into
- * index.html / server/createServer.ts in this pass (see the design review).
+ * Live today: `8thwall-test` (single image target) and `site` (the real
+ * four-plaque production experience, `targets[]`) both route here.
  */
 async function runEightWallExperience(experience: ExperienceManifest): Promise<void> {
   const canvas = document.querySelector<HTMLCanvasElement>('#camerafeed');
@@ -267,11 +309,20 @@ async function runEightWallExperience(experience: ExperienceManifest): Promise<v
   const overlay = new UxOverlay();
 
   // Image-target data fetches in parallel with the arrival gate below — it
-  // must be ready before the Start AR gesture calls session.start().
-  const imageTargetsPromise =
-    experience.placement === 'image' && experience.imageTargetUrl !== undefined
-      ? loadImageTargetData(experience.imageTargetUrl)
-      : null;
+  // must be ready before the Start AR gesture calls session.start(). Both
+  // branches resolve to the same LoadedMultiImageTargets shape (§E
+  // "Multi-target plaques"): a single imageTargetUrl becomes a one-element
+  // targets map with identity offset/rotation, so everything downstream
+  // (session.start(), ImageTargetAnchorSource) is one code path regardless
+  // of how many plaques this experience declares.
+  const imageTargetsPromise: Promise<LoadedMultiImageTargets> | null =
+    experience.placement !== 'image'
+      ? null
+      : experience.targets !== undefined
+        ? loadImageTargetDataForTargets(experience.targets)
+        : experience.imageTargetUrl !== undefined
+          ? loadSingleImageTargetAsMulti(experience.imageTargetUrl, experience)
+          : null;
 
   // ---- Arrival gate ------------------------------------------------------
   // Runs whenever the experience declares a geofence, regardless of
@@ -376,17 +427,7 @@ async function runEightWallExperience(experience: ExperienceManifest): Promise<v
         if (kind === 'scanning') overlay.showHint('Point your camera at the plaque.');
       });
 
-      if (experience.physicalTargetWidthMeters === undefined) {
-        throw new Error(
-          `Experience "${experience.targetId}" declares placement "image" without physicalTargetWidthMeters.`
-        );
-      }
-      const imageAnchor = new ImageTargetAnchorSource(
-        session,
-        scene,
-        imageTargets.primaryName,
-        experience.physicalTargetWidthMeters
-      );
+      const imageAnchor = new ImageTargetAnchorSource(session, scene, [...imageTargets.targetsByName.values()]);
       await imageAnchor.acquire();
       anchorSource = imageAnchor;
     } else {
@@ -403,19 +444,31 @@ async function runEightWallExperience(experience: ExperienceManifest): Promise<v
   }
 
   // ---- Scene content -------------------------------------------------
-  if (experience.physicalTargetWidthMeters === undefined) {
-    // ManifestResolver currently enforces this pairing whenever modelUrl is
-    // declared, regardless of engine/placement — the recheck exists for
-    // type narrowing and to keep the invariant local and loud, same
-    // pattern as the MindAR path above.
-    throw new Error(`Experience "${experience.targetId}" declares modelUrl without physicalTargetWidthMeters.`);
-  }
   // '8thwall': SceneGraphLoader mounts the mesh at identity rotation/scale
   // 1 — anchorSource.group (TapPlacedAnchorSource / ImageTargetAnchorSource)
   // already supplies the correct frame and the real-meters absolute scale
-  // (Phase 2B decision record). Piping anchorSource.group in below is the
-  // same seam the MindAR path uses with anchor.group.
-  const loader = new SceneGraphLoader(modelUrl, experience.physicalTargetWidthMeters, '8thwall');
+  // (Phase 2B decision record); physicalTargetWidthMeters is provably
+  // unread by SceneGraphLoader's '8thwall' branch (see its own source —
+  // only the 'mindar' branch's metersToMarkerWidths() consumes it), so a
+  // targets[] experience (§E "Multi-target plaques" — no singular
+  // physicalTargetWidthMeters at this level, each plaque has its own) can
+  // pass any one of its targets' widths here without it mattering; the
+  // singular-field path still requires its own value, same as before.
+  // Piping anchorSource.group in below is the same seam the MindAR path
+  // uses with anchor.group.
+  const sceneWidthMeters =
+    experience.physicalTargetWidthMeters ??
+    (experience.targets !== undefined ? experience.targets[0]?.physicalTargetWidthMeters : undefined);
+  if (sceneWidthMeters === undefined) {
+    // ManifestResolver enforces physicalTargetWidthMeters (singular) or a
+    // non-empty targets[] (each validated with its own) whenever modelUrl
+    // is declared — the recheck exists for type narrowing and to keep the
+    // invariant local and loud, same pattern as the MindAR path above.
+    throw new Error(
+      `Experience "${experience.targetId}" declares modelUrl without physicalTargetWidthMeters (or a non-empty targets[]).`
+    );
+  }
+  const loader = new SceneGraphLoader(modelUrl, sceneWidthMeters, '8thwall');
   const { root, hotspots, occluders } = await loader.load();
   console.log(
     `[runEightWallExperience] SceneGraphLoader found ${hotspots.length} hotspot_* node(s) ` +

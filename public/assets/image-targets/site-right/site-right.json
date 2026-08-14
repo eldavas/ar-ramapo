@@ -1,0 +1,23 @@
+{
+  "imagePath": "/assets/image-targets/site-right/site-right_luminance.png",
+  "metadata": null,
+  "name": "site-right",
+  "type": "PLANAR",
+  "properties": {
+    "left": 128,
+    "top": 0,
+    "width": 768,
+    "height": 1024,
+    "isRotated": true,
+    "originalWidth": 1024,
+    "originalHeight": 1024
+  },
+  "resources": {
+    "originalImage": "site-right_original.png",
+    "croppedImage": "site-right_cropped.png",
+    "thumbnailImage": "site-right_thumbnail.png",
+    "luminanceImage": "site-right_luminance.png"
+  },
+  "created": 1786733729825,
+  "updated": 1786733729825
+}

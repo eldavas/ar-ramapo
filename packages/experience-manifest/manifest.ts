@@ -86,10 +86,82 @@ export type ExperienceManifest = {
    * engines — MindAR anchor space is measured in marker-widths and needs
    * the ×(1/width) conversion; ARKit sizes its ARReferenceImage from the
    * same number (§E, §F).
+   *
+   * Required on every entry in `targets[]` below too (each plaque has its
+   * own printed width — in practice the same value on all of them, since
+   * they're printed at the same size, but declared per-target because
+   * nothing enforces them being identical).
    */
   physicalTargetWidthMeters?: number;
+  /**
+   * Multi-target plaques (§A/§E "Multi-target plaques" forward design,
+   * implemented 2026-08-14): for an experience with more than one physical
+   * tracking plaque converging on the same site-scene — the production
+   * Ramapo layout, one plaque per side — the singular `imageTargetUrl`/
+   * `mindTargetUrl` above are insufficient (they assume exactly one target,
+   * with its own center as the origin). Declares this instead, XOR with
+   * those singular fields (mirrors the existing dual-engine optional-field
+   * pattern rather than introducing a new one). 8th Wall only today —
+   * `mindTargetIndex` is reserved per the original design but unconsumed;
+   * MindAR multi-target routing is still "not yet built" (§G, unchanged).
+   */
+  targets?: PlaqueTarget[];
   version: string;
 };
+
+/**
+ * One physical plaque within a multi-target experience. `imageTargetUrl`'s
+ * data is merged with every other target's before being handed to 8th
+ * Wall's `XrController.configure({ imageTargetData })` — the engine
+ * natively tracks multiple simultaneously-armed image targets and reports
+ * which one fired via `Xr8ImageTrackedEvent.name`; `ImageTargetAnchorSource`
+ * routes on that name to the matching entry below.
+ */
+export interface PlaqueTarget {
+  /** MindAR: index within one multi-image .mind bundle. Reserved, unused today. */
+  mindTargetIndex?: number;
+  /** 8th Wall: this plaque's compiled image-target JSON (§E). */
+  imageTargetUrl?: string;
+  /**
+   * 8th Wall: the target `name` carried on `Xr8ImageTrackedEvent`, matching
+   * it to this entry at runtime. Optional — defaults to the compiled
+   * target's own `name` field (image-target-cli names it after the output
+   * folder; see ImageTargetLoader) when the two already agree, which is the
+   * common case; only needed if they must differ.
+   */
+  imageTargetName?: string;
+  physicalTargetWidthMeters: number;
+  /**
+   * This plaque's position, measured from the §A reference corner (the
+   * scene's own authored origin — `AR_World_Origin` in site-scene.glb), in
+   * the model's own local X/Z (glTF Y-up: X = east/west, Z = north/south).
+   * Derived directly from `site-scene.glb`'s own `plaque_{front,back,left,
+   * right}` mesh bounds (which trace back to `tools/build_site_buildings.py`'s
+   * `plaque_centers` dict — not independently measured or invented) — see
+   * that script and AR_SYSTEM.md §G for the derivation and its one
+   * placeholder input (`LEDGE_WIDTH_M`, still a fabricator-unconfirmed
+   * guess; these offsets move if that constant changes and the scene is
+   * re-exported).
+   */
+  originOffsetMeters: { x: number; z: number };
+  /**
+   * Corrects this plaque's physical mount rotation, in degrees, so content
+   * anchors identically in world space regardless of which plaque
+   * triggered tracking. Derived geometrically from which edge of the
+   * terrain rectangle each plaque sits on (real, authored geometry — see
+   * AR_SYSTEM.md §G), relative to `site-front`'s own mount as the 0°
+   * reference (matching the already-shipped single-plaque `site-front`
+   * entry, so the two stay consistent). NOT validated on a physical mount:
+   * the placeholder plaque volumes in site-scene.glb are flat top-down
+   * markers with no authored facing direction, so this assumes a
+   * perpendicular-to-edge, artwork-upright vertical mount — the standard
+   * assumption for this kind of plaque, but unverified against a real
+   * fabricated mount (same "best inference, validate on device" status
+   * ImageTargetAnchorSource.ts's own TARGET_FRAME_TO_WORLD_FIX already
+   * carries for the single-target path this composes with).
+   */
+  rotationYawDeg: number;
+}
 
 export const experienceManifest: ExperienceManifest[] = [
   {
@@ -192,34 +264,22 @@ export const experienceManifest: ExperienceManifest[] = [
     version: '0.2.1',
   },
   // ---------------------------------------------------------------------
-  // Real physical-targeting entries for the 4 site plaques (AR_SYSTEM.md §G
-  // Phase 3 production-swap notes, 2026-08-14). Each of tools/plaque/site/
-  // plaque-{front,back,left,right}.png is compiled into its own single-
-  // image .mind target (tools/compile_mind_target.mjs <png> <mind> — the
-  // same compiler bench-target.mind uses, now parameterized for any image)
-  // and gets its own manifest entry — the existing single-plaque MindAR
-  // architecture (§A's original rule: the QR plaque center is the scene's
-  // absolute origin) applied 4 times, NOT the four-plaque shared-corner
-  // design in §A/§E's "Multi-target plaques" section. That design needs
-  // `targets[]`, which exists in neither this manifest type nor the
-  // runtime (`ImageTargetAnchorSource` takes one `primaryName`;
-  // `ARSessionManager.start()` takes one fixed `.mind` anchor index —
-  // confirmed by reading both, and by docs/asset-authoring-guide.md §3.3:
-  // "there is no per-target routing built yet"). Building that now would be
-  // new, unverified AR-runtime engineering for numbers
-  // (originOffsetMeters/rotationYawDeg) that are still genuinely unknown,
-  // pending the physical panel-footprint measurement (see
-  // cad-source/handoff/README.md's "Known open item"). Four independent
-  // entries need none of that: each anchors the FULL site-scene centered on
-  // whichever single plaque was scanned — a real test of tracking +
-  // rendering + hotspots + content with real printed artwork, deliberately
-  // decoupled from the still-pending shared-origin calibration.
-  //
-  // KNOWN LIMITATION, not fixable in software: scanning any plaque other
-  // than the one the physical model happens to be centered on will NOT
-  // line up AR content with real printed structures — that alignment is
-  // exactly what the blocked four-plaque design would fix. A physical
-  // design gap, not a bug.
+  // SINGLE-ENGINE VALIDATION HARNESS, not the production entry (see 'site'
+  // below for that): 4 standalone MindAR entries, one per real plaque
+  // (AR_SYSTEM.md §G Phase 3 production-swap notes, 2026-08-14). Each of
+  // tools/plaque/site/plaque-{front,back,left,right}.png is compiled into
+  // its own single-image .mind target (tools/compile_mind_target.mjs
+  // <png> <mind> — the same compiler bench-target.mind uses, now
+  // parameterized for any image) and gets its own manifest entry — the
+  // existing single-plaque MindAR architecture (§A's original rule: the QR
+  // plaque center is the scene's absolute origin) applied 4 times. Kept
+  // for exactly what bench-test/8thwall-test are already kept for: a
+  // MindAR-specific (as opposed to 8th Wall) tracking-quality/regression
+  // harness against the real printed artwork and the real site-scene —
+  // each anchors the FULL site-scene centered on whichever single plaque
+  // was scanned, which is NOT how the real four-plaque experience behaves
+  // (that needs the shared-corner offsets in 'site' below). Never the
+  // active production default (see ACTIVE_TARGET_ID, src/client/main.ts).
   {
     targetId: 'site-front',
     riveUrl: '/assets/bench-ui.riv',
@@ -266,6 +326,61 @@ export const experienceManifest: ExperienceManifest[] = [
     trackingImageUrl: '/assets/site-right-plaque.png',
     contentUrl: 'https://docs.google.com/spreadsheets/d/1O4Zq8ggc7TgjKZIuUtufO-G9hJiK2KalJpD2Cux2sN8/gviz/tq?tqx=out:json',
     physicalTargetWidthMeters: 0.05,
+    version: '0.1.0',
+  },
+  // ---------------------------------------------------------------------
+  // PRODUCTION ENTRY (2026-08-14): the real four-plaque experience — 8th
+  // Wall, `targets[]`, any of the 4 real plaques converges on the same
+  // site-scene/hotspots/Marker/Card/content pipeline, correctly positioned
+  // relative to the shared §A reference corner (`AR_World_Origin` in
+  // site-scene.glb) rather than re-centered on whichever plaque fired.
+  // This is what `ACTIVE_TARGET_ID` (src/client/main.ts) points at.
+  //
+  // originOffsetMeters/rotationYawDeg below are DERIVED, not measured or
+  // invented — see AR_SYSTEM.md §G for the full derivation and the exact
+  // Blender/script objects each number traces back to. Short version:
+  // offsets come straight from site-scene.glb's own plaque_{side} mesh
+  // bounds (which trace to tools/build_site_buildings.py's plaque_centers
+  // dict); rotations come from which edge of the terrain rectangle each
+  // plaque sits on (also real, authored geometry), relative to
+  // 'site-front' above as the 0° reference. The one placeholder INPUT
+  // upstream of these DERIVED numbers is LEDGE_WIDTH_M (a fabricator-
+  // unconfirmed guess, cad-source/handoff/README.md's "Known open item")
+  // — these offsets move if that constant changes and the scene is
+  // re-exported, same as everything else downstream of it already does.
+  {
+    targetId: 'site',
+    riveUrl: '/assets/bench-ui.riv',
+    modelUrl: '/assets/site-scene.glb',
+    usdzUrl: '/assets/site-scene.usdz',
+    placement: 'image',
+    contentUrl: 'https://docs.google.com/spreadsheets/d/1O4Zq8ggc7TgjKZIuUtufO-G9hJiK2KalJpD2Cux2sN8/gviz/tq?tqx=out:json',
+    targets: [
+      {
+        imageTargetUrl: '/assets/image-targets/site-front/site-front.json',
+        physicalTargetWidthMeters: 0.05,
+        originOffsetMeters: { x: 0.803275, z: -0.0381 },
+        rotationYawDeg: 0,
+      },
+      {
+        imageTargetUrl: '/assets/image-targets/site-back/site-back.json',
+        physicalTargetWidthMeters: 0.05,
+        originOffsetMeters: { x: 0.803275, z: 1.381125 },
+        rotationYawDeg: 180,
+      },
+      {
+        imageTargetUrl: '/assets/image-targets/site-left/site-left.json',
+        physicalTargetWidthMeters: 0.05,
+        originOffsetMeters: { x: -0.0381, z: 0.671512 },
+        rotationYawDeg: 90,
+      },
+      {
+        imageTargetUrl: '/assets/image-targets/site-right/site-right.json',
+        physicalTargetWidthMeters: 0.05,
+        originOffsetMeters: { x: 1.64465, z: 0.671512 },
+        rotationYawDeg: -90,
+      },
+    ],
     version: '0.1.0',
   },
 ];
