@@ -133,19 +133,29 @@ state, not a hidden canvas:
 **Hotspot custom properties (scene asset side):** each `hotspot_*` node
 carries `label`, `contentKey`, `riveArtboard` (`Marker`), and
 `riveStateMachine` (`MarkerMachine`) — authored in
-`tools/build_bench_scene.py`, all four required by `MarkerLayer` since
-Phase 5.
+`tools/build_bench_scene.py` (dominoes) and `tools/build_site_buildings.py`
+(named buildings), all four required by `MarkerLayer` since Phase 5. These
+are always the same two literal values (`Marker`/`MarkerMachine`) — there
+is exactly one Marker artboard in `bench-ui.riv`, content-agnostic, reused
+by every hotspot in the project; don't read "authored per hotspot" as an
+invitation to design a per-content-type Marker unless the artboard itself
+actually changes.
 
 **Content source (Google Sheet):** the manifest's `contentUrl` points at
 the sheet's gviz endpoint
 (`https://docs.google.com/spreadsheets/d/<SHEET_ID>/gviz/tq?tqx=out:json`),
 sharing set to "anyone with the link can view". First row is the header —
 `contentKey | title | subtitle | body | imageUrl` (column order free, labels
-exact) — one row per hotspot. `subtitle` and `imageUrl` are optional;
-root-relative paths under `/public` (e.g.
-`/assets/content/images/domino-1.jpg`) are recommended for images —
-absolute https URLs work only if the host serves CORS headers. Editing a
-cell shows up on the next page load; no redeploy.
+exact) — one row per hotspot. All four content columns (`title`/
+`subtitle`/`body`/`imageUrl`) must exist as headers, but any individual
+cell may be left blank — `GoogleSheetContentProvider` treats a blank cell
+as an absent field (the Card clears that text run/skips the image) rather
+than a resolution error; only an unknown `contentKey`, a missing column,
+or the sheet being unreachable/malformed still throw
+`ContentResolutionError` (`src/client/ContentProvider.ts`). Root-relative
+paths under `/public` (e.g. `/assets/content/images/domino-1.jpg`) are
+recommended for images — absolute https URLs work only if the host serves
+CORS headers. Editing a cell shows up on the next page load; no redeploy.
 
 ---
 

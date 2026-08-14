@@ -785,6 +785,53 @@ schema above.
       existing decode only confirmed the `A-BLDG-OUTL` and
       `CG-TOPO-Site Model` layers).
 
+  **Progress (2026-08-13, later same day): `bench-test`/`8thwall-test`
+  manifest entries now load the digital-twin `site-scene.glb`/`.usdz`
+  instead of the synthetic `bench-scene.*` rig — a test-harness swap, NOT
+  the four-plaque production swap above (that stays blocked on the
+  physical panel-footprint measurement; nothing about `targets[]` changed).**
+  `modelUrl`/`usdzUrl` now point at `site-scene.glb`/`.usdz` (copied from
+  `cad-source/handoff/` into `/public/assets`); `mindTargetUrl`/
+  `trackingImageUrl`/`physicalTargetWidthMeters` are still `bench-test`'s
+  own 5cm QR plaque — this swap changes only which mesh renders, not which
+  physical target triggers it. Manifest `bench-test` → 0.5.1,
+  `8thwall-test` → 0.2.1.
+
+  Closed the asset-schema gap the same-day building-hotspot revision above
+  had deliberately left open: `tools/build_site_buildings.py` now authors
+  `riveArtboard`/`riveStateMachine` (`"Marker"`/`"MarkerMachine"`) on the
+  12 `hotspot_building_*` nodes — the premise that this needed a
+  purpose-built building UI turned out to be wrong. `bench-ui.riv`
+  (ground-truth via `tools/inspect_rive_ui.mjs`) has exactly one Marker
+  artboard and one Card artboard, both content-agnostic; every hotspot
+  this project has ever authored binds the identical `"Marker"`/
+  `"MarkerMachine"` literal. Reusing it for buildings is the existing UI,
+  not a new one. The content sheet's 12 `site-building-*` rows (`bench-test`
+  `contentUrl`) were separately completed (title/body/imageUrl) by hand.
+
+  Verified end to end (headless Chrome, real app + real assets, the
+  `?fakegeo=1&fakear=1` desk bypasses) at 320/393/430px: 12 hotspots
+  discovered, four distinct buildings each resolve their own `contentKey`
+  and open the Card with real content, close button/drag-to-dismiss/
+  tap-outside all work (verified with real CDP mouse events — a
+  JS-dispatched `PointerEvent` can't satisfy `Element.setPointerCapture`,
+  a harness limitation, not an app one). `proxy-target` untouched.
+
+  **Progress (2026-08-13, later still): content pipeline hardened against
+  incomplete editorial rows.** `GoogleSheetContentProvider` used to throw
+  `ContentResolutionError` for the entire sheet (memoized for the session)
+  if any single row's `title`/`body` cell was blank — surfaced immediately
+  by the swap above, since 8 of the 12 `site-building-*` rows were still
+  unwritten. `CardContent.title`/`body` are now optional, same contract
+  `subtitle`/`imageUrl` already had; a blank cell now reads as an absent
+  field (`CardPanel` clears that Rive text run, same `?? ''` idiom
+  `subtitle` already used — no new empty-state UI). Column-level
+  structure (`title`/`body`/`contentKey` must exist as headers) and every
+  other failure mode (unknown `contentKey`, network/HTTP failure,
+  malformed gviz payload) are unchanged, still fail loud. 9 unit tests
+  (`src/client/ContentProvider.test.ts`, run via `npm test` — Node's
+  built-in `node:test`, no new dependency) cover both sides of that line.
+
 - **Phase 4 — Native iOS App Clip. (OPEN)**
   Goal: the iOS delivery path promised in §A — a native App Clip
   (Swift / SwiftUI / ARKit / RealityKit / Rive iOS runtime) that consumes

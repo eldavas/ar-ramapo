@@ -15,15 +15,28 @@ Regenerate all of it with:
 - **`site-scene.blend`** — the authored scene, open directly in Blender.
   Terrain + 21 buildings + a placeholder mounting ledge + 4 placeholder
   QR-plaque markers (magenta boxes, one per side). Everything placeholder
-  carries a `placeholder` custom property.
+  carries a `placeholder` custom property. 12 of the 21 buildings (the
+  ones with a real matched name) also carry a `hotspot_*` empty with
+  `label`/`contentKey`/`buildingId`/`riveArtboard`/`riveStateMachine` —
+  the same Marker/Card Rive contract every hotspot in this project binds
+  (`docs/asset-authoring-guide.md` §2.4), not a bespoke building UI.
 - **`site_terrain.json` / `site_buildings.json`** — the intermediate data
   `tools/build_site_buildings.py` (and `export_handoff_bundle.py`) build
   the scene from. **You don't need the source DWG/DXF to keep working** —
   these two files are enough to re-run the Blender-side build/export
   scripts and iterate on materials, the ledge width, plaque placement, etc.
-- **`site-scene.glb` / `site-scene.usdz`** — exported for quick preview
-  (e.g. `qlmanage -p` on macOS, or drag into any glTF viewer) without
-  opening Blender at all.
+- **`site-scene.glb` / `site-scene.usdz`** — quick-preview exports (e.g.
+  `qlmanage -p` on macOS, or drag into any glTF viewer) without opening
+  Blender at all. As of 2026-08-13 these are also copied into
+  `/public/assets/` and loaded by the real app — `bench-test`/
+  `8thwall-test` (`packages/experience-manifest/manifest.ts`) point their
+  `modelUrl`/`usdzUrl` here for on-device testing against the real
+  digital-twin mesh. That's a test-harness swap on those two existing
+  targetIds, not the four-plaque production experience (§A/§E) — the
+  tracking plaque/target is still `bench-test`'s own 5cm QR, unrelated to
+  this scene's 4 placeholder plaques above. Re-run
+  `export_handoff_bundle.py` after any scene change and copy the two
+  files into `/public/assets/` again to update what the app serves.
 
 ## What's NOT here, on purpose
 
