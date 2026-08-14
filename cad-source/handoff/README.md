@@ -34,11 +34,17 @@ Regenerate all of it with:
   unrelated to this scene's 4 placeholder plaque *markers* below. As of
   2026-08-14, `site-front`/`site-back`/`site-left`/`site-right` also point
   here, tracking off the 4 **real** printed plaques instead
-  (`tools/plaque/site/`, see below) — still none of these five is the
-  four-plaque shared-origin production experience (§A/§E), which needs
-  `targets[]` and stays blocked on this file's "Known open item". Re-run
-  `export_handoff_bundle.py` after any scene change and copy the two files
-  into `/public/assets/` again to update what the app serves.
+  (`tools/plaque/site/`, see below), each independently re-centering the
+  whole scene on itself — a MindAR validation harness, not the production
+  entry. As of 2026-08-14, manifest entry `'site'` (8th Wall, `targets[]`)
+  IS the four-plaque shared-origin production experience (§A/§E) and the
+  live production default — its `originOffsetMeters`/`rotationYawDeg` are
+  derived from this scene's own `plaque_{front,back,left,right}` mesh
+  bounds and edge geometry (`docs/asset-authoring-guide.md` §3.5), so they
+  move if this file's "Known open item" (the ledge width) changes and the
+  scene is re-exported — swap `LEDGE_WIDTH_M`, re-run
+  `export_handoff_bundle.py`, copy the two files into `/public/assets/`
+  again, and re-derive the offsets the same way.
 
   **Two different things are both called "plaque" here, don't conflate
   them:** the 4 magenta boxes described above are placeholder *markers* —

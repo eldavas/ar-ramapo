@@ -895,6 +895,131 @@ schema above.
   *position on the model* (as opposed to plaque print size), and every
   number the four-plaque shared-origin design needs.
 
+  **Progress (2026-08-14, later same day): audit requested on two claims
+  from the entry above — both investigated against this file, the runtime,
+  and Blender, neither claim survived unchanged.**
+
+  1. **"8th Wall is the definitive production runtime, MindAR was a
+     regression" — not supported by this file, checked directly.** §A:
+     "Two tracking engines are supported side by side... MindAR (... the
+     original and still-active engine...) and 8th Wall." §F: "MindAR and
+     8th Wall are the two supported web tracking engines." §G Phase 6's
+     own goal statement: 8th Wall was added "as a second, **opt-in**
+     tracking engine, **alongside** MindAR **rather than replacing it**...
+     this repo's Phase 6 is **deliberately additive**." The phase's own
+     title is "8th Wall SLAM Tracking, **Additive Engine**." `git log`
+     confirms the same: the commit that first added 8th Wall is titled
+     "add 8th Wall as an opt-in tracking engine **alongside** MindAR," and
+     `.mind` compiled targets predate this project's Phase 3 (`bench-
+     target.mind`) and Phase 0 (`proxy-target.mind`) — MindAR was never
+     introduced by, or specific to, the site-plaque work. `ACTIVE_TARGET_ID`
+     has been a single hardcoded constant since Phase 1 (`git blame`), not
+     a mechanism any recent commit invented. **No MindAR code was removed
+     or reverted** — the 4 single-plaque MindAR entries
+     (`site-front`/`site-back`/`site-left`/`site-right`) stay, explicitly
+     relabeled in `manifest.ts` as a MindAR-specific validation harness
+     (same role `bench-test` already has), never the production default.
+  2. **"The physical-measurement blocker can't be real if Blender already
+     has the geometry" — half right.** `site-scene.glb`'s own
+     `plaque_{front,back,left,right}` mesh bounds (traced to
+     `tools/build_site_buildings.py`'s `plaque_centers` dict — real script
+     math, not invented) DO give exact `originOffsetMeters` for all 4
+     plaques, and the terrain rectangle's known edge assignment per plaque
+     DOES give a sound, derivable `rotationYawDeg` (edge-outward-normal
+     geometry, relative to `site-front` as 0°) — both now implemented
+     (below), neither required a physical measurement to derive. What's
+     still genuinely a placeholder, confirmed by re-reading the exact same
+     source: `LEDGE_WIDTH_M` (`tools/build_site_buildings.py`) is
+     authored, in its own comment, as "best guess from the reference
+     photo — PLACEHOLDER, not measured" — predates this session entirely
+     (commit `172237e`, authored by the project owner, 2026-08-13, before
+     any of this digital-targeting work started). The offsets derived from
+     it are real numbers with a known, documented, single-constant
+     dependency — not an unmeasurable unknown — and are implemented as
+     such below.
+
+  **Implemented: real `targets[]` runtime for 8th Wall (§E "Multi-target
+  plaques," previously design-only).** New manifest entry `targetId:
+  'site'` — `placement: 'image'`, 4-element `targets[]`, one per real
+  plaque — is now `ACTIVE_TARGET_ID`, the live production default.
+  `packages/experience-manifest/manifest.ts` gains the `PlaqueTarget`
+  interface and `targets?` field (exact shape §E already specified).
+  `ManifestResolver.ts` validates each target (asset URL, positive width,
+  finite offset/rotation) and enforces `targets[]` XOR the singular
+  `mindTargetUrl`/`imageTargetUrl` fields. `ImageTargetLoader.ts` gains
+  `loadImageTargetDataForTargets()`, fetching every plaque's compiled 8th
+  Wall image-target JSON (`npx @8thwall/image-target-cli`, run against all
+  4 real plaque PNGs — `public/assets/image-targets/site-{front,back,left,
+  right}/`, `imagePath` fixed up to a served root-relative path, same
+  documented step `bench-plaque.json` already needed) and merging them
+  into one array — 8th Wall natively tracks multiple simultaneously-armed
+  image targets and reports which one fired via
+  `Xr8ImageTrackedEvent.name`; nothing in the engine binary needed
+  extending. `ImageTargetAnchorSource.ts`'s constructor now takes an array
+  of resolved targets instead of one name+width; `onImageEvent` routes on
+  the fired event's name; `applyPose()` composes the tracked pose with
+  that specific plaque's own `originOffsetMeters`/`rotationYawDeg` so the
+  mounted site-scene's origin — never the tracked plaque itself once the
+  offset is non-zero — ends up at the same world position/orientation
+  regardless of which of the 4 plaques triggered tracking. A single-target
+  experience (`8thwall-test`) is simply a one-element array with identity
+  offset/rotation, which composes down to exactly the pre-existing
+  behavior — confirmed by a dedicated test, not just reasoning about it
+  (below). `main.ts` unifies both the singular- and `targets[]`-sourced
+  paths into one `LoadedMultiImageTargets` shape before either reaches
+  `ImageTargetAnchorSource`, so there's one code path, not two.
+
+  **Geometry derivation (full detail, `docs/asset-authoring-guide.md`
+  §3.5):** `originOffsetMeters` = each plaque's mesh-bounds center in
+  `site-scene.glb`, relative to `AR_World_Origin`, in glTF X/Z (Blender
+  Y flips sign on export — Y-up/−Z-forward, §F). `rotationYawDeg` = the
+  angle between each plaque's outward-facing edge normal (computed from
+  its position relative to the terrain rectangle's centroid — `front`
+  sits on the −Z edge, `back` +Z, `left` −X, `right` +X) and `front`'s own
+  edge normal, defined as the 0° reference — front=0°, back=180°,
+  left=90°, right=−90°. **Not on-device validated** (no physical mount
+  exists to validate against — the placeholder plaque volumes in
+  `site-scene.glb` are flat top-down markers, not vertical wall plaques,
+  so this assumes a perpendicular-to-edge, artwork-upright mount, the
+  standard assumption for this kind of plaque): same epistemic status
+  `TARGET_FRAME_TO_WORLD_FIX` (the single-target glue this composes with)
+  already carried before this pass — not a new, weaker claim.
+
+  **Verified in software:** `npm run typecheck`/`build`/`test` clean.
+  `GET /api/manifest`'s `site` entry and HTTP HEAD on all 4 compiled
+  image-target JSONs + their luminance PNGs return 200, byte-exact.
+  Headless Chrome (`?fakegeo=1&fakear=1`): `site` resolves, loads
+  `site-scene.glb`, discovers 12 hotspots, and the full tap → contentKey →
+  Card → close/drag/tap-outside chain works — same shared pipeline already
+  proven for `site-front` etc, re-confirmed for `site` specifically (a
+  real bug surfaced and got fixed here: a stale top-level
+  `physicalTargetWidthMeters` check in `runEightWallExperience` didn't
+  know about `targets[]` yet and threw at startup — caught by this exact
+  probe, not assumed fixed). **The composition math itself** (the new
+  part — does each of the 4 targets' offset/rotation actually recover a
+  consistent world placement) **is verified by a dedicated unit test**
+  (`src/client/ImageTargetAnchorSource.test.ts`, 3 cases: all 4 real
+  targets recover an assumed ground-truth world pose from their own
+  simulated tracked event; the single-target identity case reduces to the
+  pre-existing formula exactly; an unconfigured target name is ignored) —
+  pure THREE.js math, runs in plain Node, no camera/engine needed. This is
+  the correctness of the *relative* geometry between the 4 plaques, fully
+  software-verifiable; it does not and cannot substitute for on-device
+  confirmation that `TARGET_FRAME_TO_WORLD_FIX` itself (the shared base
+  glue) is correct — that was already an open item before this pass, per
+  its own doc comment, unchanged by it.
+
+  **Still open, genuinely requiring physical access, not software:**
+  whether the printed plaques track reliably under a real camera; whether
+  `TARGET_FRAME_TO_WORLD_FIX`'s base assumption holds on a real mount; and
+  the real `LEDGE_WIDTH_M` measurement, which would change the offset
+  numbers above (re-derive the same way, documented in
+  `docs/asset-authoring-guide.md` §3.5, once it lands) but does not block
+  anything currently shipped — the current offsets are real, traceable,
+  and self-consistent, just contingent on that one still-placeholder
+  input, exactly like every other placeholder-derived number in this
+  project already is.
+
 - **Phase 4 — Native iOS App Clip. (OPEN)**
   Goal: the iOS delivery path promised in §A — a native App Clip
   (Swift / SwiftUI / ARKit / RealityKit / Rive iOS runtime) that consumes

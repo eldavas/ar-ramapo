@@ -294,26 +294,53 @@ all 4 sides) of **1758.95 × 1495.43 mm**. This number moves once the real
 ledge width lands — swap `LEDGE_WIDTH_M` and re-run
 `tools/export_handoff_bundle.py`.
 
-**Plaque position on the model — PLACEHOLDER, derived from the ledge
-guess above, not a real measurement.** Each plaque's center, relative to
-`AR_World_Origin` (extracted from `site-scene.glb`'s own plaque mesh
-bounds, which trace exactly back to `build_site_buildings.py`'s
-`plaque_centers` dict — not independently invented):
+**Plaque position on the model — derived from `site-scene.glb`, not
+independently measured; the one placeholder INPUT upstream of these
+otherwise-real numbers is the ledge guess above (2026-08-14: implemented
+as `manifest.ts`'s `'site'` entry `targets[].originOffsetMeters`, not
+just documented — AR_SYSTEM.md §G has the full derivation and the
+software verification).** Each plaque's mesh-bounds center in
+`site-scene.glb`, relative to `AR_World_Origin`, in glTF X/Z (Blender
+authors Y-up→export flips Y to −Z, §F — this is why "north" reads as a
+negative Z for `front`, not a sign error):
 
-| Plaque | X from origin | Y from origin (north) |
+| Plaque | X from origin | Z from origin |
 |---|---:|---:|
-| front | 803.27 mm | 38.10 mm |
-| back | 803.27 mm | 1381.13 mm |
-| left | −38.10 mm | 671.51 mm |
-| right | 1644.65 mm | 671.51 mm |
+| front | 803.275 mm | −38.100 mm |
+| back | 803.275 mm | 1381.125 mm |
+| left | −38.100 mm | 671.512 mm |
+| right | 1644.650 mm | 671.512 mm |
 
-**Not available, not invented:** each plaque's mounting rotation
-(`rotationYawDeg`). The 4 placeholder plaque volumes in `site-scene.glb`
-are flat magenta slabs lying on top of the ledge (viewed from above), not
-upright wall-mounted plaques — no facing direction has been authored yet,
-so there is nothing to extract. This, plus the ledge-width measurement
-above, is what the four-plaque `targets[]` design (AR_SYSTEM.md §A/§E)
-is still blocked on.
+**Plaque mounting rotation (`rotationYawDeg`) — derived, not measured or
+invented, 2026-08-14, implemented in the same manifest entry.** Computed
+from which edge of the terrain rectangle each plaque sits on (real,
+authored geometry: `front`/`back` occupy the strips at Y≈0/Y≈−depth in
+`build_site_buildings.py`'s `strips` dict, i.e. the min/max-Z edges after
+export; `left`/`right` the min/max-X edges) — the angle between each
+plaque's outward edge-normal and `front`'s own (defined as the 0°
+reference, matching the already-shipped single-plaque `site-front` entry
+so the two stay consistent):
+
+| Plaque | rotationYawDeg |
+|---|---:|
+| front | 0° (reference) |
+| back | 180° |
+| left | 90° |
+| right | −90° |
+
+**What this rotation derivation does NOT have, and doesn't claim to:** an
+on-device-validated mount. The 4 placeholder plaque volumes in
+`site-scene.glb` are flat magenta slabs lying on top of the ledge (viewed
+from above), not upright wall-mounted plaques — no *authored* facing
+direction exists to read a value from, so the numbers above assume a
+standard perpendicular-to-edge, artwork-upright vertical mount (the only
+sane default for a museum-placard-style plaque). This is the same
+"best inference, validate on device" status
+`ImageTargetAnchorSource.ts`'s `TARGET_FRAME_TO_WORLD_FIX` — the fixed
+glue these rotations compose with — already carried before this pass;
+verified in software (a dedicated geometry self-consistency test,
+`src/client/ImageTargetAnchorSource.test.ts`), not yet against a real
+mounted plaque.
 
 ---
 
