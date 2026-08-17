@@ -11,7 +11,7 @@ import { InputBridge } from './InputBridge.js';
 import { SceneGraphLoader } from './SceneGraphLoader.js';
 import { HotspotProjector } from './HotspotProjector.js';
 import { MarkerLayer, contentKeyOf } from './MarkerLayer.js';
-import { CardPanel, CardImageSlot } from './CardPanel.js';
+import { CardPanel } from './CardPanel.js';
 import { GoogleSheetContentProvider } from './ContentProvider.js';
 import type { Hotspot } from './SceneGraphLoader.js';
 import type { ExperienceManifest } from '../../packages/experience-manifest/manifest.js';
@@ -142,18 +142,16 @@ async function main(): Promise<void> {
     const { root, hotspots, occluders } = await loader.load();
     anchor.group.add(root);
 
-    // One fetch/parse of the .riv serves all marker instances plus the
-    // Card; the image slot captures the Card's `cardImage` referenced
-    // asset at parse time for sheet-driven substitution.
-    const imageSlot = new CardImageSlot();
-    const riveFile = await loadRiveFile(experience.riveUrl, imageSlot.assetLoader);
+    // One fetch/parse of the .riv serves all marker instances — the Card
+    // is plain HTML/CSS (CardPanel.ts), no Rive involved.
+    const riveFile = await loadRiveFile(experience.riveUrl);
 
     const contentProvider = new GoogleSheetContentProvider(experience.contentUrl);
     contentProvider.prefetch();
 
     const markers = new MarkerLayer(riveFile);
     await markers.attach(hotspots);
-    const card = new CardPanel(riveFile, imageSlot);
+    const card = new CardPanel();
     await card.attach();
 
     // Selection state machine (app-owned; the artboards only mirror it).
@@ -476,15 +474,16 @@ async function runEightWallExperience(experience: ExperienceManifest): Promise<v
   );
   anchorSource.group.add(root);
 
-  const imageSlot = new CardImageSlot();
-  const riveFile = await loadRiveFile(experience.riveUrl, imageSlot.assetLoader);
+  // One fetch/parse of the .riv serves all marker instances — the Card is
+  // plain HTML/CSS (CardPanel.ts), no Rive involved.
+  const riveFile = await loadRiveFile(experience.riveUrl);
 
   const contentProvider = new GoogleSheetContentProvider(contentUrl);
   contentProvider.prefetch();
 
   const markers = new MarkerLayer(riveFile);
   await markers.attach(hotspots);
-  const card = new CardPanel(riveFile, imageSlot);
+  const card = new CardPanel();
   await card.attach();
   console.log('[runEightWallExperience] MarkerLayer and CardPanel attached — content pipeline is live.');
 
