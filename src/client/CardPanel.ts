@@ -38,25 +38,52 @@ const MAX_BACKING_SCALE = 2;
 // letterbox this file just fixed.
 const CARD_MAX_VIEWPORT_HEIGHT_FRACTION = 0.9;
 
+/**
+ * Fixed-header height, in artboard DESIGN units (of the 350-wide artboard,
+ * scale-invariant per docs/asset-authoring-guide.md's canvas-aspect
+ * contract). Everything above this line (grabber, title, subtitle, close
+ * button) is authored at a size that does NOT depend on body content
+ * length; everything below it is the Hug-growing body/image region that
+ * needs to scroll rather than push the header off-screen (2026-08-14,
+ * second physical test — see the class doc comment).
+ *
+ * Measured empirically, not guessed: tools/inspect_card_header_boundary.mjs
+ * renders the real bench-ui.riv Card artboard twice — once with a short
+ * body, once with a ~40x-repeated long body, title/subtitle held identical
+ * — and compares the two rasters. The header region (grabber through the
+ * close button/subtitle line) is visually identical between the two
+ * renders and ends at ~100–107 design units in both (confirmed by direct
+ * visual inspection of the rendered PNGs, since a naive per-row pixel diff
+ * was too sensitive to independent-instance anti-aliasing noise near the
+ * top edge to threshold reliably). 112 adds a small safety margin beyond
+ * the measured close-button bottom edge (~47 units, well inside this),
+ * so the fixed header can never clip the close button's hit area. Re-run
+ * that tool after any bench-ui.riv re-export that touches the header.
+ */
+const HEADER_HEIGHT_ARTBOARD_UNITS = 112;
+
 // Slide is app-owned (container transform), not Rive-owned — see the class
 // doc comment. The curve matches the deceleration most native bottom
 // sheets use (react-spring-bottom-sheet, iOS sheets), not a generic ease.
 const SLIDE_TRANSITION = 'transform 300ms cubic-bezier(0.32, 0.72, 0, 1)';
-// Below this, a pointer sequence is a tap candidate (forwarded into the
-// artboard as usual for the close button); at or above it, it's a
-// confirmed drag and the artboard stops receiving events for the rest of
-// this gesture.
+// Below this, a pointer sequence on the header is a tap candidate
+// (forwarded into the artboard as usual for the close button); at or
+// above it, it's a confirmed drag and the artboard stops receiving events
+// for the rest of this gesture.
 const DRAG_TAP_THRESHOLD_PX = 12;
 // The close button (Card_Close_Button_Container, artboard rect
-// x:[304,334] y:[17,47] of 350x480 — ~30x30 units, under Apple's 44pt
-// minimum target size) sits in this corner. A gesture starting here is
-// never promoted to a drag, however much the finger jitters while aiming
-// at a small target — without this, an accidental drag classification
-// mid-tap suppresses the paired pointerUp forward and the button silently
-// doesn't fire (intermittently, exactly as small-target mis-taps do). The
-// grabber handle (top-center, ~45-55% x) is well clear of this zone.
+// x:[304,334] y:[17,47] of the full 350x480 design — ~30x30 units, under
+// Apple's 44pt minimum target size) sits in this corner OF THE HEADER
+// (y:[17,47] of the header's own HEADER_HEIGHT_ARTBOARD_UNITS=112, not the
+// full 480 — the header canvas below is a crop, so button fractions are
+// relative to ITS OWN height). A gesture starting here is never promoted
+// to a drag, however much the finger jitters while aiming at a small
+// target — without this, an accidental drag classification mid-tap
+// suppresses the paired pointerUp forward and the button silently doesn't
+// fire (intermittently, exactly as small-target mis-taps do). The grabber
+// handle (top-center, ~45-55% x, near y=0) is well clear of this zone.
 const NO_DRAG_ZONE_MIN_X_FRACTION = 0.8;
-const NO_DRAG_ZONE_MAX_Y_FRACTION = 0.15;
+const NO_DRAG_ZONE_MAX_Y_FRACTION = 47 / HEADER_HEIGHT_ARTBOARD_UNITS + 0.05; // ~47%, with margin
 // Release past this fraction of the sheet's own height commits to close,
 // regardless of velocity.
 const DRAG_CLOSE_FRACTION = 0.25;
@@ -148,39 +175,68 @@ export class CardImageSlot {
  * fires the `closeRequested` Rive Event; a drag-to-dismiss past the
  * threshold fires the same `closeHandler` callback — both routes funnel
  * through the same app-level close, same as the original design.
+ *
+ * DOM structure (2026-08-14, second physical test — the shell/content
+ * split below replaces a first attempt that scrolled the WHOLE sheet,
+ * which dragged the grabber/close button off-screen along with the body,
+ * an actual regression from what a fixed bottom-sheet header must do):
+ *
+ *   container (fixed shell — position, size, open/close slide; NEVER
+ *              scrolls; drag-to-dismiss transform lives here)
+ *     ├── headerCanvas (small canvas, fixed height, ALWAYS visible —
+ *     │                 a live top-crop mirror of `rive.canvas`, see
+ *     │                 refreshHeaderMirror()) — grabber + title/
+ *     │                 subtitle + close button all live in this crop
+ *     └── contentWrapper (overflow-y:auto — the ONLY scrollable element)
+ *           └── rive.canvas (the real, interactive Rive canvas — full
+ *                             artboard height, pulled up by exactly the
+ *                             header's own height via a negative
+ *                             margin-top, so contentWrapper's own natural
+ *                             top edge shows body content, not a second
+ *                             copy of the header)
+ *
+ * There is only ONE underlying artboard/state-machine instance
+ * (`rive.canvas`, inside contentWrapper) — headerCanvas is a passive
+ * pixel mirror, not a second Rive instance, so both are always in sync by
+ * construction and there is exactly one place text runs/inputs are set.
+ * Pointer input on the header is remapped onto the SAME instance's
+ * coordinate space (see forwardPointer's `sourceRect` parameter) since
+ * headerCanvas shows an identical top-left-aligned crop of the same
+ * raster — a tap at (x,y) on either canvas corresponds to the same
+ * artboard point.
  */
 export class CardPanel {
   private readonly container: HTMLDivElement;
+  private readonly headerCanvas: HTMLCanvasElement;
+  private readonly headerCtx: CanvasRenderingContext2D;
+  private readonly contentWrapper: HTMLDivElement;
   private readonly rive: RiveController;
   private open_ = false;
   private closeHandler: (() => void) | null = null;
 
-  // Drag-gesture tracking (see attach()). dragStartY !== null means a
-  // pointer sequence is in progress; isDragging distinguishes "still a tap
-  // candidate" from "confirmed drag, artboard forwarding suspended."
-  // dragEligible is fixed for the whole gesture at pointerdown (see
-  // NO_DRAG_ZONE_* — a gesture starting on the close button can never
-  // become a drag, however far it wanders).
+  // Drag-gesture tracking (see attach()). Attached ONLY to the fixed
+  // header now — the content area never participates in this gesture, so
+  // (unlike the first, whole-sheet-scroll attempt) there is no need to
+  // arbitrate "is this a scroll or a dismiss" here at all: the header has
+  // nothing of its own to scroll. dragStartY !== null means a pointer
+  // sequence is in progress on the header; isDragging distinguishes
+  // "still a tap candidate" (e.g. aiming for the close button) from
+  // "confirmed drag, artboard forwarding suspended." dragEligible is
+  // fixed for the whole gesture at pointerdown (see NO_DRAG_ZONE_* — a
+  // gesture starting on the close button can never become a drag).
   private dragStartY: number | null = null;
   private dragStartTime = 0;
   private isDragging = false;
   private dragEligible = true;
   private lastMoveY = 0;
   private lastMoveTime = 0;
-  // Set once a gesture moves past DRAG_TAP_THRESHOLD_PX without ever being
-  // promoted to a dismiss-drag (see handlePointerMove) — i.e. a native
-  // content-scroll happened instead. Distinct from isDragging: it survives
-  // a gesture the container never captured, so pointerup can tell "content
-  // scroll released here" apart from "a genuine tap", which isDragging
-  // alone cannot (isDragging only tracks gestures THIS class intercepted).
-  private hadSignificantMove = false;
 
-  // Inputs the container/backing were last sized for. Bounds height is
-  // seeded with the design height; the first Advance replaces it with the
-  // real Hug-resolved height (the placeholder content resolves to ~408,
-  // not 480, so the very first frame already re-syncs). Viewport values
-  // are tracked too: the 90% height cap and the natural CSS height both
-  // depend on them (rotation, iOS URL-bar collapse).
+  // Inputs the layout was last computed for. Bounds height is seeded with
+  // the design height; the first Advance replaces it with the real
+  // Hug-resolved height (the placeholder content resolves to ~408, not
+  // 480, so the very first frame already re-syncs). Viewport values are
+  // tracked too: the 90% height cap and the natural CSS height both depend
+  // on them (rotation, iOS URL-bar collapse).
   private appliedBoundsHeight = CARD_ARTBOARD_HEIGHT;
   private appliedViewportWidth = 0;
   private appliedViewportHeight = 0;
@@ -189,26 +245,37 @@ export class CardPanel {
     this.container = document.createElement('div');
     // z-index above the marker layer (10); pointer-events only while open,
     // so the closed (invisible) card never swallows taps meant for markers
-    // or the scene behind it.
+    // or the scene behind it. overflow:hidden (the shell itself never
+    // scrolls — only contentWrapper below does) doubles as the rounded-
+    // corner/height-cap clip for whatever contentWrapper doesn't fit.
     // transform starts at translateY(100%) — fully below the viewport —
     // synchronously, before Rive even loads, so there is no first-load
     // flash regardless of any Rive/state-machine timing.
-    // overflow-y:auto (was hidden) — inert while the canvas fills the
-    // container (100%/100%: nothing to scroll), load-bearing when the 90%
-    // height cap is active and the canvas is deliberately TALLER than the
-    // container: content beyond the container's bottom edge used to be
-    // permanently clipped and unreachable (bug: long Card content had no
-    // way to be read past the cap) — auto-scroll makes that same clip
-    // window scrollable instead of a hard cutoff. touch-action:pan-y (was
-    // none) lets the browser own vertical panning by default; attach()'s
-    // gesture handlers only preventDefault/setPointerCapture once a
-    // gesture is positively identified as a dismiss-drag (scrollTop===0
-    // and pulling down), so a genuine content-scroll is never hijacked.
     this.container.style.cssText =
-      'position:fixed;left:0;bottom:0;overflow-y:auto;-webkit-overflow-scrolling:touch;' +
+      'position:fixed;left:0;bottom:0;overflow:hidden;display:flex;flex-direction:column;' +
       `width:${CARD_CSS_WIDTH};aspect-ratio:${CARD_ARTBOARD_WIDTH}/${CARD_ARTBOARD_HEIGHT};` +
-      `z-index:20;pointer-events:none;touch-action:pan-y;transform:translateY(100%);` +
+      `z-index:20;pointer-events:none;transform:translateY(100%);` +
       `transition:${SLIDE_TRANSITION};`;
+
+    this.headerCanvas = document.createElement('canvas');
+    // flex:none — fixed height (set in syncAspectToArtboard), never grows
+    // with the flex layout; touch-action:none, this is the drag handle.
+    this.headerCanvas.style.cssText = 'flex:none;display:block;width:100%;touch-action:none;';
+    const headerCtx = this.headerCanvas.getContext('2d');
+    if (!headerCtx) {
+      throw new Error('CardPanel: 2D context unavailable for the header mirror canvas.');
+    }
+    this.headerCtx = headerCtx;
+    this.container.appendChild(this.headerCanvas);
+
+    this.contentWrapper = document.createElement('div');
+    // flex:1 — takes whatever height the header didn't use, up to the
+    // container's own (possibly capped) height; overflow-y:auto is the
+    // ONLY scrolling surface in this whole panel. -webkit-overflow-
+    // scrolling:touch for iOS momentum scrolling.
+    this.contentWrapper.style.cssText =
+      'flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y;';
+    this.container.appendChild(this.contentWrapper);
 
     const backingScale = Math.min(window.devicePixelRatio || 1, MAX_BACKING_SCALE);
     this.rive = new RiveController({
@@ -223,38 +290,45 @@ export class CardPanel {
   /** Mounts the panel; resolves when the Card artboard is interactive. */
   async attach(): Promise<void> {
     const canvas = this.rive.canvas;
-    canvas.style.cssText = 'width:100%;height:100%;display:block;';
-    this.container.appendChild(canvas);
+    // display:block only — width/height/margin are set by
+    // syncAspectToArtboard once real bounds are known (full artboard
+    // height, pulled up by the header's height so contentWrapper's own
+    // top shows body content, not a redundant copy of the header).
+    canvas.style.cssText = 'display:block;width:100%;';
+    this.contentWrapper.appendChild(canvas);
     document.body.appendChild(this.container);
 
     // Same single-input-path forwarding as the markers: pointer events are
     // mapped into artboard space so the Card's authored Rive listeners
-    // (the close button) receive them; shouldDisableRiveListeners stays on.
-    // Only reached for a genuine tap (see handlePointerUp) — once a
-    // gesture is recognized as a drag, the artboard stops receiving
-    // events for the rest of it, so it can't get stuck in a half-pressed
-    // click state.
-    const forwardPointer = (event: PointerEvent, isDown: boolean): void => {
-      // These listeners only receive events while the container has
-      // pointer-events:auto — i.e. while the card believes it is open. A
-      // capture full of these lines while nothing is visibly on screen is
-      // the smoking gun for an invisible-but-open card swallowing every
-      // tap in its box (troubleshooting doc §9).
+    // (the close button) receive them; shouldDisableRiveListeners stays
+    // on. headerCanvas is a top-left-aligned 1:1 CROP of the main canvas's
+    // own backing pixels (see refreshHeaderMirror) — a point at backing
+    // pixel (x,y) in EITHER canvas is the same point in the main canvas's
+    // own frame, which is what mapCanvasPointToArtboard's Fit.contain
+    // math is built against (RiveController.canvasWidth/canvasHeight,
+    // i.e. the MAIN canvas's full backing size). The conversion below
+    // must therefore scale by the TAPPED element's own backing size
+    // (`backingWidth`/`backingHeight`) — using the main canvas's full
+    // size here for a tap that landed on the much-shorter header crop
+    // would inflate its Y fraction into the body region and miss the
+    // close button entirely (caught by headless verification, not
+    // assumed correct).
+    const forwardPointer = (
+      sourceRect: DOMRect,
+      backingWidth: number,
+      backingHeight: number,
+      event: PointerEvent,
+      isDown: boolean
+    ): void => {
       console.log(
         `[${traceT()}] [Card] pointer${isDown ? 'down' : 'up'} at ` +
-          `(${event.clientX.toFixed(0)},${event.clientY.toFixed(0)}) — swallowed by the open ` +
-          'card container, forwarded into the artboard'
+          `(${event.clientX.toFixed(0)},${event.clientY.toFixed(0)}) — forwarded into the artboard`
       );
       if (!this.rive.isReady) return;
-      // CANVAS rect, not container rect: the renderer maps artboard space
-      // onto the canvas box, and under the 90% height cap the canvas is
-      // taller than the (clipping) container — container-relative math
-      // would land taps below their true artboard point.
-      const rect = this.rive.canvas.getBoundingClientRect();
-      if (rect.width === 0 || rect.height === 0) return;
+      if (sourceRect.width === 0 || sourceRect.height === 0) return;
 
-      const canvasX = ((event.clientX - rect.left) / rect.width) * this.rive.canvasWidth;
-      const canvasY = ((event.clientY - rect.top) / rect.height) * this.rive.canvasHeight;
+      const canvasX = ((event.clientX - sourceRect.left) / sourceRect.width) * backingWidth;
+      const canvasY = ((event.clientY - sourceRect.top) / sourceRect.height) * backingHeight;
       const artboardPoint = this.rive.mapCanvasPointToArtboard(canvasX, canvasY);
       if (isDown) {
         this.rive.pointerDown(artboardPoint.x, artboardPoint.y);
@@ -262,35 +336,42 @@ export class CardPanel {
         this.rive.pointerUp(artboardPoint.x, artboardPoint.y);
       }
     };
+    const forwardHeaderPointer = (event: PointerEvent, isDown: boolean): void => {
+      forwardPointer(
+        this.headerCanvas.getBoundingClientRect(),
+        this.headerCanvas.width,
+        this.headerCanvas.height,
+        event,
+        isDown
+      );
+    };
 
+    // Drag-to-dismiss + tap forwarding, both attached to headerCanvas
+    // ONLY: the grabber and the close button both live inside it, and it
+    // is the one part of the Card that never scrolls, so it can always
+    // serve as the swipe handle regardless of how far the content is
+    // scrolled. The content area (contentWrapper) never gets these
+    // listeners at all — it is native-scroll-only, so a vertical gesture
+    // there can never be misread as a dismiss.
     const handlePointerDown = (event: PointerEvent): void => {
       event.stopPropagation();
-      // No preventDefault/setPointerCapture here (unlike before): the
-      // gesture might turn out to be a native content-scroll (see
-      // handlePointerMove), and capturing/preventing at pointerdown would
-      // suppress the browser's own scroll handling before we can tell the
-      // two apart. Both are applied later, only once a gesture is
-      // positively identified as a dismiss-drag.
+      // No preventDefault/setPointerCapture yet — only once a gesture is
+      // confirmed as a drag (see handlePointerMove), so a plain tap on
+      // the close button isn't obstructed by gesture bookkeeping.
       this.dragStartY = event.clientY;
       this.dragStartTime = performance.now();
       this.lastMoveY = event.clientY;
       this.lastMoveTime = this.dragStartTime;
       this.isDragging = false;
-      this.hadSignificantMove = false;
 
-      // Canvas rect for the same reason as forwardPointer: the no-drag
-      // zone protects the authored close button, whose position is
-      // card-relative — under the height cap the card (canvas) is taller
-      // than the container, and container fractions would stretch the
-      // zone off the button.
-      const rect = this.rive.canvas.getBoundingClientRect();
+      const rect = this.headerCanvas.getBoundingClientRect();
       const xFraction = rect.width > 0 ? (event.clientX - rect.left) / rect.width : 0;
       const yFraction = rect.height > 0 ? (event.clientY - rect.top) / rect.height : 0;
       this.dragEligible = !(
         xFraction >= NO_DRAG_ZONE_MIN_X_FRACTION && yFraction <= NO_DRAG_ZONE_MAX_Y_FRACTION
       );
 
-      forwardPointer(event, true);
+      forwardHeaderPointer(event, true);
     };
 
     const handlePointerMove = (event: PointerEvent): void => {
@@ -298,25 +379,11 @@ export class CardPanel {
       const deltaY = event.clientY - this.dragStartY;
 
       if (!this.isDragging) {
-        if (Math.abs(deltaY) < DRAG_TAP_THRESHOLD_PX) return; // still a tap candidate
-        this.hadSignificantMove = true;
-        // Promote to an app-owned dismiss-drag only when there is nothing
-        // left to scroll UP into (scrollTop<=0) and the finger is pulling
-        // DOWN past the threshold — the same gesture a native "pull to
-        // dismiss" bottom sheet uses to distinguish itself from ordinary
-        // scrolling. Anywhere else (mid-scroll, or scrolled content
-        // pulling further down into itself), this is content scroll: leave
-        // it alone, let the browser's native overflow-y:auto handle it.
-        if (!this.dragEligible || this.container.scrollTop > 0 || deltaY <= DRAG_TAP_THRESHOLD_PX) {
-          return;
-        }
-        console.log(
-          `[${traceT()}] [Card] drag threshold crossed at scrollTop=0 — ` +
-            'suspending artboard forwarding, taking over from native scroll'
-        );
+        if (!this.dragEligible || Math.abs(deltaY) < DRAG_TAP_THRESHOLD_PX) return; // still a tap candidate
+        console.log(`[${traceT()}] [Card] drag threshold crossed on header — suspending artboard forwarding`);
         this.isDragging = true;
         this.container.style.transition = 'none';
-        this.container.setPointerCapture(event.pointerId);
+        this.headerCanvas.setPointerCapture(event.pointerId);
       }
 
       event.stopPropagation();
@@ -352,19 +419,15 @@ export class CardPanel {
         } else {
           this.container.style.transform = 'translateY(0)';
         }
-      } else if (!this.hadSignificantMove) {
-        // A genuine tap (never moved past the threshold, whether or not it
-        // could have scrolled): forward the paired pointerUp for the
-        // artboard's click detection (the close button). A released
-        // content-scroll (hadSignificantMove but never promoted to
-        // isDragging) deliberately does NOT reach here — forwarding it
-        // would fire a spurious tap wherever the finger happened to lift.
-        forwardPointer(event, false);
+      } else {
+        // A genuine tap (never crossed the drag threshold): forward the
+        // paired pointerUp for the artboard's click detection (the close
+        // button).
+        forwardHeaderPointer(event, false);
       }
 
       this.dragStartY = null;
       this.isDragging = false;
-      this.hadSignificantMove = false;
     };
 
     const handlePointerCancel = (): void => {
@@ -374,13 +437,12 @@ export class CardPanel {
       }
       this.dragStartY = null;
       this.isDragging = false;
-      this.hadSignificantMove = false;
     };
 
-    this.container.addEventListener('pointerdown', handlePointerDown);
-    this.container.addEventListener('pointermove', handlePointerMove);
-    this.container.addEventListener('pointerup', handlePointerUp);
-    this.container.addEventListener('pointercancel', handlePointerCancel);
+    this.headerCanvas.addEventListener('pointerdown', handlePointerDown);
+    this.headerCanvas.addEventListener('pointermove', handlePointerMove);
+    this.headerCanvas.addEventListener('pointerup', handlePointerUp);
+    this.headerCanvas.addEventListener('pointercancel', handlePointerCancel);
 
     await this.rive.whenReady();
     this.rive.onRiveEvent((eventName) => {
@@ -396,24 +458,61 @@ export class CardPanel {
     // default Fit.contain letterboxes the now-taller artboard horizontally
     // inside the fixed-aspect canvas: visible width fraction = 480/H, i.e.
     // ~10% camera-feed margins per side at H≈604 (troubleshooting doc §12).
+    // The header mirror also needs refreshing on the same tick (any
+    // content change repaints the whole raster, header pixels included).
     this.syncAspectToArtboard();
-    this.rive.onAdvance(() => this.syncAspectToArtboard());
+    this.refreshHeaderMirror();
+    this.rive.onAdvance(() => {
+      this.syncAspectToArtboard();
+      this.refreshHeaderMirror();
+    });
   }
 
   /**
-   * Re-derives the container's CSS box and the canvas backing store from
-   * the live artboard bounds, so canvas aspect === artboard aspect and
-   * Fit.contain fills the full width by construction. Two regimes:
+   * Copies the top HEADER_HEIGHT_ARTBOARD_UNITS-worth of the main canvas's
+   * CURRENT backing-store pixels into headerCanvas. @rive-app/canvas
+   * renders through a plain CanvasRenderingContext2D (confirmed against
+   * the installed rive.js, not assumed — no WebGL buffer-preservation
+   * caveat applies), so drawImage from one 2D canvas into another always
+   * shows the latest committed frame. Cheap: a single blit, same cadence
+   * as syncAspectToArtboard (once per Advance tick, not per animation
+   * frame).
+   */
+  private refreshHeaderMirror(): void {
+    const source = this.rive.canvas;
+    const headerBackingHeight = this.headerCanvas.height;
+    if (source.width === 0 || headerBackingHeight === 0) return;
+    this.headerCtx.clearRect(0, 0, this.headerCanvas.width, this.headerCanvas.height);
+    this.headerCtx.drawImage(
+      source,
+      0,
+      0,
+      source.width,
+      Math.min(headerBackingHeight, source.height),
+      0,
+      0,
+      this.headerCanvas.width,
+      Math.min(headerBackingHeight, source.height)
+    );
+  }
+
+  /**
+   * Re-derives the fixed header's size, the scrollable content wrapper's
+   * size, and the main canvas's backing store from the live artboard
+   * bounds, so canvas aspect === artboard aspect (Fit.contain fills the
+   * full width by construction) and the header/body split stays aligned
+   * with HEADER_HEIGHT_ARTBOARD_UNITS at any viewport width. Two regimes
+   * for the total (header + content) height:
    *
-   * - Natural height fits under 90% of the viewport: container carries
-   *   the artboard aspect, canvas fills it (the original width fix).
-   * - It doesn't: container height is pinned to the 90% cap and the
-   *   canvas keeps its natural aspect-true height inside it — clipped by
-   *   the container's overflow:hidden, NEVER shrunk to the capped box,
-   *   because a canvas box with the wrong aspect is exactly the §12
-   *   letterbox. Bottom-anchored + top-aligned canvas means the clip
-   *   eats the sheet's bottom; grabber/title/close button stay on screen
-   *   (pre-cap, tall content pushed them above the viewport top).
+   * - Natural height fits under 90% of the viewport: contentWrapper is
+   *   exactly tall enough for the remaining (non-header) content — no
+   *   scrolling occurs, matching a short article's "just fits" case.
+   * - It doesn't: contentWrapper is pinned to (90%-of-viewport minus the
+   *   header), and the canvas inside it keeps its full natural height —
+   *   overflow-y:auto on contentWrapper makes the remainder reachable by
+   *   scrolling instead of clipping it away unreachably (the original
+   *   bug) or dragging the header off-screen with it (the first, wrong
+   *   fix).
    *
    * Cheap no-op (float compares) on frames where nothing changed;
    * viewport dimensions participate because both the cap and the natural
@@ -437,26 +536,39 @@ export class CardPanel {
     this.appliedViewportHeight = window.innerHeight;
 
     const canvas = this.rive.canvas;
-    const naturalCssHeight = (height / width) * window.innerWidth;
-    const maxCssHeight = window.innerHeight * CARD_MAX_VIEWPORT_HEIGHT_FRACTION;
-    const capped = naturalCssHeight > maxCssHeight;
-    if (capped) {
-      this.container.style.aspectRatio = '';
-      this.container.style.height = `${maxCssHeight}px`;
-      canvas.style.height = `${naturalCssHeight}px`;
-    } else {
-      this.container.style.height = '';
-      this.container.style.aspectRatio = `${width} / ${height}`;
-      canvas.style.height = '100%';
-    }
+    // px-per-design-unit is set by WIDTH alone (canvas width is always
+    // 100% of the viewport) and is identical in both axes once canvas
+    // aspect === artboard aspect — the same invariant the header-height
+    // conversion below relies on.
+    const pxPerDesignUnit = window.innerWidth / width;
+    const headerHeightPx = HEADER_HEIGHT_ARTBOARD_UNITS * pxPerDesignUnit;
+    const naturalTotalCssHeight = height * pxPerDesignUnit;
+    const maxTotalCssHeight = window.innerHeight * CARD_MAX_VIEWPORT_HEIGHT_FRACTION;
+    const capped = naturalTotalCssHeight > maxTotalCssHeight;
+    const contentWrapperCssHeight = Math.max(
+      0,
+      (capped ? maxTotalCssHeight : naturalTotalCssHeight) - headerHeightPx
+    );
+
+    this.headerCanvas.style.height = `${headerHeightPx}px`;
+    this.contentWrapper.style.height = `${contentWrapperCssHeight}px`;
+    canvas.style.height = `${naturalTotalCssHeight}px`;
+    // Pulls the canvas's own top HEADER_HEIGHT_ARTBOARD_UNITS out of
+    // contentWrapper's visible area (permanently — this is layout, not a
+    // user scroll position) so its natural top edge shows body content;
+    // the identical top crop is what headerCanvas mirrors instead.
+    canvas.style.marginTop = `-${headerHeightPx}px`;
+
     const backingScale = Math.min(window.devicePixelRatio || 1, MAX_BACKING_SCALE);
     // Through Rive's resize path (reads the CANVAS's just-reflowed CSS
-    // box — the aspect-true one, capped or not) so its renderer alignment
-    // state stays coherent.
+    // box) so its renderer alignment state stays coherent.
     this.rive.resizeDrawingSurface(backingScale);
+    this.headerCanvas.width = Math.round(window.innerWidth * backingScale);
+    this.headerCanvas.height = Math.round(headerHeightPx * backingScale);
     console.log(
-      `[${traceT()}] [Card] artboard bounds ${width.toFixed(0)}x${height.toFixed(0)} — ` +
-        `re-synced${capped ? ` (height capped at ${maxCssHeight.toFixed(0)}px, canvas ${naturalCssHeight.toFixed(0)}px clipped)` : ''} ` +
+      `[${traceT()}] [Card] artboard bounds ${width.toFixed(0)}x${height.toFixed(0)} — re-synced ` +
+        `header=${headerHeightPx.toFixed(0)}px content=${contentWrapperCssHeight.toFixed(0)}px` +
+        `${capped ? ` (total capped at ${maxTotalCssHeight.toFixed(0)}px, canvas ${naturalTotalCssHeight.toFixed(0)}px)` : ''} ` +
         `backing=${this.rive.canvasWidth}x${this.rive.canvasHeight}`
     );
   }
@@ -515,9 +627,10 @@ export class CardPanel {
 
     // Every open (fresh or content swap while already open) starts
     // scrolled to the top — otherwise a short article opened right after a
-    // long, scrolled-down one would render with its header already
-    // scrolled out of view.
-    this.container.scrollTop = 0;
+    // long, scrolled-down one would render with its body content already
+    // scrolled down. The header is unaffected either way (it's a fixed
+    // mirror, never a scroll position).
+    this.contentWrapper.scrollTop = 0;
 
     if (this.open_) {
       this.rive.fireTrigger(TRIGGER_REFRESH);

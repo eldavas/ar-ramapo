@@ -69,6 +69,27 @@ const HOTSPOT_HOST_DEBUG_COLOR = 0xff0000;
 const TERRAIN_NODE_NAME = 'site_terrain';
 
 /**
+ * Real-hardware finding (2026-08-14, second physical test): with the
+ * terrain fixed (below), the mounting ledge and the 4 plaque placeholders
+ * were still visible — a wide auxiliary "frame" around the model the
+ * production experience must not show (only buildings + markers are real
+ * content). Found the correct hook instead of hardcoding 4 more literal
+ * mesh names (`site_ledge`, `plaque_front/back/left/right`): confirmed
+ * directly against the shipped site-scene.glb that `tools/
+ * build_site_buildings.py` already tags exactly this geometry with a
+ * `placeholder` glTF extra (`ledge[USERDATA_PLACEHOLDER_KEY] = True`,
+ * same for each `pobj` plaque marker) — the asset's own existing semantic
+ * distinction for "auxiliary mounting geometry, not real content" (same
+ * mechanism `cad-source/handoff/README.md` already describes: "everything
+ * placeholder carries a placeholder custom property"), surviving export
+ * as `node.userData.placeholder === true`. `site_terrain` itself carries
+ * no such flag (it IS real DWG-derived geometry, not a placeholder guess —
+ * it's hidden for the separate, already-documented reason above: the
+ * physical model already shows its own real terrain).
+ */
+const USERDATA_PLACEHOLDER_KEY = 'placeholder';
+
+/**
  * Real-hardware finding (2026-08-14, first physical test): the terrain
  * rendered solid black on-device. Root cause, confirmed against the shipped
  * asset and runtime config (not assumed): every mesh in site-scene.glb —
@@ -109,7 +130,11 @@ const TERRAIN_NODE_NAME = 'site_terrain';
  * content placed near Z=0.
  */
 function applyUnlitRenderingMaterial(mesh: THREE.Mesh): void {
-  if (mesh.name === TERRAIN_NODE_NAME) {
+  if (mesh.name === TERRAIN_NODE_NAME || mesh.userData[USERDATA_PLACEHOLDER_KEY] === true) {
+    // Invisible but still present: THREE.Raycaster tests geometry only and
+    // ignores material opacity, so the ledge/plaque volumes stay valid
+    // occluders (a hotspot behind the ledge is still correctly occluded)
+    // without ever being drawn to the camera feed.
     mesh.material = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false });
     return;
   }

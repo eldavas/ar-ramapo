@@ -11,25 +11,39 @@ import { traceT } from './TraceLog.js';
  * SceneGraphLoader's GLTF_TO_WORLD constants; the two compose, they never
  * duplicate).
  *
- * Best inference pending device validation: 8th Wall FLAT targets frame
- * the printed image in the target's local XY plane with +Z out of the
- * surface toward the viewer (the engine's own examples attach a default
- * three.js PlaneGeometry — which lies in XY facing +Z — directly at the
- * event pose). The GLB is authored Y-up, so Rx(+90°) maps authored +Y
- * onto target +Z: content "stands up out of the plaque" — the same +90°X
- * the parent repo needed for MindAR, for the same reason.
+ * CORRECTED (2026-08-14, third physical test — the whole scene rendered
+ * visibly tilted/rotated relative to the tracked plaque). Root cause,
+ * confirmed rather than assumed: this constant has been `Rx(+90°)` since
+ * it was introduced (git history) and had never been validated on a real
+ * 8th Wall image-target detection until this test — the doc comment above
+ * already flagged both "identity" and "±90°X" as open candidates, exactly
+ * anticipating this class of failure. `applyPose()`'s composition math
+ * itself is unchanged and independently
+ * verified self-consistent (ImageTargetAnchorSource.test.ts); the defect
+ * was specifically in this constant's VALUE. Checked against two
+ * independent real-world 8th Wall + three.js integrations (not internal
+ * guessing): a published React Three Fiber walkthrough
+ * (dev.to/activeguild, "Bridging 8th Wall AR and React Three Fiber") sets
+ * `object.quaternion.set(pose.rotation.x, pose.rotation.y, pose.rotation.z,
+ * pose.rotation.w)` directly from the event with no extra glue rotation,
+ * and 8th Wall's own forum (forum.8thwall.com/t/issues-with-rotation-
+ * position-scaling-when-image-tracking/1891, an official response)
+ * explicitly recommends `object3D.quaternion.copy()` from
+ * detail.rotation "without extra correction rotation" for exactly this
+ * class of "3D content should stand upright, aligned with the tracked
+ * image" case (not a flat texture-replacement overlay) — the same case
+ * this project is in (Y-up glTF content). identity() is therefore the
+ * evidence-backed correction, not `Rx(+90°)`.
  *
- * VALIDATE ON DEVICE (Phase D checkpoint): if the scene lies flat-wrong,
- * this quaternion is the one named thing to change (candidates: identity,
- * ±90°X). If the plaque ends up mounted vertically/tilted on the printed
- * model and content must stay world-upright regardless, replace the rigid
- * fix with position-from-event + yaw-only rotation — a change confined to
- * applyPose().
+ * STILL genuinely open, requiring physical access, not software (the
+ * per-plaque `rotationYawDeg` correction is unaffected either way — it
+ * corrects a separate, orthogonal world-Y-axis rotation between plaques,
+ * not this target-frame convention): whether the 4 real plaques' actual
+ * physical mount (once fabricated) matches the assumed perpendicular-to-
+ * edge, artwork-upright vertical mount asset-authoring-guide.md §3.5
+ * already documents as unverified.
  */
-const TARGET_FRAME_TO_WORLD_FIX = new THREE.Quaternion().setFromAxisAngle(
-  new THREE.Vector3(1, 0, 0),
-  Math.PI / 2
-);
+const TARGET_FRAME_TO_WORLD_FIX = new THREE.Quaternion();
 
 /**
  * §F scale glue. Under scale:'absolute' world units are real meters and
@@ -89,7 +103,7 @@ function scaleRatio(event: Xr8ImageTrackedEvent, physicalTargetWidthMeters: numb
  * good anchor to fall back to, and refusing to ever place the scene would
  * be worse than an imperfect first placement.
  */
-function isPoseTrustworthy(ratio: number): boolean {
+function isScalePlausible(ratio: number): boolean {
   return Math.abs(ratio - 1) <= SCALE_MISMATCH_TOLERANCE;
 }
 
@@ -156,14 +170,23 @@ function formatPose(event: Xr8ImageTrackedEvent): string {
  * `targets` map) re-snaps the mount group to that plaque's own
  * offset/rotation-corrected pose, correcting accumulated SLAM drift
  * whenever the user glances back at whichever plaque is currently in
- * view — PROVIDED the sample passes isPoseTrustworthy() (below): a reading
- * whose engine-reported scale is implausible is rejected outright instead
- * of applied, so a single bad frame can no longer move the anchor (see that
- * function's doc comment for the on-device evidence this responds to).
- * After imagelost the group simply stops receiving snaps — SLAM world
- * tracking (disableWorldTracking: false in EightWallSession) keeps the
- * frozen world pose valid, so content persists while the user walks around
- * the model. Scan any one plaque once, walk around.
+ * view — PROVIDED the sample passes isSampleTrustworthy() (below), which
+ * gates on TWO independent signals, not one: the engine-reported scale
+ * (a reading whose scale is implausible is rejected) AND the engine's own
+ * trackingStatus (a reading arriving while SLAM is not NORMAL — e.g.
+ * RELOCALIZING — is rejected too, closing a real gap an audit found: this
+ * class's HotspotProjector-facing isTracking() already gated MARKER
+ * VISIBILITY on trackingStatus, but applyPose() gated the ANCHOR'S OWN
+ * POSE on scale alone — so a relocalization-churn pose could still
+ * silently corrupt the anchor while markers were merely hidden, only to
+ * reveal the corrupted position once tracking recovered and hid nothing
+ * anymore). Either rejection means a single bad frame can no longer move
+ * the anchor (see isSampleTrustworthy's doc comment for the on-device
+ * evidence this responds to). After imagelost the group simply stops
+ * receiving snaps — SLAM world tracking (disableWorldTracking: false in
+ * EightWallSession) keeps the frozen world pose valid, so content
+ * persists while the user walks around the model. Scan any one plaque
+ * once, walk around.
  *
  * onOriginChanged fires only on RE-detection (imagefound after a lost,
  * once already acquired) — a discontinuity where the pose may visibly
@@ -251,6 +274,37 @@ export class ImageTargetAnchorSource implements AnchorSource {
     return this.imageVisible;
   }
 
+  /**
+   * Second-audit finding (2026-08-14, third physical test): whether a
+   * tracked sample is trustworthy enough to apply to the world anchor.
+   * Two independent gates, either can reject:
+   *
+   * - Scale plausibility (isScalePlausible): the same
+   *   SCALE_MISMATCH_TOLERANCE check as the pre-existing warning.
+   * - SLAM tracking status: `this.session.trackingStatus === 'NORMAL'`.
+   *   isTracking() (above) already reads this exact field to gate marker
+   *   VISIBILITY; applyPose() previously never read it at all, so a pose
+   *   sample arriving mid-RELOCALIZING (or any other non-NORMAL status —
+   *   TOO_MUCH_MOTION, NOT_ENOUGH_TEXTURE, INITIALIZING) could still
+   *   silently move the anchor while markers were merely hidden by the
+   *   OTHER gate — hiding the symptom, not preventing the corruption. The
+   *   anchor would then reveal wherever it drifted to the moment tracking
+   *   recovered and isTracking() stopped hiding markers.
+   */
+  private isSampleTrustworthy(ratio: number): boolean {
+    return isScalePlausible(ratio) && this.session.trackingStatus === 'NORMAL';
+  }
+
+  private logSampleRejected(event: Xr8ImageTrackedEvent, target: ResolvedPlaqueTarget, ratio: number): void {
+    warnIfScaleMismatch(event, target.physicalTargetWidthMeters, ratio);
+    if (this.session.trackingStatus !== 'NORMAL') {
+      console.warn(
+        `[${traceT()}] [ImageTarget] pose sample rejected — trackingStatus=${this.session.trackingStatus} ` +
+          `reason=${this.session.trackingReason} (not NORMAL). Anchor holds its last known-good transform.`
+      );
+    }
+  }
+
   onOriginChanged(handler: () => void): void {
     this.originChangedHandlers.push(handler);
   }
@@ -275,24 +329,25 @@ export class ImageTargetAnchorSource implements AnchorSource {
         const wasAcquired = this.acquired;
         const ratio = scaleRatio(event, target.physicalTargetWidthMeters);
         // First-ever acquisition always applies — there is no prior
-        // known-good anchor to fall back to (see isPoseTrustworthy's doc
+        // known-good anchor to fall back to (see isSampleTrustworthy's doc
         // comment).
-        const trustworthy = !wasAcquired || isPoseTrustworthy(ratio);
+        const trustworthy = !wasAcquired || this.isSampleTrustworthy(ratio);
         console.log(
           `[${traceT()}] [ImageTarget] FOUND "${event.name}"\n` +
             `  scale=${event.scale.toFixed(3)}m ${formatPose(event)}\n` +
+            `  trackingStatus=${this.session.trackingStatus}\n` +
             `  acquired: ${wasAcquired} -> true` +
             (wasAcquired
               ? trustworthy
                 ? ' (re-detection — firing onOriginChanged, pose discontinuity)'
-                : ' (re-detection REJECTED — scale ratio outside tolerance, keeping previous anchor)'
+                : ' (re-detection REJECTED — see warning below — keeping previous anchor)'
               : ' (first acquire — group visible, resolving acquire())')
         );
         this.imageVisible = true;
         if (trustworthy) {
           this.applyPose(event, target);
         } else {
-          warnIfScaleMismatch(event, target.physicalTargetWidthMeters, ratio);
+          this.logSampleRejected(event, target, ratio);
         }
         if (!this.acquired) {
           this.acquired = true;
@@ -319,10 +374,10 @@ export class ImageTargetAnchorSource implements AnchorSource {
             );
           }
           const ratio = scaleRatio(event, target.physicalTargetWidthMeters);
-          if (isPoseTrustworthy(ratio)) {
+          if (this.isSampleTrustworthy(ratio)) {
             this.applyPose(event, target);
           } else {
-            warnIfScaleMismatch(event, target.physicalTargetWidthMeters, ratio);
+            this.logSampleRejected(event, target, ratio);
           }
           this.imageVisible = true;
         }
