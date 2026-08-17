@@ -79,24 +79,23 @@ Rive internals outside this file" boundary intact (see the `internals()`
 cast and its comment at the top of `RiveController.ts` for why that
 boundary exists).
 
-### 2.4 Phase 5 contract — `bench-ui.riv` (Marker + Card)
+### 2.4 Phase 5 UI — `bench-ui.riv` (Marker) + plain HTML/CSS (Card)
 
-The spatial experience's UI is one `.riv` file with **two artboards**,
-served at the manifest's `riveUrl` (`/assets/bench-ui.riv`). The names
-below are the load-bearing contract between the file and the runtime
-(`MarkerLayer.ts`, `CardPanel.ts`); all are case-sensitive, and a mismatch
-fails loudly at startup (wrong artboard/state-machine name) or on first
-use (wrong input/text-run name), never silently.
+The spatial experience's UI is split across two different renderers, for
+two different reasons — this is a **deliberate split, not an
+inconsistency**, and the reasoning below is worth reading before assuming
+one should just match the other.
 
-Design rule behind everything here: **the app owns placement, Rive owns
-appearance.** Markers are repositioned every frame by the projector — never
-keyframe an artboard sliding to a location. The Card's canvas never moves —
-its enter/exit motion lives entirely inside the artboard, which is why it
-always animates from the same screen spot.
+**Marker** — still a Rive artboard, served from the manifest's `riveUrl`
+(`/assets/bench-ui.riv`). Design rule: **the app owns placement, Rive
+owns appearance.** Markers are repositioned every frame by the
+projector — never keyframe an artboard sliding to a location. A marker is
+small, fixed-size (120×120 design, 96 CSS px rendered), and never needs
+to reflow around variable-length content, so a single Rive canvas is a
+good fit and has never caused a rendering bug.
 
-**Artboard `Marker`** — square, author at 120×120 (rendered at 96 CSS px;
-the visual anchor must be the artboard **center**, which the runtime pins
-to the projected hotspot point):
+Author at 120×120 (the visual anchor must be the artboard **center**,
+which the runtime pins to the projected hotspot point):
 
 | Contract item | Exact name | Notes |
 |---|---|---|
@@ -107,43 +106,28 @@ to the projected hotspot point):
 
 Author states to tolerate any flag combination and rapid toggling.
 
-**Artboard `Card`** — author at 350×480 design size (bottom-sheet
-portrait; rendered full-width at the bottom of the screen). The
-artboard's Auto Layout height is **Hug and that is load-bearing**: the
-runtime lets the artboard grow/shrink with the bound content, and
-`CardPanel` re-syncs its CSS aspect and canvas backing from the live
-bounds every frame (troubleshooting doc §12). Keep width fixed at 350;
-changing the height sizing mode away from Hug is a contract change, not
-a cosmetic one.
-At rest (`isOpen` false) it must show nothing — "closed" is an artboard
-state, not a hidden canvas:
+**Card — plain HTML/CSS, not a Rive artboard (2026-08-14, corrected after
+repeated failures).** The Card used to be a Rive artboard (`Card` in
+`bench-ui.riv`) with `title`/`subtitle`/`body` text runs and a
+`cardImage` referenced asset. That design went through five consecutive
+physical-device fix attempts trying to make ONE Rive canvas keep its
+header fixed while scrolling its body — including a canvas-cropping/
+mirroring scheme that introduced its own browser paint-compositing bug —
+because a single Rive canvas has no native way to do that at all. The
+underlying problem was never Rive-specific: it's "keep a header fixed,
+scroll the body," which HTML/CSS (`flex:none` header + `flex:1;
+overflow-y:auto` content) does natively and has never needed a single
+fix since switching to it. The Card is now built entirely in
+`CardPanel.ts` — title, subtitle, body, and the close button/grabber are
+real DOM elements, not Rive text runs or listeners. **There is no
+authoring contract for the Card in `bench-ui.riv` any more** — don't
+re-add a `Card` artboard there; if the Card's visual design needs to
+change, change `CardPanel.ts`'s inline styles directly.
 
-| Contract item | Exact name | Notes |
-|---|---|---|
-| State machine | `CardMachine` | |
-| Boolean input | `isOpen` | default false. false→true plays Enter, true→false plays Exit; both transitions must be interruptible |
-| Trigger input | `refresh` | quick content pulse fired when content swaps while already open; must be a visual no-op if fired mid-Enter |
-| Text run | `title` | at the artboard root, exported name, non-empty placeholder value |
-| Text run | `subtitle` | optional secondary line (e.g. a date/category tag) between title and body; may be set to an empty string — author it to collapse gracefully when blank |
-| Text run | `body` | same as `title`; sheet content length is unbounded — don't clip/ellipsis it in the artboard, the runtime handles overflow (below) |
-| Referenced image asset | `cardImage` | mark the image **Referenced** (not Embedded) with this exact asset name; the runtime substitutes its bitmap from the content source's `imageUrl` |
-| Rive Event | `closeRequested` | type General, fired by the authored close button's listener. The button must NOT change `isOpen` itself — the app owns that state and answers the event |
-| Fonts | embedded | export with fonts embedded; the runtime is self-hosted and referenced fonts would fail to resolve |
-
-**Scrolling long content (2026-08-14, corrected same day):** the Card
-artboard has no authored scroll/clip mechanism (confirmed via
-`tools/dump_riv_objects.py` — no `ClippingShape` component exists on it)
-and none is required — the runtime handles overflow entirely app-side.
-An initial pass scrolled the WHOLE rendered sheet, which dragged the
-grabber and close button off-screen with it — wrong, and corrected the
-same day: `CardPanel.ts` now splits the DOM into a fixed header (a live
-canvas mirror of the artboard's own top crop — grabber, title, subtitle,
-close button, measured empirically via
-`tools/inspect_card_header_boundary.mjs`, never guessed) that never
-scrolls, and a separate scrollable wrapper for the body/image region
-only. This is app-owned, not something to author in Rive; don't add
-clip/scroll components to the Card artboard to "fix" overflow — the
-runtime already handles it (troubleshooting doc §12/§13/§15).
+The `cardImage` field from the content sheet is now just an `<img src>`
+— no Referenced/Embedded asset distinction, no CORS caveat (nothing
+reads its pixels), any URL the sheet points at works the same way it
+would in a plain web page.
 
 **Hotspot custom properties (scene asset side):** each `hotspot_*` node
 carries `label`, `contentKey`, `riveArtboard` (`Marker`), and

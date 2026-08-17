@@ -64,10 +64,12 @@ Two spatial invariants anchor the entire content pipeline:
   **8th Wall** (SLAM world tracking + GPS geofence + optional image-target
   hybrid — `8thwall-test`). An experience declares exactly one, via the
   manifest's `mindTargetUrl` (MindAR) or `placement` (8th Wall) fields
-  (§E) — never both. Rive rendering, the Marker/Card artboard contract,
-  and the whole content pipeline (`SceneGraphLoader`, `MarkerLayer`,
-  `CardPanel`, `ContentProvider`, `HotspotProjector`) are shared,
-  unmodified, across both engines, behind an `AnchorSource` seam (§F).
+  (§E) — never both. Rive rendering (the Marker artboard contract), the
+  Card (plain HTML/CSS as of 2026-08-14 — see §G Phase 3's fifth
+  physical-device-test entry), and the whole content pipeline
+  (`SceneGraphLoader`, `MarkerLayer`, `CardPanel`, `ContentProvider`,
+  `HotspotProjector`) are shared, unmodified, across both engines, behind
+  an `AnchorSource` seam (§F).
 - iOS — future native App Clip (ARKit + RealityKit + Rive iOS runtime). Not
   yet built. Not mixed into the web codebase (§F).
 
@@ -1341,6 +1343,61 @@ schema above.
   (148, worst-case 2-line title+subtitle) is generous enough for the
   actual range of building names/tags real editors will write — depends
   on real content, not just the asset.
+
+  **Progress (2026-08-14, fifth physical-device test): the Card scroll
+  bug persisted even after the fourth-pass fix — a real device still
+  showed several lines of body text frozen at the top of the scroll
+  area. Root architectural cause: keeping the Card as a single Rive
+  canvas and trying to make part of it stay fixed while scrolling the
+  rest was never going to be reliable — the Card is now plain HTML/CSS,
+  not a Rive artboard at all.**
+
+  Direct user instruction drove this change, and the instruction was
+  correct: five consecutive fix attempts (troubleshooting doc §12
+  through §16) had all been narrower patches on top of the same
+  fundamentally awkward foundation — one Rive canvas raster, cropped and
+  mirrored with increasingly specific measurements and burst-limited
+  refresh logic to fake "fixed header, scrollable body," which a real
+  DOM element does natively with `flex:none` + `flex:1;
+  overflow-y:auto`. Rebuilt `CardPanel.ts` from scratch: title, subtitle,
+  body are real text nodes; the image is a real `<img>`; the close
+  button is a real `<button>`; the grabber is a plain div. No canvas, no
+  Rive, no per-frame polling, no measured-boundary constant — plain CSS
+  flexbox owns the header/body split, and native `overflow-y:auto` owns
+  scrolling. `bench-ui.riv` no longer has a Card contract at all (still
+  serves the `Marker` artboard, unchanged — small, fixed-size content
+  never had this problem). `CardImageSlot` (the Rive referenced-asset
+  bridge) is deleted; `cardImage` is now a plain `<img src>`, no
+  CORS/asset-type caveat needed since nothing reads its pixels.
+  `tools/inspect_card_header_boundary.mjs` (the empirical Rive-boundary
+  measurement tool from the two prior passes) is deleted — nothing left
+  to measure.
+
+  **Verified:** `npm run typecheck`/`build`/`test` clean (16/16,
+  unchanged — the Card rewrite touches none of the anchor/composition
+  code those tests cover). Headless Chrome, real compiled assets,
+  320/393/430px: 12 hotspots, zero console exceptions, full tap → Card
+  open → close (button/drag-to-dismiss/tap-outside) chain at every size.
+  Card-specific, with a corrected screenshot crop (the previous pass's
+  crop region only captured the top of the viewport, missing the
+  bottom-anchored card entirely — a test-harness bug in the verification
+  itself, caught and fixed before trusting its result): header region
+  100% pixel-identical across three different scroll positions (0, 300,
+  900px); the content region differs by ~32–39% of columns across every
+  40px band checked, between every pair of distinct scroll positions,
+  with no anomalous
+  band matching an earlier/different position — i.e. no frozen or
+  duplicated line anywhere, at any scroll depth. Drag-to-dismiss starting
+  ON the close button was confirmed to never engage (the button's own
+  `contains()` check, replacing the previous fractional no-drag-zone
+  math entirely).
+  **Not verifiable in software:** real native `overflow-y:auto` momentum
+  scrolling and drag-to-dismiss gesture disambiguation on actual iOS
+  Safari touch input — headless Chrome's synthetic mouse events don't
+  exercise the same touch/scroll code paths a real finger does, though
+  this class of gap is far smaller now than with the canvas-based
+  design, since there is no longer any custom paint/compositing logic
+  for the browser's own scroll engine to conflict with.
 
 - **Phase 4 — Native iOS App Clip. (OPEN)**
   Goal: the iOS delivery path promised in §A — a native App Clip

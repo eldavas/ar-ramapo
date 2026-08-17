@@ -1132,3 +1132,48 @@ single-plaque MindAR harness entries for isolated desk testing.
 
 Full detail and verification numbers: AR_SYSTEM.md §G Phase 3, "Progress
 (2026-08-14, fourth physical-device test)".
+
+## 17. The Card is no longer a Rive artboard (2026-08-14, fifth physical
+test) — five straight fix attempts on the same foundation was the signal
+to change the foundation, not patch it again
+
+§§12–16 above are five consecutive attempts to make ONE Rive canvas keep
+part of itself (the header) visually fixed while the rest (the body)
+scrolls: a width/letterbox fix, a height-cap fix, a whole-sheet-scroll
+fix that regressed the header, a header-crop-measurement fix that was
+wrong twice (single-line assumption, then a paint-compositing bug from
+continuously mirroring the canvas), and even after fixing that, a real
+device STILL showed several lines of body text frozen at the top of the
+scroll area on the next physical test.
+
+The user's direct read of the situation was correct and is the reason
+this section exists: a single canvas has no native concept of "part of
+me is fixed, part of me scrolls" — every attempt above was really
+building a bespoke, increasingly fragile simulation of what
+`flex:none` + `flex:1; overflow-y:auto` does for free. The fix was to
+stop patching the canvas-based design and rebuild the Card as plain
+HTML/CSS: `CardPanel.ts` now owns real DOM elements (a heading, two
+paragraphs, an `<img>`, a `<button>`) instead of a Rive artboard, text
+runs, and a referenced asset. `bench-ui.riv`'s `Card` artboard, the
+`CardImageSlot` Rive-asset bridge, and
+`tools/inspect_card_header_boundary.mjs` (the measurement tool the
+previous two passes needed) are all deleted — there is nothing left to
+measure once the browser's own layout engine owns the split.
+
+**Verification note, same class of lesson as §15's own regression:** the
+first re-run of the scroll-freeze verification against the new HTML
+Card came back "100% identical everywhere," which looked like ANOTHER
+freeze bug — but was actually the verification script's own crop region
+missing the card entirely (a leftover hardcoded top-of-viewport crop
+from the canvas-based design's geometry, never updated for the new
+bottom-anchored flexbox layout, so it was screenshotting empty background
+above the card). Caught by checking the layout numbers before trusting
+the pixel comparison, not by assuming a fix must be wrong just because a
+check failed. Corrected to crop around the container's actual measured
+`getBoundingClientRect()`, after which the real result was unambiguous:
+header 100% identical across all tested scroll depths, content
+consistently ~32–39% different between any two distinct scroll depths,
+no anomalous "frozen" band anywhere.
+
+Full detail: AR_SYSTEM.md §G Phase 3, "Progress (2026-08-14, fifth
+physical-device test)".
