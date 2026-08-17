@@ -333,6 +333,18 @@ so the two stay consistent):
 | left | 90° |
 | right | −90° |
 
+**Note on "outward edge-normal" above — a math reference axis, not a
+physical-facing claim:** that phrase describes how the angle was
+*computed* (each edge's outward normal is an easy, unambiguous direction
+to derive from the terrain rectangle's geometry), not which way the
+printed artwork faces once mounted. Those are independent questions — the
+mounting *rotation* (which way each plaque's artwork reads) is confirmed
+2026-08-17 to be **inward**, toward the terrain center, in
+`docs/physical-plaque-placement.md` §2. `rotationYawDeg`'s values above
+are unaffected either way: they're *relative* corrections between the 4
+plaques (front defines the 0° reference), so they hold regardless of
+which absolute direction "front" itself reads toward.
+
 **What this rotation derivation does NOT have, and doesn't claim to:** an
 on-device-validated mount. `rotationYawDeg` itself is unaffected by mount
 tilt (it's purely a function of which edge of the terrain rectangle the

@@ -1420,6 +1420,24 @@ schema above.
   same-project precedent is strong footing, not a substitute for testing
   against the real hardware/plaque once fabricated.
 
+  **Progress (2026-08-17, later same day): the in-plane mounting
+  rotation — which way each plaque's artwork reads — is confirmed
+  against a reference diagram: inward, toward the terrain center, not
+  outward.** This was a genuinely unspecified gap before now — the
+  earlier tilt fix (flat vs. vertical, above) never addressed which way
+  the artwork should face once laid flat. Verified by direct vector
+  computation (not diagram-reading by eye, which risks sign errors): each
+  plaque's required "up" direction points exactly at the terrain
+  centroid — front→north, back→south, left→east, right→west, each purely
+  along one axis (front/back are centered on the model's X-width,
+  left/right on its Z-depth, so the inward vector has no cross-component).
+  `docs/physical-plaque-placement.md` §2 now states this as an explicit
+  mounting instruction. **No manifest or code change**: `rotationYawDeg`'s
+  0°/180°/90°/−90° pattern is relative between the 4 plaques (front
+  defines the 0° reference), so it holds regardless of which absolute
+  direction "front" itself reads toward — confirmed this is a physical
+  mounting-instruction gap only, not a software one.
+
 - **Phase 4 — Native iOS App Clip. (OPEN)**
   Goal: the iOS delivery path promised in §A — a native App Clip
   (Swift / SwiftUI / ARKit / RealityKit / Rive iOS runtime) that consumes

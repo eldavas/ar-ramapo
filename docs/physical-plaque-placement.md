@@ -97,18 +97,40 @@ means "past that edge, into the ledge"). front/back are centered along
 the model's X-width (803.275mm ≈ half of 1606.55mm); left/right are
 centered along its Z-depth (671.512mm ≈ half of 1343.03mm).
 
-**Mounting orientation (corrected 2026-08-17, coworker physical review):**
-each plaque lies **flat** on its ledge strip, artwork facing **up**
-(toward the ceiling/camera), the same way the physical model's terrain
-and the Blender placeholder plaque markers already sit — NOT standing
-vertically like a museum placard, which was the earlier (incorrect)
-assumption. `rotationYawDeg` in the manifest is unaffected by this: it
-only corrects which of the 4 horizontal directions each plaque's artwork
-"reads" toward (front=0°, back=180°, left=90°, right=−90° — purely a
-function of which edge of the terrain rectangle the plaque sits on, not
-its tilt). The tracking glue in `ImageTargetAnchorSource.ts`
-(`TARGET_FRAME_TO_WORLD_FIX`) IS affected — see §5 for the current value
-and confidence level.
+**Mounting tilt (corrected 2026-08-17, coworker physical review):** each
+plaque lies **flat** on its ledge strip, artwork facing **up** (toward
+the ceiling/camera), the same way the physical model's terrain and the
+Blender placeholder plaque markers already sit — NOT standing vertically
+like a museum placard, which was the earlier (incorrect) assumption.
+`rotationYawDeg` in the manifest is unaffected by this: it only corrects
+which of the 4 horizontal directions each plaque's artwork "reads" toward
+(front=0°, back=180°, left=90°, right=−90° — purely a function of which
+edge of the terrain rectangle the plaque sits on, not its tilt). The
+tracking glue in `ImageTargetAnchorSource.ts` (`TARGET_FRAME_TO_WORLD_FIX`)
+IS affected by tilt — see §5 for the current value and confidence level.
+
+**Mounting rotation — which way each plaque reads (confirmed 2026-08-17
+against a reference diagram):** orient each plaque so its text reads
+right-side-up to someone standing at that edge, outside the model, and
+looking inward toward the terrain — the same way a trailhead sign reads
+correctly as you walk up to it. Equivalently and exactly: **each plaque's
+"up" (the direction from its "Scan me" bar toward its QR code) points
+straight at the terrain's center**, not away from it:
+
+| Side | "Up" points toward | I.e. |
+|---|---|---|
+| front | terrain center (north) | away from the front edge, into the model |
+| back | terrain center (south) | away from the back edge, into the model |
+| left | terrain center (east) | away from the left edge, into the model |
+| right | terrain center (west) | away from the right edge, into the model |
+
+This was genuinely unspecified before — the tilt fix above only ever
+addressed flat-vs-vertical, never this in-plane rotation. No manifest or
+code change needed for this: `rotationYawDeg`'s 0°/180°/90°/−90° pattern
+is a set of *relative* corrections between the 4 plaques (front defines
+the 0° reference), so it stays correct regardless of which absolute
+direction "front" itself reads toward — this is purely a physical
+mounting instruction, not a software one.
 
 ---
 
@@ -122,7 +144,9 @@ and confidence level.
    left and front edges of the terrain meet (§2's diagram).
 4. Measure and mark the 4 center points from §2's table along the ledge
    (not the terrain — the ledge is the border strip outside it).
-5. Mount each plaque flat at its marked point, artwork facing up (§2).
+5. Mount each plaque flat at its marked point, artwork facing up, rotated
+   so its text reads right-side-up standing at that edge and facing into
+   the model — i.e. "up" points at the terrain center (§2).
 6. Confirm each plaque's own corner-mark shape matches
    `tools/build_site_plaques.py`'s `SIDES` mapping for that position
    (front=triangle, back/left/right each have their own distinct
