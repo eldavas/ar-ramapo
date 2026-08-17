@@ -42,25 +42,48 @@ const CARD_MAX_VIEWPORT_HEIGHT_FRACTION = 0.9;
  * Fixed-header height, in artboard DESIGN units (of the 350-wide artboard,
  * scale-invariant per docs/asset-authoring-guide.md's canvas-aspect
  * contract). Everything above this line (grabber, title, subtitle, close
- * button) is authored at a size that does NOT depend on body content
- * length; everything below it is the Hug-growing body/image region that
- * needs to scroll rather than push the header off-screen (2026-08-14,
- * second physical test — see the class doc comment).
+ * button) is meant to be the part of the artboard whose height does NOT
+ * depend on BODY content length; everything below it is the Hug-growing
+ * body/image region that needs to scroll rather than push the header
+ * off-screen (2026-08-14, second physical test — see the class doc
+ * comment).
  *
- * Measured empirically, not guessed: tools/inspect_card_header_boundary.mjs
- * renders the real bench-ui.riv Card artboard twice — once with a short
- * body, once with a ~40x-repeated long body, title/subtitle held identical
- * — and compares the two rasters. The header region (grabber through the
- * close button/subtitle line) is visually identical between the two
- * renders and ends at ~100–107 design units in both (confirmed by direct
- * visual inspection of the rendered PNGs, since a naive per-row pixel diff
- * was too sensitive to independent-instance anti-aliasing noise near the
- * top edge to threshold reliably). 112 adds a small safety margin beyond
- * the measured close-button bottom edge (~47 units, well inside this),
- * so the fixed header can never clip the close button's hit area. Re-run
- * that tool after any bench-ui.riv re-export that touches the header.
+ * Measured empirically twice, not guessed, and wrong the first two times
+ * — both real device tests, both the exact same symptom (a header line
+ * frozen/duplicated at the seam while scrolling, because the fixed header
+ * crop clipped into text that should have been part of the scrollable
+ * body):
+ *
+ * - Pass 1 (112): measured by eye from a screenshot comparison. Too
+ *   imprecise — the true boundary for single-line title/subtitle was
+ *   109.75, already past it.
+ * - Pass 2 (95): `tools/inspect_card_header_boundary.mjs` was rewritten to
+ *   scan rendered pixels for the subtitle/body text runs' own authored
+ *   fill color (#3C3C43, confirmed via `tools/dump_riv_objects.py`) and
+ *   report exact bands — precise, but ONLY tested a single-line subtitle.
+ *   A real device test with a subtitle long enough to WRAP to 2 lines
+ *   clipped into that second line: the boundary isn't a fixed artboard
+ *   constant independent of content after all — it depends on how many
+ *   lines the title/subtitle actually wrap to.
+ * - Pass 3 (this value): the probe now measures a deliberately generous
+ *   worst case — a title AND a subtitle both long enough to wrap to 2
+ *   lines each (asset-authoring-guide.md documents subtitle as meant to
+ *   be a short "date/category tag"; 2 lines each is a realistic,
+ *   generously-margined ceiling for that contract, not an arbitrary
+ *   number). Measured: subtitle's 2nd line ends at 130.25 design units,
+ *   body starts at 160.5 — a comfortable 30-unit gap either way of this
+ *   constant's value. **Known remaining limitation, not fixed by this
+ *   pass:** a title or subtitle that wraps to 3+ lines would still clip.
+ *   Considered and deliberately not solved with a fully dynamic runtime
+ *   measurement (would need a second, hidden Rive instance or a two-pass
+ *   render per open() with a visible flash) given no realistic Card
+ *   content requires it — re-run the probe and raise this constant, or
+ *   revisit with a dynamic measurement, if that assumption ever breaks.
+ * Re-run `tools/inspect_card_header_boundary.mjs` after any bench-ui.riv
+ * re-export that touches the header, and confirm the reported gap still
+ * safely contains this constant.
  */
-const HEADER_HEIGHT_ARTBOARD_UNITS = 112;
+const HEADER_HEIGHT_ARTBOARD_UNITS = 148;
 
 // Slide is app-owned (container transform), not Rive-owned — see the class
 // doc comment. The curve matches the deceleration most native bottom
@@ -74,7 +97,7 @@ const DRAG_TAP_THRESHOLD_PX = 12;
 // The close button (Card_Close_Button_Container, artboard rect
 // x:[304,334] y:[17,47] of the full 350x480 design — ~30x30 units, under
 // Apple's 44pt minimum target size) sits in this corner OF THE HEADER
-// (y:[17,47] of the header's own HEADER_HEIGHT_ARTBOARD_UNITS=112, not the
+// (y:[17,47] of the header's own HEADER_HEIGHT_ARTBOARD_UNITS, not the
 // full 480 — the header canvas below is a crop, so button fractions are
 // relative to ITS OWN height). A gesture starting here is never promoted
 // to a drag, however much the finger jitters while aiming at a small
@@ -241,6 +264,10 @@ export class CardPanel {
   private appliedViewportWidth = 0;
   private appliedViewportHeight = 0;
 
+  // Burst counter for the header mirror — see requestHeaderMirrorRefresh's
+  // doc comment for why this must NOT be a persistent per-frame refresh.
+  private headerRefreshFramesRemaining = 0;
+
   constructor(riveFile: RiveFile, private readonly imageSlot: CardImageSlot) {
     this.container = document.createElement('div');
     // z-index above the marker layer (10); pointer-events only while open,
@@ -290,11 +317,24 @@ export class CardPanel {
   /** Mounts the panel; resolves when the Card artboard is interactive. */
   async attach(): Promise<void> {
     const canvas = this.rive.canvas;
-    // display:block only — width/height/margin are set by
-    // syncAspectToArtboard once real bounds are known (full artboard
-    // height, pulled up by the header's height so contentWrapper's own
-    // top shows body content, not a redundant copy of the header).
-    canvas.style.cssText = 'display:block;width:100%;';
+    // display:block — width/height/margin are set by syncAspectToArtboard
+    // once real bounds are known (full artboard height, pulled up by the
+    // header's height so contentWrapper's own top shows body content, not
+    // a redundant copy of the header).
+    //
+    // will-change:transform + translateZ(0) (2026-08-14, fourth physical
+    // test): a real device test showed the FIRST line of scrolled body
+    // content staying frozen on screen while the rest scrolled correctly
+    // underneath it — reproduced in headless Chrome too, and confirmed by
+    // measurement to NOT be a layout bug (canvas.getBoundingClientRect()
+    // moves by exactly the scroll delta) but a paint/compositing one: the
+    // browser's GPU layer for a canvas that both scrolls AND redraws every
+    // animation frame (Rive's own render loop) can leave a stale raster
+    // in the region that just scrolled out of its old position, instead
+    // of repainting it. Forcing this canvas onto its own explicit
+    // compositing layer makes the browser re-tile it correctly on scroll
+    // instead of reusing a stale tile from before the scroll.
+    canvas.style.cssText = 'display:block;width:100%;will-change:transform;transform:translateZ(0);';
     this.contentWrapper.appendChild(canvas);
     document.body.appendChild(this.container);
 
@@ -458,14 +498,35 @@ export class CardPanel {
     // default Fit.contain letterboxes the now-taller artboard horizontally
     // inside the fixed-aspect canvas: visible width fraction = 480/H, i.e.
     // ~10% camera-feed margins per side at H≈604 (troubleshooting doc §12).
-    // The header mirror also needs refreshing on the same tick (any
-    // content change repaints the whole raster, header pixels included).
     this.syncAspectToArtboard();
-    this.refreshHeaderMirror();
+    this.requestHeaderMirrorRefresh();
     this.rive.onAdvance(() => {
       this.syncAspectToArtboard();
-      this.refreshHeaderMirror();
+      if (this.headerRefreshFramesRemaining > 0) {
+        this.headerRefreshFramesRemaining--;
+        this.refreshHeaderMirror();
+      }
     });
+  }
+
+  /**
+   * Arms a short burst of header-mirror refreshes on the next few Advance
+   * ticks — NOT a persistent per-frame subscription (2026-08-14, fourth
+   * physical test — a real device showed the first line of scrolled body
+   * content frozen in place, reproduced in headless Chrome and root-caused
+   * by isolation, not assumed: continuously calling `drawImage` with the
+   * scrolling main canvas as its SOURCE, every single Advance tick
+   * forever, corrupts the browser's own scroll-repaint for that same
+   * canvas — disabling the mirror refresh entirely made the scrolling
+   * artifact disappear). The header's content (grabber/title/subtitle/
+   * close) is static between `open()` calls, so it only needs re-copying
+   * for the handful of frames right after content changes (Hug layout
+   * settling, same "not synchronous" reasoning `syncAspectToArtboard`
+   * already documents) — not forever afterward, while the user may be
+   * scrolling. `open()` calls this again on every content swap.
+   */
+  private requestHeaderMirrorRefresh(): void {
+    this.headerRefreshFramesRemaining = 10;
   }
 
   /**
@@ -474,9 +535,9 @@ export class CardPanel {
    * renders through a plain CanvasRenderingContext2D (confirmed against
    * the installed rive.js, not assumed — no WebGL buffer-preservation
    * caveat applies), so drawImage from one 2D canvas into another always
-   * shows the latest committed frame. Cheap: a single blit, same cadence
-   * as syncAspectToArtboard (once per Advance tick, not per animation
-   * frame).
+   * shows the latest committed frame. Only called for a short burst after
+   * content changes (see requestHeaderMirrorRefresh) — never on every
+   * frame indefinitely.
    */
   private refreshHeaderMirror(): void {
     const source = this.rive.canvas;
@@ -628,9 +689,12 @@ export class CardPanel {
     // Every open (fresh or content swap while already open) starts
     // scrolled to the top — otherwise a short article opened right after a
     // long, scrolled-down one would render with its body content already
-    // scrolled down. The header is unaffected either way (it's a fixed
-    // mirror, never a scroll position).
+    // scrolled down. The header mirror is re-armed for a short burst too
+    // (title/subtitle may have just changed) — see
+    // requestHeaderMirrorRefresh's doc comment for why this is bounded,
+    // not a persistent per-frame refresh.
     this.contentWrapper.scrollTop = 0;
+    this.requestHeaderMirrorRefresh();
 
     if (this.open_) {
       this.rive.fireTrigger(TRIGGER_REFRESH);
