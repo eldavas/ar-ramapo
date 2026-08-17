@@ -1145,6 +1145,133 @@ schema above.
   `.riv`/`.glb` asset file — every fix lives in the loading/normalization
   or gesture-handling layer that already owned this class of decision.
 
+  **Progress (2026-08-14, second same-day physical-device test): three
+  more findings — one a genuine software correction with external
+  evidence, two additional bugs in the fixes above, none requiring a
+  tracking-architecture or engine change.**
+
+  1. **Markers/scene rendered visibly tilted.** Confirmed by diff
+     (`git show` of the previous fix commit) that `applyPose()`'s
+     rotation composition was NOT touched by the prior pass — the defect
+     predates it, in `TARGET_FRAME_TO_WORLD_FIX` itself, present since
+     the constant was introduced and never validated on a real 8th Wall
+     image-target detection (the doc comment already named both
+     "identity" and "±90°X" as open candidates for exactly this failure).
+     Not fixed by "rotating markers until they look right" — markers have
+     no rotation logic of their own at all (`MarkerLayer` pins screen-space
+     divs by `left`/`top` only); the tilt is entirely a property of the
+     3D anchor's own quaternion, computed once in `applyPose()` and
+     consumed unmodified by `SceneGraphLoader` (identity for the 8th Wall
+     branch, confirmed) and `HotspotProjector` (pure projection, no
+     rotation logic). Root-caused instead against two independent,
+     external, real-world 8th Wall + three.js integrations: a published
+     React Three Fiber walkthrough (dev.to/activeguild, "Bridging 8th
+     Wall AR and React Three Fiber") applies
+     `object.quaternion.set(pose.rotation.x, ...)` directly from the
+     event with no extra glue rotation, and 8th Wall's own forum
+     (forum.8thwall.com/t/issues-with-rotation-position-scaling-when-
+     image-tracking/1891) explicitly recommends applying `detail.rotation`
+     via `quaternion.copy()` "without extra correction rotation" for
+     upright 3D content (not a flat overlay) — this project's exact case
+     (Y-up glTF content). `TARGET_FRAME_TO_WORLD_FIX` changed from
+     `Rx(+90°)` to `identity()`; `rotationYawDeg` (a separate, orthogonal
+     per-plaque world-Y correction) is unaffected. Verified: the existing
+     composition self-consistency test (`ImageTargetAnchorSource.test.ts`)
+     still passes unmodified in structure with its mirrored constant
+     updated to match.
+  2. **Terrain fixed, but the mounting ledge and 4 plaque placeholders
+     were still visible.** `SceneGraphLoader.ts` already had the right
+     instinct (hide by semantic role, not by hardcoding names) for
+     terrain; the same asset already carries the hook for the rest —
+     confirmed directly against the shipped GLB
+     (`extras: {"placeholder": true}` on `site_ledge` and all 4
+     `plaque_*` nodes, from `tools/build_site_buildings.py`'s own
+     `USERDATA_PLACEHOLDER_KEY`, the exact mechanism
+     `cad-source/handoff/README.md` already documented: "everything
+     placeholder carries a `placeholder` custom property"). Fix: the
+     same invisible-but-still-an-occluder treatment terrain already gets
+     now also applies to any mesh with `userData.placeholder === true`
+     — no new hardcoded mesh names, using the asset's own existing
+     semantic marker instead of one matching literally forbidden by the
+     Golden Rule's spirit. Verified: headless Chrome scene traversal
+     shows `plaque_front/back/left/right` and `site_ledge` all
+     `MeshBasicMaterial transparent=true opacity=0`; buildings unaffected.
+  3. **The Card scroll fix from the prior pass was wrong — it scrolled
+     the WHOLE sheet, dragging the grabber and close button off-screen.**
+     A real, user-identified regression in the previous pass's own fix,
+     not a pre-existing bug. `CardPanel`'s DOM is restructured into a
+     fixed outer shell containing a small, ALWAYS-visible header mirror
+     (grabber + title/subtitle + close button) and a separate scrollable
+     content wrapper (body/image only) — see the class doc comment for
+     the full structure. The header/body boundary is not guessed: 
+     `tools/inspect_card_header_boundary.mjs` renders the real
+     `bench-ui.riv` Card artboard with short vs. long body content and
+     visually diffs the two rasters (a naive pixel-row diff was too
+     sensitive to independent-instance anti-aliasing noise near the top
+     edge; direct visual inspection of the rendered PNGs was reliable)
+     to find the content-invariant region's true extent (~100–107 design
+     units, `HEADER_HEIGHT_ARTBOARD_UNITS = 112` with margin). The header
+     is a live 2D-canvas `drawImage` mirror of the real interactive
+     canvas's own top crop (confirmed `@rive-app/canvas` renders via
+     `CanvasRenderingContext2D`, not WebGL, so this is a reliable
+     same-frame copy), not a second Rive instance — one artboard, one
+     state machine, one place text runs are set. Drag-to-dismiss now
+     attaches ONLY to the header (the one region that never scrolls),
+     so there is no scroll-vs-dismiss ambiguity to arbitrate at all: the
+     content area has no dismiss-gesture listeners whatsoever, which is
+     a stronger guarantee than gating on scroll position. **A real bug
+     was caught during this pass's own headless verification, not
+     shipped**: forwarding a tap from the header mirror initially scaled
+     the tap coordinates by the MAIN canvas's full backing size instead
+     of the header mirror's own (much smaller) backing size, missing the
+     close button's actual hit area entirely — fixed by scaling each
+     forwarded pointer by the backing size of whichever canvas the user
+     actually touched. Verified end-to-end (headless Chrome + real CDP
+     mouse events): short content doesn't scroll; long content does,
+     natively (`scrollTop` readback exact, reaches
+     `scrollHeight − clientHeight`); header pixels are visibly identical
+     before/after scrolling (screenshot comparison); close-button tap
+     closes the card; grabber drag-to-dismiss closes the card;
+     tap-outside closes the card; re-opening resets `scrollTop` to 0.
+  4. **Anchor-stability, audited deeper per explicit request — a real
+     gap found beyond the prior pass's scale-ratio gate, not a
+     speculative smoothing/Kalman layer.** `isTracking()` (which
+     `HotspotProjector` reads to hide markers) has always gated on
+     `session.trackingStatus === 'NORMAL'`; `applyPose()`'s
+     trustworthiness gate did not — it only checked the engine-reported
+     scale ratio. This meant a pose sample arriving while SLAM was
+     `RELOCALIZING` (or `TOO_MUCH_MOTION`/`NOT_ENOUGH_TEXTURE`/
+     `INITIALIZING`) but happened to report a plausible scale could
+     still move the anchor; only the SEPARATE marker-visibility gate hid
+     the resulting drift from view, revealing wherever the anchor ended
+     up the moment tracking recovered to `NORMAL`. `isSampleTrustworthy()`
+     now requires BOTH gates — scale plausibility AND
+     `trackingStatus === 'NORMAL'` — before applying any sample past the
+     first acquisition (which still always applies; no prior good anchor
+     to fall back to). Verified by 2 new unit tests (16 total, up from
+     14): a scale-plausible sample arriving mid-`RELOCALIZING` is
+     rejected while a prior good anchor holds, recovers once
+     `trackingStatus` returns to `NORMAL`; the first-ever acquisition
+     still applies even before `trackingStatus` has reported anything.
+     **Still open, requiring physical access, not software**: whether
+     these two gates catch every real-world instability mode, or whether
+     additional signal (e.g. position/rotation continuity between
+     consecutive accepted samples) is needed — cannot be determined
+     without an on-device session to observe what a genuinely unstable
+     tracking run's accepted-sample sequence looks like after this fix.
+
+  Verified together (headless Chrome, real compiled assets, 320/393/430px):
+  12 hotspots, zero console exceptions, full tap → Card open → header
+  fixed during scroll → close (button/drag/tap-outside) chain at every
+  size. `npm run typecheck`/`build`/`test` clean (16/16 unit tests).
+  **Not verifiable in software, explicitly separated from the above**:
+  whether `TARGET_FRAME_TO_WORLD_FIX = identity()` is exactly right for
+  THIS project's real printed plaques and camera (the two external
+  sources are strong, independent evidence, not an on-device
+  confirmation); whether the 4 plaques' real physical mount matches the
+  assumed perpendicular-to-edge vertical mount; and the anchor-stability
+  open item above.
+
 - **Phase 4 — Native iOS App Clip. (OPEN)**
   Goal: the iOS delivery path promised in §A — a native App Clip
   (Swift / SwiftUI / ARKit / RealityKit / Rive iOS runtime) that consumes

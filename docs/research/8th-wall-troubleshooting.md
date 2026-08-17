@@ -990,3 +990,87 @@ Both fixes, verification numbers, and the still-open hardware-only gaps
 (`TARGET_FRAME_TO_WORLD_FIX` and the per-plaque mount rotation remain
 "best inference, validate on device" — unchanged by this pass): AR_SYSTEM.md
 §G Phase 3, "Progress (2026-08-14, first real physical-device test)".
+
+---
+
+## 14. TARGET_FRAME_TO_WORLD_FIX was actually wrong (2026-08-14, second
+same-day physical test) — the scene rendered visibly tilted, root-caused
+against external evidence rather than guessed
+
+The §13 update above corrected two rendering bugs but didn't touch the
+tracking rotation math. A second same-day physical pass showed the whole
+digital scene rendering tilted relative to the tracked plaque — markers
+included, since `MarkerLayer` has no rotation logic of its own at all
+(pure 2D `left`/`top` positioning from `HotspotProjector`'s projection);
+the tilt is entirely downstream of `ImageTargetAnchorSource.group`'s own
+quaternion.
+
+**Ruled out first, not assumed:** `git show` of the previous fix commit
+confirmed `applyPose()`'s rotation composition was untouched by it — the
+defect predates that pass, in `TARGET_FRAME_TO_WORLD_FIX`'s VALUE, not
+the composition formula (independently verified self-consistent by
+`ImageTargetAnchorSource.test.ts`, unchanged). The constant had been
+`Rx(+90°)` since introduction and had never actually been exercised
+against a real 8th Wall image-target detection — its own doc comment
+already named "identity" and "±90°X" as open candidates for this exact
+failure mode.
+
+**Evidence, not a guess between the two named candidates:** two
+independent, external, real-world 8th Wall + three.js integrations were
+checked (WebSearch/WebFetch, not internal reasoning):
+
+- A published React Three Fiber walkthrough (dev.to/activeguild,
+  "Bridging 8th Wall AR and React Three Fiber: How Pose Data Flows into
+  Three.js") applies the event's rotation directly:
+  `groupRef.current.quaternion.set(pose.rotation.x, pose.rotation.y,
+  pose.rotation.z, pose.rotation.w)` — no extra glue rotation.
+- 8th Wall's own community forum
+  (forum.8thwall.com/t/issues-with-rotation-position-scaling-when-image-
+  tracking/1891), an official response to exactly this class of report,
+  recommends `object3D.quaternion.copy()` from the event's `detail.rotation`
+  "without extra correction rotation" for 3D content that should stand
+  upright aligned with the tracked image (as opposed to a flat
+  texture-replacement overlay laid directly onto the image plane) — this
+  project's exact case, Y-up glTF content.
+
+Both sources independently converge on "apply the event's rotation
+directly, no fixed glue quaternion" for this content shape. Fix:
+`TARGET_FRAME_TO_WORLD_FIX` changed from `Rx(+90°)` to `identity()`.
+`rotationYawDeg` (the separate, orthogonal per-plaque world-Y-axis
+correction — §E "Multi-target plaques") is unaffected either way.
+
+**Not resolved by this pass, explicitly separated:** whether identity()
+is exactly correct for THIS project's real printed plaques and camera —
+the two sources are strong, independent, external evidence, not an
+on-device confirmation of this specific asset; and whether the 4 real
+plaques' physical mount (once fabricated) matches the assumed
+perpendicular-to-edge, artwork-upright vertical mount
+docs/asset-authoring-guide.md §3.5 already flags as unverified.
+
+## 15. Ledge/plaque placeholders still visible after the terrain fix, and
+the Card scroll fix from §13 was itself a regression — both fixed the
+same day
+
+**Ledge/plaques:** the terrain-specific fix in §13 didn't generalize to
+the mounting ledge or the 4 plaque placeholder volumes, which stayed
+visible (a wide diagonal "frame" in the physical photo evidence).
+`tools/build_site_buildings.py` already tags this exact geometry with
+`extras: {"placeholder": true}` (confirmed against the shipped GLB, not
+assumed from the script alone) — the same mechanism
+`cad-source/handoff/README.md` already documented. `SceneGraphLoader.ts`
+now applies the same invisible-but-still-an-occluder treatment to any
+mesh carrying that flag, generalizing the terrain fix instead of adding
+4 more hardcoded mesh names.
+
+**Card scroll regression:** §13's fix made the ENTIRE Card container
+scroll, which drags the grabber and close button off-screen along with
+the body — not the intended behavior, and a real regression in that
+pass's own fix (user-caught, not a pre-existing bug). Corrected to a
+fixed-header/scrollable-content DOM split; a real pointer-forwarding bug
+was caught by this pass's own headless verification before shipping
+(header taps were scaled by the wrong canvas's backing size and missed
+the close button). Full detail, the header-boundary measurement
+methodology, and verification numbers: AR_SYSTEM.md §G Phase 3,
+"Progress (2026-08-14, second same-day physical-device test)" — same
+entry covers all of §14 and §15's fixes plus the anchor-stability
+trackingStatus gate.

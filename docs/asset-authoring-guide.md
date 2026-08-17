@@ -130,15 +130,20 @@ state, not a hidden canvas:
 | Rive Event | `closeRequested` | type General, fired by the authored close button's listener. The button must NOT change `isOpen` itself — the app owns that state and answers the event |
 | Fonts | embedded | export with fonts embedded; the runtime is self-hosted and referenced fonts would fail to resolve |
 
-**Scrolling long content (2026-08-14):** the Card artboard has no
-authored scroll/clip mechanism (confirmed via
+**Scrolling long content (2026-08-14, corrected same day):** the Card
+artboard has no authored scroll/clip mechanism (confirmed via
 `tools/dump_riv_objects.py` — no `ClippingShape` component exists on it)
-and none is required — `CardPanel.ts` scrolls the whole rendered sheet
-natively (`overflow-y:auto` on the container) once content grows past the
-90%-viewport height cap, so a long `body` is reachable by scrolling rather
-than silently cut off. This is app-owned, not something to author in
-Rive; don't add clip/scroll components to the Card artboard to "fix"
-overflow — the runtime already handles it (troubleshooting doc §12/§13).
+and none is required — the runtime handles overflow entirely app-side.
+An initial pass scrolled the WHOLE rendered sheet, which dragged the
+grabber and close button off-screen with it — wrong, and corrected the
+same day: `CardPanel.ts` now splits the DOM into a fixed header (a live
+canvas mirror of the artboard's own top crop — grabber, title, subtitle,
+close button, measured empirically via
+`tools/inspect_card_header_boundary.mjs`, never guessed) that never
+scrolls, and a separate scrollable wrapper for the body/image region
+only. This is app-owned, not something to author in Rive; don't add
+clip/scroll components to the Card artboard to "fix" overflow — the
+runtime already handles it (troubleshooting doc §12/§13/§15).
 
 **Hotspot custom properties (scene asset side):** each `hotspot_*` node
 carries `label`, `contentKey`, `riveArtboard` (`Marker`), and
@@ -344,11 +349,14 @@ on-device-validated mount. The 4 placeholder plaque volumes in
 from above), not upright wall-mounted plaques — no *authored* facing
 direction exists to read a value from, so the numbers above assume a
 standard perpendicular-to-edge, artwork-upright vertical mount (the only
-sane default for a museum-placard-style plaque). This is the same
-"best inference, validate on device" status
+sane default for a museum-placard-style plaque). This composes with
 `ImageTargetAnchorSource.ts`'s `TARGET_FRAME_TO_WORLD_FIX` — the fixed
-glue these rotations compose with — already carried before this pass;
-verified in software (a dedicated geometry self-consistency test,
+target-frame-to-world glue, corrected 2026-08-14 from `Rx(+90°)` to
+`identity()` after a physical test showed the scene rendering tilted
+(root-caused against external 8th Wall + three.js evidence, docs/research/
+8th-wall-troubleshooting.md §14) — but is itself still an independent,
+not-yet-on-device-validated assumption: verified in software only (a
+dedicated geometry self-consistency test,
 `src/client/ImageTargetAnchorSource.test.ts`), not yet against a real
 mounted plaque.
 
