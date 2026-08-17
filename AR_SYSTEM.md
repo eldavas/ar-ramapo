@@ -1272,6 +1272,76 @@ schema above.
   assumed perpendicular-to-edge vertical mount; and the anchor-stability
   open item above.
 
+  **Progress (2026-08-14, fourth physical-device test): the Card scroll
+  fix itself was still incomplete — two more root causes found, both
+  fixed. Also: the "small and rotated on a bare desk" observation is
+  correctly explained, not a bug.**
+
+  1. **`HEADER_HEIGHT_ARTBOARD_UNITS` (95) still clipped into the header
+     content — a longer subtitle wrapping to 2 lines duplicated/froze on
+     screen while scrolling.** The prior pass's measurement
+     (`tools/inspect_card_header_boundary.mjs`) only tested a single-line
+     title/subtitle; real content can wrap. Rewritten to measure a
+     deliberately generous worst case — a title AND subtitle both long
+     enough to force a 2-line wrap each — and re-measured: real boundary
+     160.5 design units, safe midpoint 145.375. Constant raised to 148.
+     Known, accepted remaining limit: a title/subtitle wrapping to 3+
+     lines would still clip; not addressed with a fully dynamic runtime
+     measurement (would need a second hidden Rive instance or a
+     visible-flash two-pass render) since no realistic Card content
+     needs it — see the constant's own doc comment for the exact
+     reasoning and what to do if that assumption ever breaks.
+  2. **A second, independent bug in the same symptom family: the first
+     line of scrolled BODY content stayed frozen/duplicated even after
+     fix 1, confirmed by isolation (not assumed) to be unrelated to the
+     header crop boundary at all.** Disabling `refreshHeaderMirror()`
+     entirely made the artifact disappear; re-enabling it brought it
+     back — proving the continuous `drawImage()` calls reading FROM the
+     scrolling main canvas, once per Advance tick, forever, were
+     corrupting the browser's own scroll-repaint for that same canvas
+     (confirmed geometrically sound: `canvas.getBoundingClientRect()`
+     moved by exactly the scroll delta the whole time — this was a paint/
+     compositing bug, not a layout bug). Fixed by bounding the mirror
+     refresh to a short burst (10 Advance ticks) right after content
+     actually changes (`open()`), instead of a persistent per-frame
+     subscription — the header's content is static between opens, so it
+     never needed continuous re-copying in the first place. Verified by
+     isolating the pixel region that previously froze: 100% of header
+     columns stay identical across scroll positions (correctly static),
+     while the previously-frozen content band now differs by ~72% of
+     columns between two different scroll positions (correctly
+     reflecting different scrolled-to text), measured via a column
+     dark-pixel-count signature comparison, not a visual screenshot
+     re-check.
+  3. **"Buildings render small and rotated when scanning a single plaque
+     lying flat on a desk" — explained, not a defect.** The `'site'`
+     entry's `originOffsetMeters` are real, meter-scale offsets (0.7–1.6
+     m) computed for the REAL ~1.6×1.3 m physical terrain (§2 above) —
+     scanning one plaque on a small desk with no terrain nearby correctly
+     places content at its real metric distance from that plaque, which
+     necessarily reads as "far away" (hence visually small, at real
+     camera perspective) relative to a small test surface. This is the
+     intended behavior of the shared-corner design once the physical
+     model exists, not a bug introduced by anything in this project.
+     `docs/physical-plaque-placement.md` (new) documents this explicitly
+     and points to the pre-existing single-plaque MindAR harness entries
+     (`site-front` etc.) for isolated desk testing that doesn't need the
+     terrain present.
+
+  Verified: `npm run typecheck`/`build`/`test` clean (16/16, unchanged —
+  these fixes didn't touch the anchor/composition code the tests cover).
+  Headless Chrome, real compiled assets, 320/393/430px: 12 hotspots, zero
+  console exceptions, full tap → Card open → close chain. Card-specific:
+  header 100% pixel-static across scroll positions; content band
+  genuinely changes across scroll positions (column-signature comparison,
+  not a visual re-check — screenshot review was blocked by a session
+  image-limit constraint during this pass, so the verification method was
+  changed to a decisive numeric comparison instead of skipped).
+  **Not verifiable in software:** whether the corrected header height
+  (148, worst-case 2-line title+subtitle) is generous enough for the
+  actual range of building names/tags real editors will write — depends
+  on real content, not just the asset.
+
 - **Phase 4 — Native iOS App Clip. (OPEN)**
   Goal: the iOS delivery path promised in §A — a native App Clip
   (Swift / SwiftUI / ARKit / RealityKit / Rive iOS runtime) that consumes

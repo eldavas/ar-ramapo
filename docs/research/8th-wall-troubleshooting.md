@@ -1074,3 +1074,61 @@ methodology, and verification numbers: AR_SYSTEM.md §G Phase 3,
 "Progress (2026-08-14, second same-day physical-device test)" — same
 entry covers all of §14 and §15's fixes plus the anchor-stability
 trackingStatus gate.
+
+## 16. The §15 Card fix was STILL incomplete — two more root causes in the
+same "frozen text while scrolling" symptom family (2026-08-14, fourth
+physical test)
+
+Two genuinely independent bugs, both producing a similar-looking symptom
+(text appearing to stick/duplicate near the top of the scrolled area),
+found by isolation rather than assumed to be the same bug twice.
+
+**Bug A — the header crop still clipped, just for a different content
+shape.** §15's `HEADER_HEIGHT_ARTBOARD_UNITS` measurement only tested a
+single-line title/subtitle. A subtitle long enough to wrap to 2 lines
+duplicated/froze its second line — the boundary genuinely depends on how
+many lines the title/subtitle wrap to, which depends on their actual
+text, not just a fixed artboard geometry fact.
+`tools/inspect_card_header_boundary.mjs` now measures a deliberately
+generous worst case (title AND subtitle both wrapping to 2 lines) instead
+of a single-line minimum; the constant moved from 95 to 148 (real
+measured boundary at that worst case: 160.5, midpoint 145.375).
+
+**Bug B — independent of A, and easy to mistake for the same thing:**
+even with A fixed, the FIRST LINE OF BODY CONTENT (not header content)
+stayed frozen/duplicated while the rest scrolled correctly underneath it.
+Isolated by disabling the header-mirror refresh entirely: the artifact
+disappeared. Root cause: `refreshHeaderMirror()` was calling
+`ctx.drawImage()` with the SCROLLING main canvas as its source, once per
+Rive Advance tick, forever (many times per second, indefinitely) — this
+corrupts the browser's own scroll-repaint for that same canvas, leaving a
+stale raster in the region that had just scrolled into view. Confirmed
+NOT a layout bug first: `canvas.getBoundingClientRect()` moved by exactly
+the scroll delta throughout, so the DOM position was always correct —
+only the painted pixels lagged. Fixed by bounding the header-mirror
+refresh to a short burst (10 ticks) right after content actually changes
+(`open()`), instead of a persistent per-Advance-tick subscription — the
+header's own content is static between opens and never needed continuous
+re-copying.
+
+**Verification note:** screenshot review was blocked mid-session by a
+image-count/size constraint on the review tooling itself (unrelated to
+the app) — the fix was verified instead via a decisive numeric method: a
+per-column dark-pixel-count signature of the suspect screen region,
+compared across scroll positions. Header region: 100% of columns
+identical across all tested scroll positions (correctly static). Content
+region that previously froze: ~72% of columns differ between two
+different scroll positions (correctly reflecting genuinely different
+scrolled-to text, not a coincidental partial match).
+
+Also clarified in this pass, not a bug: scanning a single plaque lying
+flat on a bare desk (no physical terrain nearby) makes buildings render
+small and, before the §14 rotation fix, visibly rotated — both are
+consequences of the `'site'` entry's real, meter-scale offsets (designed
+for the actual ~1.6×1.3m terrain) applied with nothing physical to
+overlay onto, not a defect. See `docs/physical-plaque-placement.md`
+(new) for the physical placement checklist and the pointer to the
+single-plaque MindAR harness entries for isolated desk testing.
+
+Full detail and verification numbers: AR_SYSTEM.md §G Phase 3, "Progress
+(2026-08-14, fourth physical-device test)".

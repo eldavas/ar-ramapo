@@ -251,6 +251,12 @@ note in the architecture review; each anchor still needs to be wired up in
 
 ### 3.5 Physical dimensions — the 4 site plaques and the digital-twin model
 
+**For the step-by-step physical printing/mounting checklist (where each
+plaque goes, in what orientation, and what's still placeholder), see
+`docs/physical-plaque-placement.md`** — this section is the underlying
+derivation data that doc pulls from; that one is the operational
+walkthrough.
+
 Recorded 2026-08-14 alongside wiring the 4 real site-plaque targets
 (`site-front`/`site-back`/`site-left`/`site-right`, AR_SYSTEM.md §G Phase
 3). Everything below is either a real, currently-printed value or is
