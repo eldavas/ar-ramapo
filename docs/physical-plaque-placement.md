@@ -97,13 +97,18 @@ means "past that edge, into the ledge"). front/back are centered along
 the model's X-width (803.275mm ≈ half of 1606.55mm); left/right are
 centered along its Z-depth (671.512mm ≈ half of 1343.03mm).
 
-**Mounting orientation:** each plaque should be mounted **vertically**
-(standing up, like a museum placard), **perpendicular to its own edge**,
-with the artwork upright and facing **outward** (away from the terrain,
-so a visitor standing outside the model sees it right-side-up). This is
-the standing assumption behind both `rotationYawDeg` in the manifest and
-the tracking glue in `ImageTargetAnchorSource.ts` — see §5 for its
-current confidence level.
+**Mounting orientation (corrected 2026-08-17, coworker physical review):**
+each plaque lies **flat** on its ledge strip, artwork facing **up**
+(toward the ceiling/camera), the same way the physical model's terrain
+and the Blender placeholder plaque markers already sit — NOT standing
+vertically like a museum placard, which was the earlier (incorrect)
+assumption. `rotationYawDeg` in the manifest is unaffected by this: it
+only corrects which of the 4 horizontal directions each plaque's artwork
+"reads" toward (front=0°, back=180°, left=90°, right=−90° — purely a
+function of which edge of the terrain rectangle the plaque sits on, not
+its tilt). The tracking glue in `ImageTargetAnchorSource.ts`
+(`TARGET_FRAME_TO_WORLD_FIX`) IS affected — see §5 for the current value
+and confidence level.
 
 ---
 
@@ -117,8 +122,7 @@ current confidence level.
    left and front edges of the terrain meet (§2's diagram).
 4. Measure and mark the 4 center points from §2's table along the ledge
    (not the terrain — the ledge is the border strip outside it).
-5. Mount each plaque vertically at its marked point, artwork facing
-   outward, upright, perpendicular to the edge it sits on (§2).
+5. Mount each plaque flat at its marked point, artwork facing up (§2).
 6. Confirm each plaque's own corner-mark shape matches
    `tools/build_site_plaques.py`'s `SIDES` mapping for that position
    (front=triangle, back/left/right each have their own distinct
@@ -139,7 +143,7 @@ as final
 | Plaque size (50 × 50 mm) | Currently what's printed and what the manifest declares (`physicalTargetWidthMeters: 0.05`) — but `tools/build_site_plaques.py`'s own doc comment calls this "not a real production plaque-size decision," only a placeholder carried over from the bench-test convention. If a final size is chosen later, it's a coordinated change across the printed artwork, `physicalTargetWidthMeters` in the manifest, and `SIZE_MM` in that script — not just a print-time decision. |
 | Ledge width (76.2 mm / 3 in) | **Placeholder** — `LEDGE_WIDTH_M` in `tools/build_site_buildings.py`, an explicit guess from a reference photo, not a measurement. The ledge running uniformly on all 4 sides IS confirmed; the exact width is not. |
 | Plaque center positions (§2's table) | **Derived**, not independently measured — computed from the terrain footprint + the ledge width above. They will shift if the ledge width changes. |
-| Mounting rotation (vertical, perpendicular-to-edge, artwork-upright) | An **assumption**, not a measurement of an actual mount — there's no fabricated vertical mount to read a real angle from yet. |
+| Mounting orientation (flat, artwork-up) | **Confirmed** 2026-08-17 (coworker physical review) — supersedes the earlier vertical-mount assumption. The exact rotational reading `TARGET_FRAME_TO_WORLD_FIX` should produce for a real flat-mounted plaque is still not on-device confirmed (§5). |
 
 **When the real ledge width lands:** swap `LEDGE_WIDTH_M` in
 `tools/build_site_buildings.py`, re-run `tools/export_handoff_bundle.py`,
@@ -163,17 +167,22 @@ orientation (§A/§E "Multi-target plaques").
 composition math itself is internally consistent — all 4 targets recover
 the same assumed world placement from their own simulated tracked event.
 
-**Corrected 2026-08-14 against external evidence, not yet on-device
-confirmed for this specific hardware:** the target-frame-to-world glue
-(`TARGET_FRAME_TO_WORLD_FIX`) was changed from a 90°-rotation to identity
-after a physical test showed the whole scene rendering tilted — see
-`docs/research/8th-wall-troubleshooting.md` §14 for the evidence trail.
+**Corrected 2026-08-14 against external evidence** (for a since-superseded
+vertical-mount assumption), **then corrected again 2026-08-17** once the
+mount orientation itself was confirmed flat: `TARGET_FRAME_TO_WORLD_FIX`
+is back to a 90°-rotation (`Rx(+90°)`), reasoning from this project's own
+already-validated MindAR glue for the identical physical shape (a flat,
+table-lying plaque — `SceneGraphLoader.ts`'s
+`GLTF_TO_MINDAR_ROTATION_X_RADIANS`), not a blind revert to the pre-2026-08-14
+value. See `docs/research/8th-wall-troubleshooting.md` §14 for the
+original evidence trail and its follow-up entry for this correction.
 
 **Still genuinely unverified, requiring the real physical mount from this
-doc, not software:** whether the vertical, perpendicular-to-edge,
-artwork-upright mounting assumption (§2) holds once plaques are actually
-fixed in place — `rotationYawDeg`'s derivation and `TARGET_FRAME_TO_WORLD_FIX`
-both depend on it.
+doc, not software:** whether 8th Wall's own image-target rotation
+convention for a flat marker actually matches MindAR's — the reasoning
+above is a strong same-project precedent, not an on-device 8th Wall
+confirmation. `rotationYawDeg` is NOT in question (§2 — it's orthogonal to
+mount tilt).
 
 ---
 

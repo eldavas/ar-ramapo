@@ -1177,3 +1177,46 @@ no anomalous "frozen" band anywhere.
 
 Full detail: AR_SYSTEM.md §G Phase 3, "Progress (2026-08-14, fifth
 physical-device test)".
+
+## 18. TARGET_FRAME_TO_WORLD_FIX corrected again (2026-08-17) — mounting
+orientation decided flat, not vertical
+
+§14 corrected this constant to `identity()` based on strong external
+evidence (a published integration example + an official 8th Wall forum
+response), both about content that "should stand upright, aligned with a
+WALL-mounted vertical tracked image." That evidence was sound for the
+case it addressed — but the underlying physical assumption it was
+answering (the 4 plaques mount vertically, "museum placard" style) is
+what turned out wrong, not the reasoning about identity() vs `Rx(+90°)`
+for THAT case. Root cause of the mismatch: nothing in this codebase had
+ever actually decided the mount orientation before §14 — `docs/asset-
+authoring-guide.md` §3.5 said as much at the time ("the only sane default
+for a museum-placard-style plaque"), a default, not a decision. A
+coworker physical review on 2026-08-17 made the real decision: the
+plaques lie flat on the ledge, artwork facing up — the same orientation
+the placeholder plaque geometry in `site-scene.glb` (flat magenta slabs)
+had already been authored in all along, coincidentally or not.
+
+**Fix:** rather than re-deriving a flat-marker rotation from scratch or
+re-guessing between identity/±90°X, reused this project's own existing,
+already-validated glue for the identical physical shape —
+`SceneGraphLoader.ts`'s `GLTF_TO_MINDAR_ROTATION_X_RADIANS = Math.PI / 2`,
+written for MindAR's bench-test plaque, which has always been a flat,
+table-lying marker (`build_bench_scene.py`'s `ar_launch_plaque`). Same
+physical marker shape, same glTF-authored content axes (X-east/Y-up/
+Z-south) → same rotation. `TARGET_FRAME_TO_WORLD_FIX` is now `Rx(+90°)`
+— numerically the pre-§14 value, but arrived at for a different, now-
+confirmed reason (the flat-marker precedent), not a blind revert.
+
+**Not re-litigated, still holds:** `applyPose()`'s composition math and
+`rotationYawDeg`'s derivation (both orthogonal to this constant, per
+their own doc comments) — unchanged, `ImageTargetAnchorSource.test.ts`'s
+16 tests still pass with the new constant value substituted in.
+
+**Still open, requiring physical access, not software:** whether 8th
+Wall's own image-target rotation convention for a flat/horizontal marker
+actually matches MindAR's convention. Both are standard AR-SDK patterns
+for this marker shape, and reusing an already-validated same-project
+value is stronger footing than a fresh guess, but it is not the same as
+an on-device 8th Wall confirmation — that still doesn't exist for this
+specific hardware/plaque combination.

@@ -11,39 +11,37 @@ import { traceT } from './TraceLog.js';
  * SceneGraphLoader's GLTF_TO_WORLD constants; the two compose, they never
  * duplicate).
  *
- * CORRECTED (2026-08-14, third physical test — the whole scene rendered
- * visibly tilted/rotated relative to the tracked plaque). Root cause,
- * confirmed rather than assumed: this constant has been `Rx(+90°)` since
- * it was introduced (git history) and had never been validated on a real
- * 8th Wall image-target detection until this test — the doc comment above
- * already flagged both "identity" and "±90°X" as open candidates, exactly
- * anticipating this class of failure. `applyPose()`'s composition math
- * itself is unchanged and independently
- * verified self-consistent (ImageTargetAnchorSource.test.ts); the defect
- * was specifically in this constant's VALUE. Checked against two
- * independent real-world 8th Wall + three.js integrations (not internal
- * guessing): a published React Three Fiber walkthrough
- * (dev.to/activeguild, "Bridging 8th Wall AR and React Three Fiber") sets
- * `object.quaternion.set(pose.rotation.x, pose.rotation.y, pose.rotation.z,
- * pose.rotation.w)` directly from the event with no extra glue rotation,
- * and 8th Wall's own forum (forum.8thwall.com/t/issues-with-rotation-
- * position-scaling-when-image-tracking/1891, an official response)
- * explicitly recommends `object3D.quaternion.copy()` from
- * detail.rotation "without extra correction rotation" for exactly this
- * class of "3D content should stand upright, aligned with the tracked
- * image" case (not a flat texture-replacement overlay) — the same case
- * this project is in (Y-up glTF content). identity() is therefore the
- * evidence-backed correction, not `Rx(+90°)`.
+ * CORRECTED AGAIN (2026-08-17, coworker physical review): the 4 plaques'
+ * real mounting orientation is decided — flat on the ledge surface,
+ * artwork facing up, NOT standing vertically like a museum placard. The
+ * 2026-08-14 fix below (`identity()`) was evidence-backed for THAT
+ * assumption specifically ("content should stand upright aligned with a
+ * WALL-mounted vertical image"); now that the physical mount is flat, this
+ * project already has a validated glue transform for exactly this
+ * physical configuration — `SceneGraphLoader.ts`'s
+ * `GLTF_TO_MINDAR_ROTATION_X_RADIANS = Math.PI / 2` — because MindAR's
+ * bench-test plaque (`build_bench_scene.py`'s `ar_launch_plaque`) has
+ * ALWAYS been a flat, table-lying plaque: "MindAR's anchor frames the flat
+ * plaque as X-east / Y-north / Z-up. Rotating +90° about X maps (x, y, z)
+ * → (x, −z, y) = (east, north, up)." Reused here rather than re-derived —
+ * same physical marker shape (flat, artwork-up), same glTF-authored
+ * content (X-east/Y-up/Z-south), so the same rotation applies. `Rx(+90°)`
+ * was in fact this constant's original value before the 2026-08-14 pass
+ * changed it to `identity()` under the (now-corrected) vertical-mount
+ * assumption — this is a return to that value, but for a DIFFERENT,
+ * now-confirmed reason (the flat-marker precedent above), not a blind
+ * revert.
  *
  * STILL genuinely open, requiring physical access, not software (the
- * per-plaque `rotationYawDeg` correction is unaffected either way — it
- * corrects a separate, orthogonal world-Y-axis rotation between plaques,
- * not this target-frame convention): whether the 4 real plaques' actual
- * physical mount (once fabricated) matches the assumed perpendicular-to-
- * edge, artwork-upright vertical mount asset-authoring-guide.md §3.5
- * already documents as unverified.
+ * per-plaque `rotationYawDeg` correction is unaffected either way — see
+ * its own doc comment; it corrects a separate, orthogonal world-Y-axis
+ * rotation between plaques, not this target-frame convention): whether
+ * 8th Wall's image-target rotation convention for a FLAT/horizontal
+ * marker actually matches MindAR's (both are common AR-SDK conventions,
+ * but this specific cross-engine assumption has no on-device 8th-Wall
+ * confirmation yet, only the internal same-project precedent above).
  */
-const TARGET_FRAME_TO_WORLD_FIX = new THREE.Quaternion();
+const TARGET_FRAME_TO_WORLD_FIX = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2);
 
 /**
  * §F scale glue. Under scale:'absolute' world units are real meters and

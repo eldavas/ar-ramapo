@@ -1399,6 +1399,27 @@ schema above.
   design, since there is no longer any custom paint/compositing logic
   for the browser's own scroll engine to conflict with.
 
+  **Progress (2026-08-17): the 4 plaques' mounting orientation is
+  decided — flat on the ledge, artwork facing up, not the vertical
+  "museum placard" mount every prior pass had assumed by default (never
+  an actual decision — `docs/asset-authoring-guide.md` §3.5 said so at
+  the time). `ImageTargetAnchorSource.ts`'s `TARGET_FRAME_TO_WORLD_FIX`
+  is corrected accordingly, from `identity()` back to `Rx(+90°)` —
+  reasoning from this project's own already-validated MindAR glue for
+  the identical physical marker shape (`SceneGraphLoader.ts`'s
+  `GLTF_TO_MINDAR_ROTATION_X_RADIANS`, written for the bench-test's
+  flat, table-lying plaque), not a blind revert to the pre-08-14 value.
+  `rotationYawDeg` and `originOffsetMeters` are unaffected — both are
+  purely a function of which terrain edge each plaque sits on, orthogonal
+  to mount tilt. Full reasoning: `docs/research/8th-wall-troubleshooting.md`
+  §18. **Verified:** `npm run test` — all 16 `ImageTargetAnchorSource.test.ts`
+  cases (geometry self-consistency, unaffected by this constant's value)
+  still pass with the new value; `npm run typecheck` clean.
+  **Still not on-device confirmed:** whether 8th Wall's own image-target
+  rotation convention for a flat marker actually matches MindAR's — the
+  same-project precedent is strong footing, not a substitute for testing
+  against the real hardware/plaque once fabricated.
+
 - **Phase 4 — Native iOS App Clip. (OPEN)**
   Goal: the iOS delivery path promised in §A — a native App Clip
   (Swift / SwiftUI / ARKit / RealityKit / Rive iOS runtime) that consumes

@@ -22,9 +22,10 @@ import type { Xr8ImageTrackedEvent } from './types/xr8.js';
 
 // Mirrors ImageTargetAnchorSource's own private constants (not exported —
 // duplicated here deliberately, so this test fails if the source ever
-// changes them without this test being updated too). identity() as of
-// 2026-08-14 — see the source file's own doc comment for why.
-const TARGET_FRAME_TO_WORLD_FIX = new THREE.Quaternion();
+// changes them without this test being updated too). Rx(+90°) as of
+// 2026-08-17 (flat-mount correction) — see the source file's own doc
+// comment for why.
+const TARGET_FRAME_TO_WORLD_FIX = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2);
 function yawCorrectionQuaternion(deg: number): THREE.Quaternion {
   return new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), THREE.MathUtils.degToRad(deg));
 }

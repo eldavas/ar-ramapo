@@ -334,21 +334,23 @@ so the two stay consistent):
 | right | −90° |
 
 **What this rotation derivation does NOT have, and doesn't claim to:** an
-on-device-validated mount. The 4 placeholder plaque volumes in
-`site-scene.glb` are flat magenta slabs lying on top of the ledge (viewed
-from above), not upright wall-mounted plaques — no *authored* facing
-direction exists to read a value from, so the numbers above assume a
-standard perpendicular-to-edge, artwork-upright vertical mount (the only
-sane default for a museum-placard-style plaque). This composes with
-`ImageTargetAnchorSource.ts`'s `TARGET_FRAME_TO_WORLD_FIX` — the fixed
-target-frame-to-world glue, corrected 2026-08-14 from `Rx(+90°)` to
-`identity()` after a physical test showed the scene rendering tilted
-(root-caused against external 8th Wall + three.js evidence, docs/research/
-8th-wall-troubleshooting.md §14) — but is itself still an independent,
-not-yet-on-device-validated assumption: verified in software only (a
-dedicated geometry self-consistency test,
-`src/client/ImageTargetAnchorSource.test.ts`), not yet against a real
-mounted plaque.
+on-device-validated mount. `rotationYawDeg` itself is unaffected by mount
+tilt (it's purely a function of which edge of the terrain rectangle the
+plaque sits on), but it composes with `ImageTargetAnchorSource.ts`'s
+`TARGET_FRAME_TO_WORLD_FIX` — the fixed target-frame-to-world glue, which
+DOES depend on mount tilt. **Mounting orientation confirmed 2026-08-17
+(coworker physical review): flat on the ledge, artwork facing up** — the
+4 placeholder plaque volumes in `site-scene.glb` (flat magenta slabs
+lying on top of the ledge, viewed from above) turn out to already match
+the real intended mount, not just be a simple placeholder shape.
+`TARGET_FRAME_TO_WORLD_FIX` was corrected accordingly: `identity()`
+(2026-08-14, evidence-backed for the vertical-mount assumption that
+turned out wrong) → `Rx(+90°)` (2026-08-17, reasoning from this project's
+own already-validated MindAR glue for the identical flat-plaque shape,
+`SceneGraphLoader.ts`'s `GLTF_TO_MINDAR_ROTATION_X_RADIANS`) — see
+`docs/research/8th-wall-troubleshooting.md` §14 and its follow-up entry.
+Still verified in software only (`src/client/ImageTargetAnchorSource.test.ts`'s
+geometry self-consistency check), not yet against a real mounted plaque.
 
 ---
 
