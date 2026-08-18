@@ -89,6 +89,39 @@ same as every other hotspot in the codebase.
 
 SCOPE: hotspots exist on the 12 named buildings only, not wired into the
 experience manifest — same staging caveat as build_site_terrain.py.
+
+REVISION (2026-08-18): real measurements landed for the ledge width
+(3.5cm, confirmed uniform on all 4 sides) and the full baseboard
+(167.5 x 141.4cm) — see the digital-twin sourcing project notes for the
+full reconciliation against these numbers (terrain-corner elevations and
+one building's anchor-point position both cross-checked against physical
+measurements and matched closely, so this pass is a data-quality
+improvement, not a bug fix). `site_ledge` is now a single full-rectangle
+mesh at the real baseboard size (previously a 4-strip border ring at a
+placeholder 3in guess) — visually simpler and matches the physical
+model's actual single continuous board. Also added
+`build_ramapo_site_marker()`: a rough, unmeasured visual-reference marker
++ text label near the front-left corner, purely so "front" is
+unmistakable when eyeballing this scene against the physical model —
+not a step toward the real title-block asset.
+
+REVISION (2026-08-18, later same day): `v`'s sign flipped at the source
+(`extract_site_terrain.py`/`extract_site_buildings.py`'s new `v_sign`,
+composing with the origin fix's `u_sign`) — v now ranges [0, depth_m]
+(front to back) instead of [-depth_m, 0]. Root cause of the confusion
+this fixes: the origin fix mirrored u only, leaving the authored frame
+left-handed; Blender's own top-view convention is right-handed, so front
+rendered at the TOP of the default top view even though left correctly
+stayed on the left — a real, reasoned-through-with-the-user discovery,
+not a guess. Flipping v too composes two mirrors into a proper rotation,
+restoring a right-handed frame: front now lands at the BOTTOM of
+Blender's default top view, matching how a person actually stands in
+front of the physical model, with left/right and wide/narrow unaffected
+either way. Ledge/plaque/marker positions in this file updated to match
+(front-side geometry moved from small-positive-v to small-negative-v,
+back-side from beyond -depth_m to beyond +depth_m) — pure relabeling, not
+a position change, confirmed by identical building matches and terrain
+relief before/after in both extraction scripts.
 """
 
 import json
@@ -120,8 +153,15 @@ IN_TO_M = 0.0254
 # board material at true physical size, so these are converted straight
 # from inches/mm, NOT through FT_TO_MODEL_M (that factor is for the 1:960
 # geographic terrain only).
-LEDGE_WIDTH_M = 3.0 * IN_TO_M  # best guess from the reference photo — PLACEHOLDER, not measured
+LEDGE_WIDTH_M = 0.035          # 3.5cm, measured 2026-08-18 (real, confirmed uniform on all 4 sides)
 LEDGE_THICKNESS_M = 0.01       # visual thickness only; top face sits flush with terrain Z=0
+
+# Full baseboard, measured 2026-08-18 (real, not derived from LEDGE_WIDTH_M —
+# independently measured, and the two agree to within ~1.5mm, well inside
+# manual-measurement tolerance; using the direct measurement here rather
+# than re-deriving it avoids compounding two separate measurements' error).
+BASEBOARD_WIDTH_M = 1.675       # 167.5cm
+BASEBOARD_DEPTH_M = 1.414       # 141.4cm
 
 PLAQUE_SIZE_M = 0.05           # reuses build_bench_scene.py's bench-test 50mm plaque convention
 PLAQUE_THICKNESS_M = 0.002     # matches build_bench_scene.py's PLAQUE_THICKNESS
@@ -131,6 +171,14 @@ PLAQUE_PLACEHOLDER_COLOR = (1.0, 0.05, 0.75, 1.0)  # loud magenta — unmistakab
 
 USERDATA_PLACEHOLDER_KEY = "placeholder"
 USERDATA_PLAQUE_SIDE_KEY = "plaqueSide"
+
+# --- RAMAPO SITE marker (visual reference only, 2026-08-18) ---
+# Rough placeholder, NOT measured — exists purely so "front" is
+# unmistakable at a glance when eyeballing building position/orientation
+# against the physical model, matching the real title block's approximate
+# corner. Dimensions are guessed, not derived from anything.
+RAMAPO_MARKER_SIZE_M = (0.18, 0.09)   # width, depth -- guessed
+RAMAPO_MARKER_COLOR = (0.05, 0.05, 0.05, 1.0)  # near-black, reads clearly against the ledge
 
 # --- Building hotspots (AR_SYSTEM.md §E Golden Rule, §G building
 # highlight-on-tap forward design) ---
@@ -281,38 +329,37 @@ def build_building_hotspots(data: dict, building_objects: list) -> list:
 
 
 def build_ledge_and_plaques(terrain_data: dict) -> tuple:
-    """Placeholder mounting ledge + 4 QR-plaque markers around the terrain
-    footprint. Width/thickness/plaque size are all best-guess constants
-    (see REVISION 2026-08-13 in the module docstring) pending the
-    coworker's real measurement — everything built here carries a
-    `placeholder` userData flag so it's unmistakable on later inspection.
-    Deliberately does NOT compute manifest-ready originOffsetMeters/
-    rotationYawDeg (§E blocks those on the real measurement too; this
-    script doesn't get ahead of that)."""
+    """Mounting ledge (now the FULL baseboard rectangle, real measured
+    dimensions as of 2026-08-18 -- see BASEBOARD_WIDTH_M/DEPTH_M) + 4
+    QR-plaque markers. Plaque size/thickness are still best-guess
+    constants pending a real plaque-size decision; each plaque carries a
+    `placeholder` userData flag so that's unmistakable on inspection, but
+    the ledge itself is no longer a placeholder shape now that real
+    measurements exist. Deliberately does NOT compute manifest-ready
+    originOffsetMeters/rotationYawDeg (§E blocks those on final numbers;
+    this script doesn't get ahead of that)."""
     width_ft, depth_ft = terrain_data["crop_size_ft"]
     ft_to_model_m = terrain_data["ft_to_model_m"]
     width_m = width_ft * ft_to_model_m
     depth_m = depth_ft * ft_to_model_m
     L = LEDGE_WIDTH_M
 
-    # 4 strips tiling the border with no gaps/overlaps: front/back extend
-    # past the corners, left/right fill just the remaining depth span.
-    strips = {
-        "front": ((-L, width_m + L), (0.0, L)),
-        "back": ((-L, width_m + L), (-depth_m - L, -depth_m)),
-        "left": ((-L, 0.0), (-depth_m, 0.0)),
-        "right": ((width_m, width_m + L), (-depth_m, 0.0)),
-    }
+    # Full baseboard as a single rectangle (not a border ring), centered
+    # on the terrain rectangle -- i.e. the terrain sits inset within it by
+    # roughly L on every side (BASEBOARD_WIDTH_M/DEPTH_M are an
+    # independent direct measurement, so the actual margin isn't exactly L
+    # on every side to the sub-mm, matching real-world measurement noise).
+    board_cx, board_cy = width_m / 2.0, depth_m / 2.0
+    x0, x1 = board_cx - BASEBOARD_WIDTH_M / 2.0, board_cx + BASEBOARD_WIDTH_M / 2.0
+    y0, y1 = board_cy - BASEBOARD_DEPTH_M / 2.0, board_cy + BASEBOARD_DEPTH_M / 2.0
 
     bm = bmesh.new()
-    base_faces = []
-    for (x0, x1), (y0, y1) in strips.values():
-        v0 = bm.verts.new((x0, y0, 0.0))
-        v1 = bm.verts.new((x1, y0, 0.0))
-        v2 = bm.verts.new((x1, y1, 0.0))
-        v3 = bm.verts.new((x0, y1, 0.0))
-        base_faces.append(bm.faces.new((v0, v1, v2, v3)))
-    extrude = bmesh.ops.extrude_face_region(bm, geom=base_faces)
+    v0 = bm.verts.new((x0, y0, 0.0))
+    v1 = bm.verts.new((x1, y0, 0.0))
+    v2 = bm.verts.new((x1, y1, 0.0))
+    v3 = bm.verts.new((x0, y1, 0.0))
+    face = bm.faces.new((v0, v1, v2, v3))
+    extrude = bmesh.ops.extrude_face_region(bm, geom=[face])
     new_verts = [g for g in extrude["geom"] if isinstance(g, bmesh.types.BMVert)]
     bmesh.ops.translate(bm, vec=(0.0, 0.0, LEDGE_THICKNESS_M), verts=new_verts)
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
@@ -323,16 +370,18 @@ def build_ledge_and_plaques(terrain_data: dict) -> tuple:
 
     ledge = bpy.data.objects.new("site_ledge", mesh)
     ledge.data.materials.append(make_material("mat_site_ledge", LEDGE_COLOR))
-    ledge[USERDATA_PLACEHOLDER_KEY] = True
     link(ledge)
 
-    # One QR-plaque placeholder centered on each side's ledge strip.
+    # One QR-plaque placeholder centered on each side's ledge strip. v now
+    # ranges [0, depth_m] (front to back, flipped 2026-08-18 for a
+    # right-handed frame) -- front sits just before v=0, back just past
+    # v=depth_m, mirroring how front/back used to straddle v=0.
     plaque_group = make_empty("Plaques")
     plaque_centers = {
-        "front": (width_m / 2.0, L / 2.0),
-        "back": (width_m / 2.0, -depth_m - L / 2.0),
-        "left": (-L / 2.0, -depth_m / 2.0),
-        "right": (width_m + L / 2.0, -depth_m / 2.0),
+        "front": (width_m / 2.0, -L / 2.0),
+        "back": (width_m / 2.0, depth_m + L / 2.0),
+        "left": (-L / 2.0, depth_m / 2.0),
+        "right": (width_m + L / 2.0, depth_m / 2.0),
     }
     plaques = []
     for side, (cx, cy) in plaque_centers.items():
@@ -355,10 +404,55 @@ def build_ledge_and_plaques(terrain_data: dict) -> tuple:
         plaques.append(pobj)
 
     print(
-        f"  built ledge (width {LEDGE_WIDTH_M / IN_TO_M:.1f} in, PLACEHOLDER) "
+        f"  built full baseboard rectangle ({BASEBOARD_WIDTH_M*100:.1f} x {BASEBOARD_DEPTH_M*100:.1f} cm, real measured) "
         f"+ {len(plaques)} plaque placeholders (one per side, PLACEHOLDER)"
     )
     return ledge, plaque_group
+
+
+def build_ramapo_site_marker(terrain_data: dict) -> bpy.types.Object:
+    """Rough visual-reference marker for "front" -- a flat placeholder
+    box + text label near the front-left corner, roughly where the real
+    engraved "RAMAPO SITE" title block sits (2026-08-18). Dimensions are
+    guessed, not measured; this exists purely so a human eyeballing the
+    scene against the physical model has an unambiguous "front" landmark,
+    not as a step toward the real title block asset."""
+    width_ft, depth_ft = terrain_data["crop_size_ft"]
+    ft_to_model_m = terrain_data["ft_to_model_m"]
+    width_m = width_ft * ft_to_model_m
+    depth_m = depth_ft * ft_to_model_m
+
+    board_cx, board_cy = width_m / 2.0, depth_m / 2.0
+    x0 = board_cx - BASEBOARD_WIDTH_M / 2.0
+    y0 = board_cy - BASEBOARD_DEPTH_M / 2.0  # front edge of the baseboard (v now increases toward the back)
+    mw, md = RAMAPO_MARKER_SIZE_M
+    margin = 0.02
+    cx, cy = x0 + margin + mw / 2.0, y0 + margin + md / 2.0
+
+    bm = bmesh.new()
+    bmesh.ops.create_cube(bm, size=1.0)
+    bmesh.ops.scale(bm, vec=(mw, md, LEDGE_THICKNESS_M), verts=bm.verts)
+    bmesh.ops.translate(bm, vec=(cx, cy, LEDGE_THICKNESS_M + LEDGE_THICKNESS_M / 2.0), verts=bm.verts)
+    mesh = bpy.data.meshes.new("ramapo_site_marker")
+    bm.to_mesh(mesh)
+    bm.free()
+
+    obj = bpy.data.objects.new("ramapo_site_marker", mesh)
+    obj.data.materials.append(make_material("mat_ramapo_site_marker", RAMAPO_MARKER_COLOR))
+    obj[USERDATA_PLACEHOLDER_KEY] = True
+    link(obj)
+
+    bpy.ops.object.text_add(location=(cx, cy, LEDGE_THICKNESS_M * 2 + 0.005))
+    text_obj = bpy.context.object
+    text_obj.name = "ramapo_site_marker_label"
+    text_obj.data.body = "RAMAPO SITE (FRONT)"
+    text_obj.data.size = 0.03
+    text_obj.data.align_x = "CENTER"
+    text_obj.data.align_y = "CENTER"
+    text_obj.parent = obj
+
+    print(f"  built RAMAPO SITE visual marker (guessed size {mw*100:.0f}x{md*100:.0f}cm) near front-left corner")
+    return obj
 
 
 def build_scene() -> None:
@@ -385,6 +479,9 @@ def build_scene() -> None:
     ledge, plaque_group = build_ledge_and_plaques(terrain_data)
     ledge.parent = origin
     plaque_group.parent = origin
+
+    ramapo_marker = build_ramapo_site_marker(terrain_data)
+    ramapo_marker.parent = origin
 
     bpy.context.view_layer.update()
 

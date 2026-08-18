@@ -1438,6 +1438,44 @@ schema above.
   direction "front" itself reads toward — confirmed this is a physical
   mounting-instruction gap only, not a software one.
 
+  **Progress (2026-08-18): real physical measurements landed for the
+  ledge width (3.5cm) and full baseboard (167.5 x 141.4cm), and the
+  digital-twin's `v` axis convention was corrected at the source.** The
+  ledge changed from a placeholder 3in-guess border ring to a single
+  full-rectangle mesh at the real measured baseboard size (`tools/
+  build_site_buildings.py`) — cross-checked first: real terrain-corner
+  elevations and one building's anchor-point position (measured directly
+  against the physical model) both matched our existing data closely, so
+  this was confirmed a data-quality improvement, not a bug fix. Separately,
+  visual inspection in Blender surfaced a real (if cosmetic) issue: the
+  2026-08-13 origin fix mirrored `u` only, leaving the authored frame
+  left-handed, so Blender's own right-handed top-view convention rendered
+  front at the TOP even though left correctly stayed on the left —
+  confusing enough (twice, independently) that it's worth fixing at the
+  source rather than re-explaining. `v` now has its own `v_sign` (in
+  `extract_site_terrain.py`/`extract_site_buildings.py`, mirroring
+  `u_sign`'s pattern exactly) and ranges `[0, depth_ft]` (front to back)
+  instead of `[-depth_ft, 0]` — two mirrors compose into a proper
+  rotation, restoring a right-handed frame, so front now renders at the
+  BOTTOM of Blender's default top view, matching physical intuition, with
+  left/right and wide/narrow unaffected either way. Confirmed pure
+  relabeling, not a position change: identical building matches (12/21)
+  and identical terrain relief (450-930ft) before/after in both
+  extraction scripts.
+
+  **Explicitly NOT done in this pass, flagged rather than silently
+  skipped:** `public/assets/site-scene.glb`/`.usdz` (what the live `site`
+  manifest entry actually serves) were NOT resynced from the regenerated
+  `cad-source/handoff/` bundle, and manifest.ts's `targets[].
+  originOffsetMeters`/`rotationYawDeg` were NOT recomputed against the
+  new geometry. Both depend on the new ledge width and `v` convention and
+  need a coordinated recompute (same method as `docs/asset-authoring-
+  guide.md` §3.5 documents) before this reaches production — copying the
+  new glb in without updating those numbers would silently break the live
+  four-plaque experience, not fix it. Confirmed `public/assets/` is
+  currently untouched (byte-identical to before this session) so
+  production is unaffected for now.
+
 - **Phase 4 — Native iOS App Clip. (OPEN)**
   Goal: the iOS delivery path promised in §A — a native App Clip
   (Swift / SwiftUI / ARKit / RealityKit / Rive iOS runtime) that consumes

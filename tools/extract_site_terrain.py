@@ -70,22 +70,38 @@ PAD_FT = 150.0
 
 
 def derive_crop_rectangle(msp):
-    """Returns (origin_x, origin_y, angle_rad, width_ft, depth_ft, u_sign)
-    for the panel footprint, read from the 00 LASER CUT layer's 7 grid
-    lines (3 dividers spanning the depth, 4 spanning the width) rather
-    than assumed.
+    """Returns (origin_x, origin_y, angle_rad, width_ft, depth_ft, u_sign,
+    v_sign) for the panel footprint, read from the 00 LASER CUT layer's 7
+    grid lines (3 dividers spanning the depth, 4 spanning the width)
+    rather than assumed.
 
     Origin corner (2026-08-13): confirmed against the reference photo
     (RAMAPO SITE plaque corner) by cross-referencing the real building
     cluster position — the buildings hug the SAME v=0 edge the corner
     below sits on, at the OPPOSITE u end, matching the photo's bare-ridge
     gap on the RAMAPO SITE side vs. the building-covered far end of that
-    edge. `u_sign=-1.0` mirrors u only (v is untouched: the origin sits on
-    the same v=0 edge as the panel-grid's naturally-derived corner, so
-    every v value is identical either way — only which end of that edge is
-    u=0 changes). This can't be expressed as a single rotation `angle`
-    (u flips, v doesn't — a reflection, not a rotation), hence the
-    separate `u_sign` every `to_local_uv` call must multiply in."""
+    edge. `u_sign=-1.0` mirrors u only (v is untouched by the origin move
+    itself: the origin sits on the same v=0 edge as the panel-grid's
+    naturally-derived corner, so every v value is identical either way —
+    only which end of that edge is u=0 changes).
+
+    `v_sign=-1.0` (2026-08-18): a SECOND, independent mirror, not related
+    to the origin move above. Originally v was 0 at the front edge and
+    -depth_ft at the back — correct, but left-handed once combined with
+    u_sign's mirror (one axis flipped, not both), which is exactly why
+    Blender's standard top-view convention (right-handed: +X screen-right,
+    +Y screen-up) rendered front at the TOP with left still on the left —
+    a real, confusing-at-a-glance consequence, confirmed by direct
+    reasoning with the user rather than guessed. Flipping v as well makes
+    two mirrors, which compose into a proper rotation — right-handed again
+    — so Blender's top view now puts front at the BOTTOM (v=0, the
+    smallest value) and back at the TOP (v=+depth_ft, the largest), with
+    left/right and wide/narrow both unaffected, matching how a person
+    actually stands in front of the physical model. Neither `u_sign` nor
+    `v_sign` can be folded into `angle` (a rotation) since between them
+    they mirror only one axis at a time relative to the "natural" DXF
+    frame; two independent sign flags are the correct representation, not
+    a workaround."""
     lines = [e for e in msp if e.dxftype() == "LINE" and e.dxf.layer == CROP_LAYER]
     if not lines:
         raise RuntimeError(f"no LINE entities on layer {CROP_LAYER!r} — crop rectangle undetectable")
@@ -116,12 +132,12 @@ def derive_crop_rectangle(msp):
     # `best` is the panel-grid corner on the buildings' end of the v=0
     # edge; the RAMAPO SITE corner is the other end of that same edge.
     ox, oy = best[0] + width_ft * ux, best[1] + width_ft * uy
-    return ox, oy, angle, width_ft, depth_ft, -1.0
+    return ox, oy, angle, width_ft, depth_ft, -1.0, -1.0
 
 
-def to_local_uv(x, y, ox, oy, angle, u_sign=1.0):
+def to_local_uv(x, y, ox, oy, angle, u_sign=1.0, v_sign=1.0):
     ux, uy = u_sign * math.cos(angle), u_sign * math.sin(angle)
-    vx, vy = -math.sin(angle), math.cos(angle)
+    vx, vy = v_sign * -math.sin(angle), v_sign * math.cos(angle)
     dx, dy = x - ox, y - oy
     return dx * ux + dy * uy, dx * vx + dy * vy
 
@@ -161,10 +177,10 @@ def main():
     doc = ezdxf.readfile(str(DXF_PATH))
     msp = doc.modelspace()
 
-    ox, oy, angle, width_ft, depth_ft, u_sign = derive_crop_rectangle(msp)
+    ox, oy, angle, width_ft, depth_ft, u_sign, v_sign = derive_crop_rectangle(msp)
     print(f"crop origin (RAMAPO SITE plaque corner): ({ox:.3f}, {oy:.3f})  "
           f"v-axis reference bearing: {math.degrees(angle):.4f} deg  "
-          f"u_sign: {u_sign:+.0f}  size: {width_ft:.1f} x {depth_ft:.1f} ft")
+          f"u_sign: {u_sign:+.0f}  v_sign: {v_sign:+.0f}  size: {width_ft:.1f} x {depth_ft:.1f} ft")
 
     proxy = next(e for e in msp if e.dxftype() == "ACAD_PROXY_ENTITY" and e.dxf.layer == TOPO_LAYER)
     virtual = list(proxy.virtual_entities())
@@ -180,10 +196,10 @@ def main():
     pts_before = pts_after = 0
     for poly in all_polys:
         elev_ft = round(poly.vertices[0].dxf.location.z, 1)
-        uv_chain = [to_local_uv(v.dxf.location.x, v.dxf.location.y, ox, oy, angle, u_sign) for v in poly.vertices]
+        uv_chain = [to_local_uv(v.dxf.location.x, v.dxf.location.y, ox, oy, angle, u_sign, v_sign) for v in poly.vertices]
         in_padded = [
             (u, v) for u, v in uv_chain
-            if -PAD_FT <= u <= width_ft + PAD_FT and -depth_ft - PAD_FT <= v <= PAD_FT
+            if -PAD_FT <= u <= width_ft + PAD_FT and -PAD_FT <= v <= depth_ft + PAD_FT
         ]
         if len(in_padded) < 2:
             continue
@@ -214,7 +230,7 @@ def main():
     # convex-hull boundary.
     centroids_u = pts[tri.simplices, 0].mean(axis=1)
     centroids_v = pts[tri.simplices, 1].mean(axis=1)
-    keep = (centroids_u >= 0) & (centroids_u <= width_ft) & (centroids_v >= -depth_ft) & (centroids_v <= 0)
+    keep = (centroids_u >= 0) & (centroids_u <= width_ft) & (centroids_v >= 0) & (centroids_v <= depth_ft)
     kept_tris = tri.simplices[keep]
     print(f"kept {len(kept_tris)} of {len(tri.simplices)} triangles inside the exact crop rectangle")
 
@@ -235,8 +251,10 @@ def main():
         "crop_origin_dwg": [ox, oy],
         "crop_origin_note": "RAMAPO SITE plaque corner (confirmed against reference photo 2026-08-13)",
         "crop_bearing_deg": math.degrees(angle),
-        "crop_bearing_note": "v-axis reference angle, NOT the true +u bearing — see u_sign",
+        "crop_bearing_note": "v-axis reference angle, NOT the true +u/+v bearing — see u_sign/v_sign",
         "crop_u_sign": u_sign,
+        "crop_v_sign": v_sign,
+        "crop_v_note": "v=0 at FRONT edge, v=+depth_ft at BACK edge (flipped 2026-08-18 for a right-handed, intuitive frame)",
         "crop_size_ft": [width_ft, depth_ft],
         "min_elevation_ft": float(min_elev),
         "max_elevation_ft": float(max_elev),
