@@ -1476,6 +1476,62 @@ schema above.
   currently untouched (byte-identical to before this session) so
   production is unaffected for now.
 
+  **Progress (2026-08-18, later same day): the flagged production sync
+  above is done, and the plaques themselves were redesigned.** Real
+  ledge/baseboard measurements landed this session (§ above); separately,
+  the user asked for a "make sure everything works on the live `'site'`
+  entry" pass, plus a plaque redesign (elongated 90×30mm landscape, QR
+  left / instructional text right per a reference design, since the real
+  35mm ledge is narrower than the old 50mm square). Both landed together:
+
+  - New artwork: `tools/build_site_plaques.py` rewritten — 90×30mm, badge
+    column (not corner marks) for the 4 distinguishing shapes
+    (triangle/circle/diamond/square), resolution raised to 24px/mm
+    (~610dpi) specifically because `@8thwall/image-target-cli` enforces a
+    hard 640px minimum per dimension and the old density fell just short
+    at the new 30mm height.
+  - New tool: `tools/compile_8thwall_target.mjs`, wrapping
+    `@8thwall/image-target-cli`'s internal `applyCrop` (no non-interactive
+    CLI mode exists) with an explicit full-image, non-lossy crop —
+    the library's own default crop forces a 3:4/4:3 ratio and would have
+    silently discarded part of the new landscape artwork (confirmed: the
+    *old* square plaques already lost ~25% of the image to this exact
+    default, unnoticed until this investigation). Vendored in
+    `tools/vendor/image-target-cli/` (isolated `npm install`, not a root
+    `package.json` dependency) — the root project has a pre-existing,
+    unrelated peer-dependency conflict (rolldown vs. rolldown-plugin-dts)
+    that breaks `npm install` for any new package even with
+    `--legacy-peer-deps`; vendoring sidesteps it rather than fixing it.
+  - All 4 plaques recompiled in both formats: `public/assets/image-targets/
+    site-{front,back,left,right}/` (8th Wall) and `public/assets/
+    site-{front,back,left,right}-target.mind` (MindAR).
+  - `tools/build_site_buildings.py`'s plaque geometry updated to match
+    (`PLAQUE_LENGTH_M`/`PLAQUE_DEPTH_M` replace the old single
+    `PLAQUE_SIZE_M`, oriented per side — length along whichever edge the
+    plaque mounts on).
+  - `public/assets/site-scene.glb`/`.usdz` resynced from the regenerated
+    `cad-source/handoff/` bundle (closing the gap flagged above).
+  - `manifest.ts`'s `'site'` entry `targets[].originOffsetMeters` and
+    `physicalTargetWidthMeters` (0.05 → 0.09) recomputed against the new
+    geometry — `rotationYawDeg` re-verified from scratch (not assumed
+    unchanged, given the same-day `v`-axis flip) and confirmed still
+    0°/180°/90°/−90°. Position numbers cross-checked directly against the
+    exported GLB's own binary vertex data, not just the generating
+    script's formulas. The single-plaque MindAR harness entries
+    (`site-front`/etc.) got the same `physicalTargetWidthMeters` update.
+
+  **Verified:** `npm run typecheck`/`build`/`test` clean (16/16, unchanged
+  — this pass touches manifest data and asset files, not the
+  composition/test code). `public/assets/site-scene.glb` MD5-matches the
+  regenerated `cad-source/handoff/` copy. Each compiled 8th-Wall
+  image-target JSON's `properties.width/height` matches the full source
+  artwork dimensions exactly (2160×720, `isRotated: false`) — confirms
+  nothing was cropped away.
+  **Not verifiable in software:** whether the new artwork/dimensions
+  actually track well on real hardware — this pass makes the production
+  entry internally consistent again, it doesn't add new on-device
+  evidence beyond what §G's existing open items already track.
+
 - **Phase 4 — Native iOS App Clip. (OPEN)**
   Goal: the iOS delivery path promised in §A — a native App Clip
   (Swift / SwiftUI / ARKit / RealityKit / Rive iOS runtime) that consumes

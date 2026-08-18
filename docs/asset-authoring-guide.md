@@ -243,7 +243,9 @@ walkthrough.
 
 Recorded 2026-08-14 alongside wiring the 4 real site-plaque targets
 (`site-front`/`site-back`/`site-left`/`site-right`, AR_SYSTEM.md §G Phase
-3). Everything below is either a real, currently-printed value or is
+3); **redesigned 2026-08-18** once the real ledge width (3.5cm) made the
+original 50mm square plaque impossible to mount without overhanging.
+Everything below is either a real, currently-printed value or is
 explicitly marked placeholder — nothing here is rounded or invented; where
 a number derives from model data or a script constant, that source is
 named so it can be re-derived if the source changes.
@@ -252,32 +254,32 @@ named so it can be re-derived if the source changes.
 
 | Property | Value | Source |
 |---|---|---|
-| Plaque size | 50 × 50 mm | `SIZE_MM` — real, matches what's printed |
-| Artwork resolution | 1024 × 1024 px (≈520 dpi at 50mm) | `SIZE_PX` |
+| Plaque size | 90 × 30 mm (landscape) | `PLAQUE_WIDTH_MM`/`PLAQUE_HEIGHT_MM` — real, matches what's printed. 30mm leaves a deliberate 5mm margin within the real 3.5cm ledge, not just "smaller than it" |
+| Artwork resolution | 2160 × 720 px (24px/mm, ≈610dpi) | `PX_PER_MM` — raised from the previous design's 20.48px/mm specifically because `@8thwall/image-target-cli` enforces a hard 640px minimum per dimension; 30mm at the old density (614px) failed outright |
 | QR payload | `https://ar-ramapo.onrender.com` (same URL, all 4 — §A: identity is resolved by tracking, never the QR payload) | `AR_EXPERIENCE_URL` |
-| `physicalTargetWidthMeters` | 0.05 | matches plaque size exactly (manifest.ts `site-*` entries) |
+| `physicalTargetWidthMeters` | 0.09 | matches the plaque's WIDTH (long axis) exactly (manifest.ts `site-*` and `'site'` entries) |
 
-**QR position within each 50mm plaque** (identical layout on all 4 —
-computed from `tools/build_site_plaques.py`'s own `mm()`/QR-placement
-math, not measured by hand):
+**Layout within each 90×30mm plaque** (identical on all 4 except the
+badge — computed from `tools/build_site_plaques.py`'s own `mm()`
+placement math, not measured by hand; matches a reference design the
+user supplied, QR left / instructional text right):
 
-| Measurement | Value |
+| Element | Position |
 |---|---:|
-| QR size (incl. quiet-zone border) | 30.71 mm (629 px) |
-| From left edge | 9.62 mm |
-| From right edge | 9.67 mm |
-| From top edge | 8.98 mm |
-| From bottom edge | 10.30 mm |
-| QR center from left edge | 24.98 mm |
-| QR center from top edge | 24.34 mm |
+| QR size (incl. quiet-zone border) | 23.33 mm, left-aligned 2.5mm from the left edge, vertically centered |
+| "Scan me" / "Hold the camera to the image" text | starts ~4mm right of the QR block |
+| Distinguishing badge (shape) | fixed column, centered 6mm from the right edge |
+| Side label (e.g. "FRONT") | directly below the badge, same column |
 
-(Left/right and top/bottom aren't perfectly symmetric — the QR module
-count doesn't divide the plaque evenly at this scale/error-correction
-level; both are correct as computed, not a rounding artifact.) Each
-side's distinguishing corner mark (triangle/circle/diamond, one shape per
-corner) is a 9mm bounding box inset from its corner — see
-`draw_corner_shape()`/`corner_origin()` in the same script if you need its
-exact placement too.
+The distinguishing badge is now a fixed-position column (not an actual
+corner of the artwork, unlike the previous design) — since the plaque's
+own 3:1 landscape aspect ratio already makes a 90°-rotated mounting
+mistake obvious to a human installer (a wide sign turned sideways looks
+wrong at a glance), the badge's job is purely tracking-distinctness
+between the 4 designs and installer verification, not rotation-proofing.
+Shape per side: front=triangle, back=circle, left=diamond, right=square
+— see `SIDES`/`draw_badge_shape()` in `tools/build_site_plaques.py` if
+you need the exact geometry.
 
 **The digital-twin model** (`cad-source/handoff/site_terrain.json` /
 `site_buildings.json`, real DWG-derived data — not placeholder):
@@ -291,40 +293,46 @@ Terrain relief (0–152.4mm) is true-scale, no vertical exaggeration —
 converted directly from the source DWG's real elevation range (450–930 ft)
 by the same `ft_to_model_m` factor as the horizontal footprint.
 
-**PLACEHOLDER, not yet measured** (`tools/build_site_buildings.py`'s
-`LEDGE_WIDTH_M`, `cad-source/handoff/README.md`'s "Known open item"): the
-mounting ledge around the terrain is currently authored at a 3-inch
-(76.2mm) *guess*, giving a placeholder total footprint (terrain + ledge on
-all 4 sides) of **1758.95 × 1495.43 mm**. This number moves once the real
-ledge width lands — swap `LEDGE_WIDTH_M` and re-run
-`tools/export_handoff_bundle.py`.
+**Ledge width — REAL, measured 2026-08-18** (was a 3in/76.2mm guess
+before): `tools/build_site_buildings.py`'s `LEDGE_WIDTH_M` is now 3.5cm,
+confirmed uniform on all 4 sides. The full baseboard is ALSO a real
+measurement now, not derived from the ledge width —
+`BASEBOARD_WIDTH_M`/`BASEBOARD_DEPTH_M` = **1675 × 1414 mm** — the two
+were cross-checked against each other and agree to within ~1.5mm, well
+inside manual-measurement tolerance. `site_ledge` in the Blender scene is
+now a single full-rectangle mesh at this real size (previously a 4-strip
+border ring at the guessed width).
 
 **Plaque position on the model — derived from `site-scene.glb`, not
-independently measured; the one placeholder INPUT upstream of these
-otherwise-real numbers is the ledge guess above (2026-08-14: implemented
-as `manifest.ts`'s `'site'` entry `targets[].originOffsetMeters`, not
-just documented — AR_SYSTEM.md §G has the full derivation and the
-software verification).** Each plaque's mesh-bounds center in
-`site-scene.glb`, relative to `AR_World_Origin`, in glTF X/Z (Blender
-authors Y-up→export flips Y to −Z, §F — this is why "north" reads as a
-negative Z for `front`, not a sign error):
+independently measured. Recomputed 2026-08-18** against the real ledge
+width above and the new 90×30mm plaque geometry (previously derived
+against the 76.2mm guess and the old 50mm square — both stale numbers
+this recompute replaces). Implemented in `manifest.ts`'s `'site'` entry
+`targets[].originOffsetMeters` — AR_SYSTEM.md §G has the full derivation
+history. Each plaque's mesh-bounds center in `site-scene.glb`, relative
+to `AR_World_Origin`, in glTF X/Z (Blender authors Y-up→export flips Y to
+−Z, §F), cross-checked directly against the GLB's own binary vertex data,
+not just the generating script's formulas:
 
 | Plaque | X from origin | Z from origin |
 |---|---:|---:|
-| front | 803.275 mm | −38.100 mm |
-| back | 803.275 mm | 1381.125 mm |
-| left | −38.100 mm | 671.512 mm |
-| right | 1644.650 mm | 671.512 mm |
+| front | 803.275 mm | 20.488 mm |
+| back | 803.275 mm | −1363.513 mm |
+| left | −19.225 mm | −671.513 mm |
+| right | 1625.775 mm | −671.513 mm |
 
 **Plaque mounting rotation (`rotationYawDeg`) — derived, not measured or
 invented, 2026-08-14, implemented in the same manifest entry.** Computed
 from which edge of the terrain rectangle each plaque sits on (real,
-authored geometry: `front`/`back` occupy the strips at Y≈0/Y≈−depth in
-`build_site_buildings.py`'s `strips` dict, i.e. the min/max-Z edges after
-export; `left`/`right` the min/max-X edges) — the angle between each
-plaque's outward edge-normal and `front`'s own (defined as the 0°
-reference, matching the already-shipped single-plaque `site-front` entry
-so the two stay consistent):
+authored geometry — `front`/`back` occupy the strips at the min/max-Z
+edges after export; `left`/`right` the min/max-X edges) — the angle
+between each plaque's outward edge-normal and `front`'s own (defined as
+the 0° reference, matching the already-shipped single-plaque `site-front`
+entry so the two stay consistent). **Re-verified 2026-08-18** against the
+new geometry rather than assumed to still hold (the terrain's `v`-axis
+sign flipped the same day, which changes individual edge-normal
+components even though the values below turn out unchanged — recomputed
+from scratch, not carried over on faith):
 
 | Plaque | rotationYawDeg |
 |---|---:|

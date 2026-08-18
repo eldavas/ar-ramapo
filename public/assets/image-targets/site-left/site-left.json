@@ -4,13 +4,13 @@
   "name": "site-left",
   "type": "PLANAR",
   "properties": {
-    "left": 128,
     "top": 0,
-    "width": 768,
-    "height": 1024,
-    "isRotated": true,
-    "originalWidth": 1024,
-    "originalHeight": 1024
+    "left": 0,
+    "width": 2160,
+    "height": 720,
+    "isRotated": false,
+    "originalWidth": 2160,
+    "originalHeight": 720
   },
   "resources": {
     "originalImage": "site-left_original.png",
@@ -18,6 +18,6 @@
     "thumbnailImage": "site-left_thumbnail.png",
     "luminanceImage": "site-left_luminance.png"
   },
-  "created": 1786733728129,
-  "updated": 1786733728129
+  "created": 1787080362336,
+  "updated": 1787080362336
 }

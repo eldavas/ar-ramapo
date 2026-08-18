@@ -2,14 +2,14 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>site-plaque print sheet (PLACEHOLDER)</title>
+<title>site-plaque print sheet</title>
 <style>
   @page { margin: 12mm; }
   body { font: 11pt/1.5 system-ui, sans-serif; color: #111; margin: 0; }
   h1 { font-size: 14pt; }
-  .grid { display: grid; grid-template-columns: repeat(2, 58mm); gap: 8mm; margin-top: 8mm; }
-  .plaque { position: relative; width: 50mm; height: 50mm; }
-  .plaque img { width: 50mm; height: 50mm; display: block; }
+  .grid { display: grid; grid-template-columns: repeat(1, 98mm); gap: 10mm; margin-top: 8mm; }
+  .plaque { position: relative; width: 90mm; height: 30mm; }
+  .plaque img { width: 90mm; height: 30mm; display: block; }
   .tag { position: absolute; bottom: -6mm; left: 0; font-size: 8pt; font-weight: bold; }
   .crop { position: absolute; width: 6mm; height: 6mm; }
   .crop i { position: absolute; background: #000; }
@@ -24,16 +24,17 @@
               #000 0, #000 0.25mm, transparent 0.25mm, transparent 10mm); }
   .ruler-label { font-size: 9pt; margin-top: 1mm; }
   ol { max-width: 150mm; }
-  .warn { color: #900; font-weight: bold; }
 </style>
 </head>
 <body>
-<h1>Site-model QR plaques — 4 × 50mm — <span class="warn">PLACEHOLDER</span></h1>
+<h1>Site-model QR plaques — 4 × 90mm × 30mm</h1>
 <ol>
-  <li class="warn">Placeholder artwork/size — not for physical fabrication. Real plaque
-      size and content are still pending (see AR_SYSTEM.md §A/§G).</li>
-  <li>If printing anyway for a mockup: <strong>100% scale / "Actual Size"</strong>, never "Fit to page".</li>
-  <li>Calibration bar below should measure exactly 100mm with a ruler.</li>
+  <li>Print at <strong>100% scale / "Actual Size"</strong> — never "Fit to page".</li>
+  <li>Verify the calibration bar below measures exactly 100mm with a ruler
+      before trusting anything else on this page.</li>
+  <li>Mount flat, artwork facing up, rotated so it reads right-side-up
+      standing at that edge facing into the model (§2 of
+      docs/physical-plaque-placement.md).</li>
 </ol>
 <div class="grid">
 <div class="plaque">
@@ -41,7 +42,7 @@
   <span class="crop tr"><i class="h"></i><i class="v"></i></span>
   <span class="crop bl"><i class="h"></i><i class="v"></i></span>
   <span class="crop br"><i class="h"></i><i class="v"></i></span>
-  <img src="plaque-front.png" alt="front plaque artwork (placeholder)">
+  <img src="plaque-front.png" alt="front plaque artwork">
   <div class="tag">FRONT</div>
 </div>
 <div class="plaque">
@@ -49,7 +50,7 @@
   <span class="crop tr"><i class="h"></i><i class="v"></i></span>
   <span class="crop bl"><i class="h"></i><i class="v"></i></span>
   <span class="crop br"><i class="h"></i><i class="v"></i></span>
-  <img src="plaque-back.png" alt="back plaque artwork (placeholder)">
+  <img src="plaque-back.png" alt="back plaque artwork">
   <div class="tag">BACK</div>
 </div>
 <div class="plaque">
@@ -57,7 +58,7 @@
   <span class="crop tr"><i class="h"></i><i class="v"></i></span>
   <span class="crop bl"><i class="h"></i><i class="v"></i></span>
   <span class="crop br"><i class="h"></i><i class="v"></i></span>
-  <img src="plaque-left.png" alt="left plaque artwork (placeholder)">
+  <img src="plaque-left.png" alt="left plaque artwork">
   <div class="tag">LEFT</div>
 </div>
 <div class="plaque">
@@ -65,7 +66,7 @@
   <span class="crop tr"><i class="h"></i><i class="v"></i></span>
   <span class="crop bl"><i class="h"></i><i class="v"></i></span>
   <span class="crop br"><i class="h"></i><i class="v"></i></span>
-  <img src="plaque-right.png" alt="right plaque artwork (placeholder)">
+  <img src="plaque-right.png" alt="right plaque artwork">
   <div class="tag">RIGHT</div>
 </div>
 </div>

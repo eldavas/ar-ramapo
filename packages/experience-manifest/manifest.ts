@@ -288,11 +288,14 @@ export const experienceManifest: ExperienceManifest[] = [
     mindTargetUrl: '/assets/site-front-target.mind',
     trackingImageUrl: '/assets/site-front-plaque.png',
     contentUrl: 'https://docs.google.com/spreadsheets/d/1O4Zq8ggc7TgjKZIuUtufO-G9hJiK2KalJpD2Cux2sN8/gviz/tq?tqx=out:json',
-    // Matches the printed plaque's real, fabricated size — tools/build_site_plaques.py's
-    // SIZE_MM constant. Unlike the ledge width/plaque position, this
-    // dimension isn't a guess: it's simply what the plaques are printed
-    // at (tools/plaque/site/print-sheet.html), 1024px/50mm ≈ 520dpi.
-    physicalTargetWidthMeters: 0.05,
+    // Matches the printed plaque's real, fabricated WIDTH (the long axis)
+    // — tools/build_site_plaques.py's PLAQUE_WIDTH_MM constant. Not a
+    // guess: it's simply what the plaques are printed at (tools/plaque/
+    // site/print-sheet.html). 2026-08-18: redesigned from a 50mm square
+    // to a 90x30mm landscape layout (real ledge is 3.5cm, a square this
+    // large no longer fit) — this is the 90mm width, not the 30mm height;
+    // MindAR's own convention scales by the source image's width.
+    physicalTargetWidthMeters: 0.09,
     version: '0.1.0',
   },
   {
@@ -303,7 +306,7 @@ export const experienceManifest: ExperienceManifest[] = [
     mindTargetUrl: '/assets/site-back-target.mind',
     trackingImageUrl: '/assets/site-back-plaque.png',
     contentUrl: 'https://docs.google.com/spreadsheets/d/1O4Zq8ggc7TgjKZIuUtufO-G9hJiK2KalJpD2Cux2sN8/gviz/tq?tqx=out:json',
-    physicalTargetWidthMeters: 0.05,
+    physicalTargetWidthMeters: 0.09,
     version: '0.1.0',
   },
   {
@@ -314,7 +317,7 @@ export const experienceManifest: ExperienceManifest[] = [
     mindTargetUrl: '/assets/site-left-target.mind',
     trackingImageUrl: '/assets/site-left-plaque.png',
     contentUrl: 'https://docs.google.com/spreadsheets/d/1O4Zq8ggc7TgjKZIuUtufO-G9hJiK2KalJpD2Cux2sN8/gviz/tq?tqx=out:json',
-    physicalTargetWidthMeters: 0.05,
+    physicalTargetWidthMeters: 0.09,
     version: '0.1.0',
   },
   {
@@ -325,7 +328,7 @@ export const experienceManifest: ExperienceManifest[] = [
     mindTargetUrl: '/assets/site-right-target.mind',
     trackingImageUrl: '/assets/site-right-plaque.png',
     contentUrl: 'https://docs.google.com/spreadsheets/d/1O4Zq8ggc7TgjKZIuUtufO-G9hJiK2KalJpD2Cux2sN8/gviz/tq?tqx=out:json',
-    physicalTargetWidthMeters: 0.05,
+    physicalTargetWidthMeters: 0.09,
     version: '0.1.0',
   },
   // ---------------------------------------------------------------------
@@ -340,14 +343,24 @@ export const experienceManifest: ExperienceManifest[] = [
   // invented — see AR_SYSTEM.md §G for the full derivation and the exact
   // Blender/script objects each number traces back to. Short version:
   // offsets come straight from site-scene.glb's own plaque_{side} mesh
-  // bounds (which trace to tools/build_site_buildings.py's plaque_centers
+  // bounds (which trace to tools/build_site_buildings.py's plaque_specs
   // dict); rotations come from which edge of the terrain rectangle each
   // plaque sits on (also real, authored geometry), relative to
-  // 'site-front' above as the 0° reference. The one placeholder INPUT
-  // upstream of these DERIVED numbers is LEDGE_WIDTH_M (a fabricator-
-  // unconfirmed guess, cad-source/handoff/README.md's "Known open item")
-  // — these offsets move if that constant changes and the scene is
-  // re-exported, same as everything else downstream of it already does.
+  // 'site-front' above as the 0° reference.
+  //
+  // RECOMPUTED 2026-08-18 (both LEDGE_WIDTH_M and BASEBOARD_WIDTH_M/DEPTH_M
+  // are now real measurements, not guesses — see the digital-twin sourcing
+  // project notes — and the plaques themselves were redesigned from a 50mm
+  // square to a 90x30mm landscape layout, hence physicalTargetWidthMeters
+  // 0.05 -> 0.09 too). rotationYawDeg is unchanged (0/180/90/-90): it only
+  // depends on which edge each plaque sits on, not on ledge width or
+  // plaque size, and was re-verified against the new geometry, not assumed
+  // to still hold. originOffsetMeters values below are re-derived the same
+  // way as before — mesh-bounds center of each plaque_{side} object in the
+  // regenerated site-scene.glb, cross-checked directly against the GLB's
+  // own binary vertex data (not just the generating script's formulas) —
+  // and will move again if LEDGE_WIDTH_M or the plaque size changes and
+  // the scene is re-exported, same as before.
   {
     targetId: 'site',
     riveUrl: '/assets/bench-ui.riv',
@@ -358,26 +371,26 @@ export const experienceManifest: ExperienceManifest[] = [
     targets: [
       {
         imageTargetUrl: '/assets/image-targets/site-front/site-front.json',
-        physicalTargetWidthMeters: 0.05,
-        originOffsetMeters: { x: 0.803275, z: -0.0381 },
+        physicalTargetWidthMeters: 0.09,
+        originOffsetMeters: { x: 0.803275, z: 0.020488 },
         rotationYawDeg: 0,
       },
       {
         imageTargetUrl: '/assets/image-targets/site-back/site-back.json',
-        physicalTargetWidthMeters: 0.05,
-        originOffsetMeters: { x: 0.803275, z: 1.381125 },
+        physicalTargetWidthMeters: 0.09,
+        originOffsetMeters: { x: 0.803275, z: -1.363513 },
         rotationYawDeg: 180,
       },
       {
         imageTargetUrl: '/assets/image-targets/site-left/site-left.json',
-        physicalTargetWidthMeters: 0.05,
-        originOffsetMeters: { x: -0.0381, z: 0.671512 },
+        physicalTargetWidthMeters: 0.09,
+        originOffsetMeters: { x: -0.019225, z: -0.671513 },
         rotationYawDeg: 90,
       },
       {
         imageTargetUrl: '/assets/image-targets/site-right/site-right.json',
-        physicalTargetWidthMeters: 0.05,
-        originOffsetMeters: { x: 1.64465, z: 0.671512 },
+        physicalTargetWidthMeters: 0.09,
+        originOffsetMeters: { x: 1.625775, z: -0.671513 },
         rotationYawDeg: -90,
       },
     ],

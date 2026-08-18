@@ -163,7 +163,12 @@ LEDGE_THICKNESS_M = 0.01       # visual thickness only; top face sits flush with
 BASEBOARD_WIDTH_M = 1.675       # 167.5cm
 BASEBOARD_DEPTH_M = 1.414       # 141.4cm
 
-PLAQUE_SIZE_M = 0.05           # reuses build_bench_scene.py's bench-test 50mm plaque convention
+# Real printed size (2026-08-18) -- tools/build_site_plaques.py's
+# PLAQUE_WIDTH_MM/PLAQUE_HEIGHT_MM, no longer a placeholder. LENGTH runs
+# along whichever edge the plaque mounts on; DEPTH is the short axis,
+# perpendicular to that edge (crossing the 3.5cm ledge).
+PLAQUE_LENGTH_M = 0.090
+PLAQUE_DEPTH_M = 0.030
 PLAQUE_THICKNESS_M = 0.002     # matches build_bench_scene.py's PLAQUE_THICKNESS
 
 LEDGE_COLOR = (0.78, 0.71, 0.58, 1.0)              # lighter than terrain — visually distinct band
@@ -390,26 +395,30 @@ def build_ledge_and_plaques(terrain_data: dict) -> tuple:
     link(ledge)
 
     # One QR-plaque placeholder per side, flush with the TRUE baseboard
-    # edge (2026-08-18 fix): PLAQUE_SIZE_M (5cm) is larger than the real
-    # ledge width (3.5cm), so centering a plaque on the ledge's midpoint
-    # — the previous approach — overhangs both the outer board edge and
-    # the terrain by the same amount. Flush-with-edge means the plaque's
-    # outer half sits exactly at the board boundary and the inner half
-    # extends onto the ledge/terrain, so nothing hangs off the board.
+    # edge, real printed dimensions (2026-08-18): the plaque is no longer
+    # square, so orientation matters -- PLAQUE_LENGTH_M (90mm) runs ALONG
+    # whichever edge it mounts on, PLAQUE_DEPTH_M (30mm) is the short
+    # axis crossing the ledge, perpendicular to that edge. Flush-with-edge
+    # (unchanged principle from the square-plaque fix): the plaque's outer
+    # half sits exactly at the board boundary, using PLAQUE_DEPTH_M (the
+    # perpendicular dimension) for the offset regardless of which side,
+    # since that's always the axis crossing the board edge.
     half_w, half_d = BASEBOARD_WIDTH_M / 2.0, BASEBOARD_DEPTH_M / 2.0
-    half_p = PLAQUE_SIZE_M / 2.0
+    half_pd = PLAQUE_DEPTH_M / 2.0
     plaque_group = make_empty("Plaques")
-    plaque_centers = {
-        "front": (board_cx, (board_cy - half_d) + half_p),
-        "back": (board_cx, (board_cy + half_d) - half_p),
-        "left": ((board_cx - half_w) + half_p, board_cy),
-        "right": ((board_cx + half_w) - half_p, board_cy),
+    # side -> (center_u, center_v, size_u, size_v) -- front/back run their
+    # long axis along u (the width-direction edge); left/right along v.
+    plaque_specs = {
+        "front": (board_cx, (board_cy - half_d) + half_pd, PLAQUE_LENGTH_M, PLAQUE_DEPTH_M),
+        "back": (board_cx, (board_cy + half_d) - half_pd, PLAQUE_LENGTH_M, PLAQUE_DEPTH_M),
+        "left": ((board_cx - half_w) + half_pd, board_cy, PLAQUE_DEPTH_M, PLAQUE_LENGTH_M),
+        "right": ((board_cx + half_w) - half_pd, board_cy, PLAQUE_DEPTH_M, PLAQUE_LENGTH_M),
     }
     plaques = []
-    for side, (cx, cy) in plaque_centers.items():
+    for side, (cx, cy, size_u, size_v) in plaque_specs.items():
         pbm = bmesh.new()
         bmesh.ops.create_cube(pbm, size=1.0)
-        bmesh.ops.scale(pbm, vec=(PLAQUE_SIZE_M, PLAQUE_SIZE_M, PLAQUE_THICKNESS_M), verts=pbm.verts)
+        bmesh.ops.scale(pbm, vec=(size_u, size_v, PLAQUE_THICKNESS_M), verts=pbm.verts)
         bmesh.ops.translate(
             pbm, vec=(cx, cy, LEDGE_THICKNESS_M + PLAQUE_THICKNESS_M / 2.0), verts=pbm.verts
         )

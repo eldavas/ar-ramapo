@@ -26,31 +26,37 @@ trusting the plaque size).
 
 | Property | Value |
 |---|---:|
-| Plaque size (each) | 50 × 50 mm |
-| Artwork resolution | 1024 × 1024 px (~520 dpi at 50mm) |
+| Plaque size (each) | 90 × 30 mm (landscape) |
+| Artwork resolution | 2160 × 720 px (24px/mm, ~610 dpi) |
 | QR payload (all 4, identical) | `https://ar-ramapo.onrender.com` |
+
+**Redesigned 2026-08-18** from the original 50×50mm square: the real
+measured ledge (3.5cm) turned out narrower than that square, which
+overhung both the outer board edge and the terrain when mounted. 30mm
+leaves a deliberate 5mm margin within the ledge; the 90mm length runs
+*along* whichever edge the plaque mounts on (§2).
 
 All 4 plaques decode to the **same URL** — which physical side you scan is
 resolved entirely by image recognition at runtime (§A), never by the QR
 payload. This is why the 4 designs must stay visually distinct from each
-other (different corner mark shape **and** different corner per side, not
-the same mark rotated) — see `tools/build_site_plaques.py`'s own doc
-comment for the full reasoning.
+other (a different badge shape per side — see below) — see
+`tools/build_site_plaques.py`'s own doc comment for the full reasoning.
 
-**QR position within each 50mm plaque** (identical layout on all 4):
+**Layout within each 90×30mm plaque** (QR left, "Scan me" instructional
+text right, matching a reference design; identical on all 4 except the
+badge):
 
-| Measurement | Value |
+| Element | Position |
 |---|---:|
-| QR size (incl. quiet-zone border) | 30.71 mm |
-| From left edge | 9.62 mm |
-| From right edge | 9.67 mm |
-| From top edge | 8.98 mm |
-| From bottom edge | 10.30 mm |
+| QR size (incl. quiet-zone border) | 23.33 mm, left-aligned 2.5mm from the left edge, vertically centered |
+| Distinguishing badge (shape) | fixed column, centered 6mm from the right edge, with a small side label ("FRONT" etc.) below it |
 
-(Left/right and top/bottom aren't perfectly symmetric — the QR module
-count doesn't divide 50mm evenly at this error-correction level; both are
-correct as computed by `tools/build_site_plaques.py`, not a rounding
-artifact.)
+The badge sits in a fixed position (not an actual corner of the artwork,
+unlike the previous design) — the plaque's own 3:1 landscape shape
+already makes a 90°-rotated mounting mistake obvious to a human installer
+at a glance, so the badge's job is tracking-distinctness between the 4
+designs and installer verification, not rotation-proofing. Shape per
+side: front=triangle, back=circle, left=diamond, right=square.
 
 ---
 
@@ -77,25 +83,36 @@ down at the model from above, with FRONT facing you:
 - **X** increases toward the RIGHT edge (0 → 1606.55mm).
 - **Z** increases toward the BACK edge (0 → 1343.03mm).
 - The ledge is a uniform-width border running around all 4 sides,
-  outside the terrain footprint (confirmed uniform on all sides; the
-  width itself is still placeholder — §4).
+  outside the terrain footprint — **width confirmed 2026-08-18: 3.5cm,
+  real measurement, uniform on all 4 sides, no longer placeholder** (§4).
+  The full baseboard (terrain + ledge on all sides) is 1675 × 1414 mm,
+  also a real measurement now, not derived from the ledge width — the two
+  independently agree to within ~1.5mm.
 
 **Plaque centers**, measured from the origin corner, along the model's own
 X/Z axes (i.e. "X mm from the left edge, Z mm from the front edge" —
-these are the exact values `manifest.ts`'s `'site'` entry uses):
+these are the exact values `manifest.ts`'s `'site'` entry uses).
+**Recomputed 2026-08-18** against the real ledge width and the new 90×30mm
+plaque size (the table below replaces the earlier one, derived against
+the 76.2mm guess and the old 50mm square):
 
 | Side | X from origin | Z from origin | Sits on |
 |---|---:|---:|---|
-| front | 803.275 mm | −38.100 mm | front ledge strip, centered along its length |
-| back | 803.275 mm | 1381.125 mm | back ledge strip, centered along its length |
-| left | −38.100 mm | 671.512 mm | left ledge strip, centered along its length |
-| right | 1644.650 mm | 671.512 mm | right ledge strip, centered along its length |
+| front | 803.275 mm | 20.488 mm | front ledge strip, flush with the outer board edge, centered along its length |
+| back | 803.275 mm | −1363.513 mm | back ledge strip, flush with the outer board edge, centered along its length |
+| left | −19.225 mm | −671.513 mm | left ledge strip, flush with the outer board edge, centered along its length |
+| right | 1625.775 mm | −671.513 mm | right ledge strip, flush with the outer board edge, centered along its length |
 
-Each plaque's center sits **outside the terrain footprint**, at the
-midpoint of its own ledge strip (negative X/Z or beyond the footprint
-means "past that edge, into the ledge"). front/back are centered along
-the model's X-width (803.275mm ≈ half of 1606.55mm); left/right are
-centered along its Z-depth (671.512mm ≈ half of 1343.03mm).
+Each plaque's center sits **outside the terrain footprint**, flush with
+the true outer edge of the baseboard (its outer half at the board
+boundary, inner half extending onto the ledge — the plaque, 30mm across
+its short axis, is smaller than the 35mm ledge, so it no longer overhangs
+either the board edge or the terrain the way the old 50mm square did).
+front/back are centered along the model's X-width (803.275mm ≈ half of
+1606.55mm); left/right are centered along its Z-depth (671.513mm ≈ half
+of 1343.03mm, sign flipped from the pre-2026-08-18 table because the
+model's own `v`-axis convention was corrected that same day — see
+AR_SYSTEM.md §G).
 
 **Mounting tilt (corrected 2026-08-17, coworker physical review):** each
 plaque lies **flat** on its ledge strip, artwork facing **up** (toward
@@ -147,12 +164,11 @@ mounting instruction, not a software one.
 5. Mount each plaque flat at its marked point, artwork facing up, rotated
    so its text reads right-side-up standing at that edge and facing into
    the model — i.e. "up" points at the terrain center (§2).
-6. Confirm each plaque's own corner-mark shape matches
+6. Confirm each plaque's own badge shape matches
    `tools/build_site_plaques.py`'s `SIDES` mapping for that position
-   (front=triangle, back/left/right each have their own distinct
-   shape/corner — open the script if you need to double check which is
-   which; don't rely on memory here, a mismatch would make 2 plaques
-   scan-ambiguous).
+   (front=triangle, back=circle, left=diamond, right=square — open the
+   script if you need to double check which is which; don't rely on
+   memory here, a mismatch would make 2 plaques scan-ambiguous).
 7. Test each plaque independently before considering the model "ready" —
    see §6.
 
@@ -164,17 +180,22 @@ as final
 | Value | Status |
 |---|---|
 | Terrain footprint (1606.55 × 1343.03 mm) | **Real**, DWG-derived |
-| Plaque size (50 × 50 mm) | Currently what's printed and what the manifest declares (`physicalTargetWidthMeters: 0.05`) — but `tools/build_site_plaques.py`'s own doc comment calls this "not a real production plaque-size decision," only a placeholder carried over from the bench-test convention. If a final size is chosen later, it's a coordinated change across the printed artwork, `physicalTargetWidthMeters` in the manifest, and `SIZE_MM` in that script — not just a print-time decision. |
-| Ledge width (76.2 mm / 3 in) | **Placeholder** — `LEDGE_WIDTH_M` in `tools/build_site_buildings.py`, an explicit guess from a reference photo, not a measurement. The ledge running uniformly on all 4 sides IS confirmed; the exact width is not. |
-| Plaque center positions (§2's table) | **Derived**, not independently measured — computed from the terrain footprint + the ledge width above. They will shift if the ledge width changes. |
+| Ledge width (35 mm) | **Real**, measured 2026-08-18 (was a 76.2mm/3in guess before). Confirmed uniform on all 4 sides. |
+| Full baseboard (1675 × 1414 mm) | **Real**, measured 2026-08-18 — an independent direct measurement, not derived from the ledge width (the two agree to within ~1.5mm). |
+| Plaque size (90 × 30 mm) | **Real** — redesigned 2026-08-18 specifically to fit the real ledge width above (the old 50mm square, chosen before any real ledge measurement existed, no longer fit). `physicalTargetWidthMeters: 0.09` in the manifest matches. |
+| Plaque center positions (§2's table) | **Derived** from the real terrain/ledge/plaque numbers above, not independently measured — recomputed 2026-08-18 and cross-checked directly against the exported GLB's own binary vertex data. Will shift again only if the ledge width or plaque size changes. |
+| `rotationYawDeg` (§2/§5) | **Derived**, re-verified 2026-08-18 against the new geometry (not assumed unchanged) — values are the same as before (0°/180°/90°/−90°). |
 | Mounting orientation (flat, artwork-up) | **Confirmed** 2026-08-17 (coworker physical review) — supersedes the earlier vertical-mount assumption. The exact rotational reading `TARGET_FRAME_TO_WORLD_FIX` should produce for a real flat-mounted plaque is still not on-device confirmed (§5). |
 
-**When the real ledge width lands:** swap `LEDGE_WIDTH_M` in
-`tools/build_site_buildings.py`, re-run `tools/export_handoff_bundle.py`,
+**If the ledge width or plaque size ever changes again:** swap the
+relevant constant (`LEDGE_WIDTH_M`/`BASEBOARD_WIDTH_M`/`BASEBOARD_DEPTH_M`
+in `tools/build_site_buildings.py`, or `PLAQUE_WIDTH_MM`/`PLAQUE_HEIGHT_MM`
+in `tools/build_site_plaques.py`), re-run `tools/export_handoff_bundle.py`,
 copy the regenerated `site-scene.glb`/`.usdz` into `/public/assets`, and
 re-derive the plaque center table the same way `docs/asset-authoring-
 guide.md` §3.5 documents (mesh-bounds center of `plaque_{side}` in the
-regenerated GLB) — then update both that table and this doc's §2.
+regenerated GLB, cross-checked against the GLB's own binary data) — then
+update both that table and this doc's §2.
 
 ---
 
@@ -207,6 +228,14 @@ convention for a flat marker actually matches MindAR's — the reasoning
 above is a strong same-project precedent, not an on-device 8th Wall
 confirmation. `rotationYawDeg` is NOT in question (§2 — it's orthogonal to
 mount tilt).
+
+**2026-08-18: `originOffsetMeters`/`physicalTargetWidthMeters` recomputed
+against the real ledge width and the redesigned 90×30mm plaque** (§2/§4)
+— `public/assets/site-scene.glb`/`.usdz` and the compiled image-target
+JSON for all 4 plaques were resynced/recompiled in the same pass, so the
+live `'site'` manifest entry is internally consistent again. This is a
+geometry/size update only — none of it touches the tracking math's own
+confidence level above.
 
 ---
 
