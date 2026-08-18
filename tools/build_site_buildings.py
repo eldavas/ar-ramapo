@@ -247,7 +247,24 @@ def build_buildings(data: dict) -> list:
     MSL (table-matched buildings) or a terrain-nearest-vertex sample
     (unmatched ones), both already resolved in extract_site_buildings.py.
     No ground-sampling here anymore, matching build_site_terrain.py's own
-    "stage 1 does the geometry, stage 2 just authors/exports" split."""
+    "stage 1 does the geometry, stage 2 just authors/exports" split.
+
+    DEFERRED IDEA, not implemented (2026-08-18): during the v-handedness
+    investigation, the user proposed giving this "Buildings" group's own
+    pivot/origin the office building's specific anchor-point corner (the
+    vertex matching building_01's "first tooth, bottom-right corner" —
+    see the digital-twin sourcing notes for the exact vertex and the
+    measurement that confirmed its position), so the whole cluster could
+    be nudged/rotated as a unit later without recomputing per-building
+    positions. Turned out unnecessary for the actual bug (the real fix was
+    the v_sign flip in the extraction scripts), so never built — noted
+    here in case group-level adjustment is ever needed. Implementing it
+    means moving `group`'s origin to that world point WITHOUT moving the
+    geometry: shift `group.location` there and counter-translate every
+    child building's mesh data by the same amount (or use Blender's
+    "Set Origin" family of operators on the group, not a plain
+    `.location` assignment, which would otherwise drag all children with
+    it since they inherit the parent transform)."""
     group = make_empty("Buildings")
     objects = []
     for b in data["buildings"]:
