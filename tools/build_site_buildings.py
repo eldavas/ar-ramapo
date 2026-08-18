@@ -342,13 +342,13 @@ def build_ledge_and_plaques(terrain_data: dict) -> tuple:
     ft_to_model_m = terrain_data["ft_to_model_m"]
     width_m = width_ft * ft_to_model_m
     depth_m = depth_ft * ft_to_model_m
-    L = LEDGE_WIDTH_M
 
     # Full baseboard as a single rectangle (not a border ring), centered
     # on the terrain rectangle -- i.e. the terrain sits inset within it by
-    # roughly L on every side (BASEBOARD_WIDTH_M/DEPTH_M are an
-    # independent direct measurement, so the actual margin isn't exactly L
-    # on every side to the sub-mm, matching real-world measurement noise).
+    # roughly LEDGE_WIDTH_M on every side (BASEBOARD_WIDTH_M/DEPTH_M are
+    # an independent direct measurement, so the actual margin isn't
+    # exactly LEDGE_WIDTH_M on every side to the sub-mm, matching
+    # real-world measurement noise).
     board_cx, board_cy = width_m / 2.0, depth_m / 2.0
     x0, x1 = board_cx - BASEBOARD_WIDTH_M / 2.0, board_cx + BASEBOARD_WIDTH_M / 2.0
     y0, y1 = board_cy - BASEBOARD_DEPTH_M / 2.0, board_cy + BASEBOARD_DEPTH_M / 2.0
@@ -372,16 +372,21 @@ def build_ledge_and_plaques(terrain_data: dict) -> tuple:
     ledge.data.materials.append(make_material("mat_site_ledge", LEDGE_COLOR))
     link(ledge)
 
-    # One QR-plaque placeholder centered on each side's ledge strip. v now
-    # ranges [0, depth_m] (front to back, flipped 2026-08-18 for a
-    # right-handed frame) -- front sits just before v=0, back just past
-    # v=depth_m, mirroring how front/back used to straddle v=0.
+    # One QR-plaque placeholder per side, flush with the TRUE baseboard
+    # edge (2026-08-18 fix): PLAQUE_SIZE_M (5cm) is larger than the real
+    # ledge width (3.5cm), so centering a plaque on the ledge's midpoint
+    # — the previous approach — overhangs both the outer board edge and
+    # the terrain by the same amount. Flush-with-edge means the plaque's
+    # outer half sits exactly at the board boundary and the inner half
+    # extends onto the ledge/terrain, so nothing hangs off the board.
+    half_w, half_d = BASEBOARD_WIDTH_M / 2.0, BASEBOARD_DEPTH_M / 2.0
+    half_p = PLAQUE_SIZE_M / 2.0
     plaque_group = make_empty("Plaques")
     plaque_centers = {
-        "front": (width_m / 2.0, -L / 2.0),
-        "back": (width_m / 2.0, depth_m + L / 2.0),
-        "left": (-L / 2.0, depth_m / 2.0),
-        "right": (width_m + L / 2.0, depth_m / 2.0),
+        "front": (board_cx, (board_cy - half_d) + half_p),
+        "back": (board_cx, (board_cy + half_d) - half_p),
+        "left": ((board_cx - half_w) + half_p, board_cy),
+        "right": ((board_cx + half_w) - half_p, board_cy),
     }
     plaques = []
     for side, (cx, cy) in plaque_centers.items():
