@@ -1367,3 +1367,40 @@ real contributors:
 **Verified in software:** `npm run typecheck`/`build`/`test` clean,
 29/29 (4 new `TrackingLossHint` tests). No change to `applyPose()`,
 `isSampleTrustworthy()`, or any composition/glue math.
+
+## 21. First capture from §20's instrumentation (2026-08-19, same day):
+`trackingStatus`-lag hypothesis refuted; "model never appears" traced to
+testing against a screen image instead of the printed plaque — no code
+defect
+
+The `re-detection-rejected` instrumentation (§20) returned its first
+real capture: ~8 rejected samples over ~20s, cycling through all 4
+`site` plaques. **Every single line reads `trackingStatus=NORMAL`** —
+the §20 hypothesis (a re-detection rejected because SLAM status hasn't
+caught up to `NORMAL` yet) predicted the opposite and is refuted for
+this session. Kept as a live, unrefuted possibility for a future capture
+— it just didn't happen here.
+
+What actually rejected every sample: `engine sees 0.198–0.223 m,
+manifest declares 0.09 m`, ratio **2.2–2.5×**, stable across the whole
+20s window regardless of the user repeatedly moving the phone closer and
+farther (the exact motion the coaching hint from §20 asks for). Compare
+§4's own historical example of genuine non-convergence — `12.40 → 1.68 →
+7.28 → 8.27`, wandering, not settled — this capture's numbers do the
+opposite: they sit still. A stable, motion-immune, non-1 ratio is the
+signature of a target whose true physical size doesn't match
+`physicalTargetWidthMeters`, not of unconverged scale.
+
+**Confirmed with the project owner:** the capture was taken pointing the
+camera at the QR/plaque artwork open in a photo-viewer/editor app on a
+tablet screen, not the printed 90×30mm paper plaque the manifest's
+`0.09` is measured against. **No code changed — none was needed.** The
+gate did exactly its job: it correctly measured the real object in front
+of the camera (a tablet-screen rendering, plausibly ~200mm across) and
+correctly refused to trust a reading that implausible against the
+declared print size. Moving the phone cannot fix a target whose real
+size will never match what's declared, which is why the coaching motion
+had zero effect across 20 seconds. **Next step is a retest against the
+actual printed plaque**, not a code change — and that retest is also
+what's still needed to get real evidence for (or against) the
+`trackingStatus`-lag hypothesis this capture couldn't test.

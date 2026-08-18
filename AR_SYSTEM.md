@@ -2188,3 +2188,51 @@ schema above.
   (too eager/too slow) against real SLAM status flicker; and the
   re-detection-rejection hypothesis above, which needs a real capture
   before any gate is touched.
+
+  **Progress (2026-08-19, later same day): the re-detection-rejection
+  instrumentation returned its first real capture — the leading
+  `trackingStatus`-lag hypothesis above is REFUTED, and the actual cause
+  the log shows is very likely a test-rig artifact, not a code defect.**
+  On-screen console screenshots from a physical session (`site`, all 4
+  plaques cycling through FOUND/LOST) show, across roughly 20 seconds and
+  every single one of ~8 captured `re-detection REJECTED` /
+  `updated`-rejected lines: `trackingStatus=NORMAL` on every line, no
+  exception. The hypothesis specifically predicted rejections coinciding
+  with a non-`NORMAL` status — that never happened once in this capture,
+  so it's ruled out as the explanation for THIS session (still theoretically
+  possible in a different capture; the instrumentation stays in place).
+
+  What the same capture actually shows: the scale-mismatch ratio is
+  **stable and tightly clustered, not converging and not wildly
+  scattering** — `engine sees 0.198–0.223 m` against `manifest declares
+  0.09 m`, i.e. a consistent **~2.2–2.5× ratio**, unchanged from the
+  first captured sample to the last across 20+ seconds of repeated
+  closer/farther phone motion (the exact coaching motion the "Still
+  locking on" hint above asks for). This pattern — tight, stable,
+  non-1 ratio that motion does not improve — is the signature of the
+  manifest's `physicalTargetWidthMeters` (0.09, correct for the real
+  printed 90×30mm plaque per the 2026-08-18 plaque-redesign commit) not
+  matching the actual physical size of whatever the camera is looking
+  at, not of unconverged absolute scale (§4's own historical log of a
+  genuine non-convergence case shows the ratio wandering — `12.40 → 1.68
+  → 7.28 → 8.27` — not sitting still). The accompanying photos show the
+  test target as a QR/plaque image open in what looks like a photo-editor
+  app on a tablet screen, not the printed paper plaque — a ~90mm printed
+  target rendered at tablet-screen size (very plausibly ~200mm across)
+  would produce almost exactly this ratio. **Confirmed with the project
+  owner**: the test target in this capture was the QR image open on a
+  tablet screen, not the printed plaque. **No code defect — this session
+  needs no code change.** The scale-mismatch rejection is working exactly
+  as designed: the manifest correctly declares the real printed plaque's
+  width (0.09 m), the engine correctly measured the actual physical
+  object in front of it (a much larger on-screen image), and the gate
+  correctly refused to trust a reading that implausible. The apparent
+  "model never appears no matter how much I move the phone" symptom is
+  fully explained without touching `isSampleTrustworthy()`,
+  `SCALE_MISMATCH_TOLERANCE`, or any other gate — moving the phone closer/
+  farther cannot fix a target whose true physical size will never match
+  the declared one. **Action, not a code change:** retest against the
+  actual printed 90×30mm plaque (paper), not a screen. The
+  re-detection-rejection instrumentation and the `trackingStatus`-lag
+  hypothesis both remain open/unrefuted for a FUTURE capture against the
+  real print — this capture simply wasn't able to test either one.
