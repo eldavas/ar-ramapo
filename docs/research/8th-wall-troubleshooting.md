@@ -1316,3 +1316,54 @@ instrumentation (`DiagnosticTimeline.ts`, `?debug=1`) is deliberately
 still in the codebase to capture exactly that on the next physical pass
 — see its own doc comment for what to remove once a capture confirms
 the fix.
+
+## 20. First physical test of §19's fix (2026-08-19): 'Loading…' could
+hang forever, and the anchor's "permanence" needs one more decision
+
+Two findings from the first real-device pass after §19 landed, full
+detail in AR_SYSTEM.md §G Phase 6 "Progress (2026-08-19)" — summarized
+here for the chronological record.
+
+**'Loading…' hangs with no explanation if the phone stays still.**
+Expected, in hindsight: `whenStable()` only resolves once absolute scale
+converges, and convergence needs real device parallax (both this
+codebase's own comment and 8th Wall's official world-tracking guidance
+say so). Fixed with a 2.5s coaching-copy timer in `main.ts` — text only,
+cleared the instant `whenStable()` resolves; the reveal criterion itself
+is untouched, no timeout reveals anything.
+
+**The anchor "getting lost" when the plaque leaves view is NOT a
+`group.visible` regression** (every assignment site checked directly —
+set `false` once, `true` exactly once, never reverted) but two separate,
+real contributors:
+
+1. Zero feedback during a genuine, sustained `isTracking()` gap (SLAM
+   `trackingStatus` leaving `NORMAL`) — markers correctly hide by design,
+   but nothing told the user it was temporary. Fixed with a debounced
+   `TrackingLossHint` (2s sustained-loss threshold, well past ordinary
+   camera-pan blips), wired through the `AnchorSource.isTracking()` seam
+   — identical for image-target and tap-placed origins.
+2. **Leading hypothesis, deliberately NOT acted on yet:** a re-detection
+   (`'found'` after `imagelost`) is gated by the same
+   `trackingStatus==='NORMAL'` check as a continuous `'updated'` sample —
+   but a re-detection is the user looking DIRECTLY at the plaque, a
+   stronger signal than whatever transient relocalization status SLAM
+   reports in that same frame. If status hasn't caught up to `NORMAL`
+   yet, the correction is silently dropped and the anchor keeps its
+   stale frozen pose. Loosening this (scale check only, for `'found'`
+   re-detections specifically) is plausible and bounded, but partially
+   reopens the exact gap the trackingStatus gate (§ above, "Second-audit
+   finding") was added to close — not safe to change on a live physical
+   exhibit without a captured log confirming this diagnosis first.
+   Instrumented instead: `ImageTargetAnchorSource.ts` now marks
+   `re-detection-rejected` naming which gate failed, whenever a
+   re-detection is dropped. **Next step, not this pass:** capture one of
+   these on a real device — if `scalePlausible=true` and
+   `trackingStatus` reads something other than `NORMAL` at rejection
+   time, that confirms the hypothesis and the gate change becomes a
+   well-evidenced next fix; if the rejections are actually bad-scale
+   readings, the hypothesis is refuted and the real cause is still open.
+
+**Verified in software:** `npm run typecheck`/`build`/`test` clean,
+29/29 (4 new `TrackingLossHint` tests). No change to `applyPose()`,
+`isSampleTrustworthy()`, or any composition/glue math.

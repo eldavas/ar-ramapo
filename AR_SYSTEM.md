@@ -2113,3 +2113,78 @@ schema above.
   re-confirmed NOT the cause during the original investigation (2.6&nbsp;MB,
   27 meshes, ~38.6K triangles, zero textures) — nothing in this pass
   touched `site-scene.glb` or any Blender asset.
+
+  **Progress (2026-08-19, first physical-device test of the cold-start fix
+  above): two more findings — one fully fixed, one partially mitigated
+  pending on-device evidence, neither required weakening the anchor's
+  existing plausibility gates.**
+
+  1. **`'Loading…'` could hang indefinitely with no explanation if the
+     user held the phone still.** Confirmed, not surprising in hindsight:
+     `whenStable()` (above) only resolves once absolute scale converges,
+     and both `EightWallSession.ts`'s own comment and 8th Wall's official
+     world-tracking guidance ("move slowly, especially at startup") agree
+     convergence needs real device parallax — a stationary phone may never
+     produce a passing sample. By design (this pass deliberately keeps
+     that design — see §F, "do not weaken existing plausibility checks"),
+     there is no timeout that reveals the scene anyway; what was missing
+     was ANY explanation while the user waits. Fixed in `main.ts`: a
+     2.5s timer (coaching-copy only, cleared the instant `whenStable()`
+     resolves — the reveal criterion itself is unchanged) swaps the hint
+     from `'Loading…'` to `'Still locking on — try moving your phone
+     slightly closer, then farther from the plaque.'` if convergence
+     hasn't happened yet.
+  2. **The anchor sometimes doesn't feel "permanent" — markers/model can
+     read as lost when the plaque leaves camera view, contradicting the
+     hybrid design's whole point (scan once, walk around;
+     `disableWorldTracking: false` keeps SLAM world tracking valid across
+     `imagelost`).** Confirmed NOT a `group.visible` regression: grepped
+     every assignment site — it is set `false` once at construction and
+     `true` exactly once, in `onPoseApplied` (Cold-start stabilization
+     above); nothing ever reverts it, so the mounted mesh itself does not
+     disappear. Two real, separate contributors identified instead:
+     - **No feedback during a real, sustained `isTracking()` gap.**
+       Markers correctly hide (by design) when SLAM `trackingStatus`
+       leaves `NORMAL`, but nothing told the user this was expected and
+       temporary — reading as "the model is gone," not "briefly
+       re-orienting." Fixed with a new `TrackingLossHint` (`main.ts`,
+       wired via the `AnchorSource.isTracking()` seam, so it's identical
+       for the image-target and tap-placed paths and inert under
+       `?fakear=1`): a hint only after tracking has been down
+       continuously for 2s (well past ordinary camera-pan blips, which
+       `MarkerLayer`'s own 250ms hysteresis already absorbs separately),
+       hidden the instant tracking recovers. Changes no tracking/pose
+       logic — purely surfaces an existing signal.
+     - **Leading hypothesis, NOT acted on, deliberately: a re-detection
+       (`'found'` with `wasAcquired=true`) can be rejected by the SAME
+       `trackingStatus==='NORMAL'` gate that protects `'updated'`
+       samples, even though the user is at that exact moment looking
+       directly at the physical plaque** — arguably the single strongest
+       correctness signal the system ever gets, independent of whatever
+       transient status SLAM's relocalization reports. If `trackingStatus`
+       hasn't caught up to `NORMAL` in the same frame the image is
+       re-detected, the correction is silently dropped and the anchor
+       keeps holding a possibly-stale/wrong frozen pose until a LATER
+       sample happens to pass both gates — plausibly reading as
+       "sometimes doesn't recover." **Explicitly not fixed this pass**:
+       loosening this gate for re-detection specifically (keep the scale
+       check, drop the trackingStatus check, only for `'found'`) is a
+       real, defensible option, but it partially reopens the exact class
+       of gap the trackingStatus gate was added to close (§ "Second-audit
+       finding," 2026-08-14) — not safe to change on a live physical
+       exhibit without a captured on-device log confirming this is
+       actually what's happening, not a different failure mode entirely.
+       Diagnostic instrumentation added instead
+       (`ImageTargetAnchorSource.ts`, `re-detection-rejected` mark, naming
+       which gate failed) so the next physical-device pass can confirm or
+       refute this before any gate changes.
+
+  **Verified in software:** `npm run typecheck`/`build`/`test` clean,
+  29/29 (4 new: `TrackingLossHint`'s debounced show/hide contract). No
+  change to `applyPose()`, `isSampleTrustworthy()`, `TARGET_FRAME_TO_WORLD_FIX`,
+  or any composition math. **Not verifiable in software, explicitly still
+  open:** whether the coaching-copy fix actually reads as helpful in the
+  field; whether the tracking-loss hint's 2s threshold is well-tuned
+  (too eager/too slow) against real SLAM status flicker; and the
+  re-detection-rejection hypothesis above, which needs a real capture
+  before any gate is touched.

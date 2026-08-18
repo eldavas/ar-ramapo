@@ -428,6 +428,21 @@ export class ImageTargetAnchorSource implements AnchorSource {
           this.onPoseApplied(!wasAcquired, ratio);
         } else {
           this.logSampleRejected(event, target, ratio);
+          if (wasAcquired) {
+            // TEMPORARY diagnostic instrumentation (physical-device
+            // follow-up, 2026-08-19) — evidence-gathering for the "anchor
+            // sometimes doesn't recover when the plaque comes back into
+            // view" report: names WHICH gate rejected the re-detection, so
+            // an on-device capture can confirm or refute the leading
+            // hypothesis that trackingStatus hasn't caught up to NORMAL
+            // yet at the exact moment of a fresh, direct sighting (vs. a
+            // genuinely bad scale reading). Not acted on yet — see
+            // DiagnosticTimeline.ts.
+            diagMark(
+              're-detection-rejected',
+              `scalePlausible=${isScalePlausible(ratio)} trackingStatus=${this.session.trackingStatus}`
+            );
+          }
         }
         if (!this.acquired) {
           this.acquired = true;

@@ -29,6 +29,7 @@ import { PlacementController } from './PlacementController.js';
 import { TapPlacedAnchorSource } from './TapPlacedAnchorSource.js';
 import { ImageTargetAnchorSource } from './ImageTargetAnchorSource.js';
 import { ImageEventHintGate } from './ImageEventHintGate.js';
+import { TrackingLossHint } from './TrackingLossHint.js';
 import {
   loadImageTargetData,
   loadImageTargetDataForTargets,
@@ -574,7 +575,27 @@ async function runEightWallExperience(experience: ExperienceManifest): Promise<v
   anchorSource.group.add(sceneContent.root);
   const { hotspots, occluders, markers, card, contentProvider } = sceneContent;
 
+  // Physical-device follow-up (2026-08-19): absolute-scale convergence
+  // needs real device parallax (EightWallSession's own comment, and 8th
+  // Wall's official world-tracking guidance: "move slowly, especially at
+  // startup") — a user holding the phone still can sit on 'Loading…'
+  // indefinitely with zero explanation. This changes ONLY the hint TEXT,
+  // never the reveal criterion — whenStable() below still gates the
+  // actual reveal on a real trustworthy pose, not this timer. If it
+  // hasn't resolved shortly after content is ready, swap to an actionable
+  // coaching message instead of leaving an unexplained 'Loading…' up
+  // forever; cleared the instant whenStable() resolves either way.
+  const POSE_COACHING_DELAY_MS = 2500;
+  let stableResolved = false;
+  const coachingTimer = setTimeout(() => {
+    if (!stableResolved) {
+      overlay.showHint('Still locking on — try moving your phone slightly closer, then farther from the plaque.');
+    }
+  }, POSE_COACHING_DELAY_MS);
+
   await anchorSource.whenStable();
+  stableResolved = true;
+  clearTimeout(coachingTimer);
   // One-way: the coaching hint listener (if any — only the image-target
   // path registers one) can never re-show the loading UX after this,
   // however many more 'scanning'/'loading' events arrive later. Does not
@@ -584,6 +605,23 @@ async function runEightWallExperience(experience: ExperienceManifest): Promise<v
   diagMark('scene-revealed');
   diagPrintTimeline();
   overlay.hideAll();
+
+  // Physical-device follow-up (2026-08-19): explain SUSTAINED tracking loss
+  // after reveal instead of leaving the user with no signal at all — the
+  // anchor/markers already behave correctly by design (frozen pose +
+  // SLAM persistence; see TrackingLossHint's own doc comment), this only
+  // makes that existing behavior legible. Engine-agnostic via the
+  // AnchorSource seam — works identically for image-target and tap-placed
+  // origins; inert for the FAKE_AR desk sim (isTracking() always true).
+  const TRACKING_LOSS_HINT_DELAY_MS = 2000;
+  const trackingLossHint = new TrackingLossHint(
+    (text) => overlay.showHint(text),
+    () => overlay.hideHint(),
+    TRACKING_LOSS_HINT_DELAY_MS
+  );
+  frameBus.onFrame((deltaMs) => {
+    trackingLossHint.tick(anchorSource.isTracking(), deltaMs);
+  });
 
   let selected: Hotspot | null = null;
   const closeCard = (): void => {
