@@ -4,6 +4,10 @@ import type { EightWallSession, ImageEventKind } from './EightWallSession.js';
 import type { ResolvedPlaqueTarget } from './ImageTargetLoader.js';
 import type { Xr8ImageTrackedEvent } from './types/xr8.js';
 import { traceT } from './TraceLog.js';
+// TEMPORARY diagnostic instrumentation — see DiagnosticTimeline.ts's own
+// doc comment. Remove this import and every diagMark()/dispatchEvent() call
+// site once the 5-6s startup investigation is closed.
+import { diagMark } from './DiagnosticTimeline.js';
 
 /**
  * §F axis-convention lockdown, image-target edition — the ONLY place the
@@ -192,6 +196,23 @@ function formatPose(event: Xr8ImageTrackedEvent): string {
  * imageupdated re-snaps are continuous sub-centimeter corrections that
  * flow through per-frame projection naturally; firing per update would
  * reset MarkerLayer's One Euro filters every frame and defeat smoothing.
+ *
+ * Cold-start reveal (2026-08-18, AR_SYSTEM.md §G "Cold-start
+ * stabilization"): `group` mounts hidden and stays hidden through the
+ * bootstrap acquisition — the first `imagefound` sample is still applied
+ * unconditionally to `group`'s transform (isSampleTrustworthy's own doc
+ * comment explains why that stays true: refusing to ever place the scene
+ * would be worse than an imperfect first placement), but applying a
+ * transform and revealing it to the user are now two different decisions.
+ * `group.visible` flips true exactly once — the first time a sample
+ * independently passes isSampleTrustworthy() — which is also what resolves
+ * whenStable(). Before this pass, `group.visible = true` ran at bootstrap
+ * acquisition itself, so the user saw the scene at whatever pose the
+ * engine's not-yet-converged absolute-scale estimate produced (routinely
+ * mis-scaled/mis-oriented for several seconds — see the troubleshooting
+ * doc's absolute-scale convergence notes) before a later trustworthy
+ * sample silently snapped it to the right place. main.ts now gates the
+ * "Loading…" → revealed transition on whenStable(), not on acquire().
  */
 export class ImageTargetAnchorSource implements AnchorSource {
   readonly kind: OriginKind = 'image-target';
@@ -214,6 +235,49 @@ export class ImageTargetAnchorSource implements AnchorSource {
   private lastTrackingSnapshot: string | null = null;
   private lastUpdatedLogMs = 0;
   private static readonly UPDATED_LOG_INTERVAL_MS = 1000;
+  // Cold-start stabilization (2026-08-18, see this class's own doc comment
+  // and AR_SYSTEM.md §G): whether a pose has ever passed
+  // isSampleTrustworthy() SINCE acquisition — distinct from `acquired`,
+  // which only means a bootstrap sample was applied. `group.visible` flips
+  // true exactly once, here, never on the bootstrap sample alone.
+  private stable = false;
+  private readonly stableResolvers: Array<() => void> = [];
+
+  /**
+   * Called for every APPLIED pose (bootstrap or checked) — see
+   * onImageEvent's two call sites. isBootstrap = true only for the
+   * very-first, unconditionally-applied acquisition sample; false for
+   * every later sample that independently passed isSampleTrustworthy().
+   * The scene/anchor must never be revealed on the bootstrap sample alone
+   * (that's the whole cold-start bug this exists to fix) — only the first
+   * genuinely-checked sample flips `stable` and reveals the group, and it
+   * does so exactly once.
+   */
+  private onPoseApplied(isBootstrap: boolean, ratio: number): void {
+    // TEMPORARY diagnostic instrumentation — see DiagnosticTimeline.ts.
+    // Kept in place (not stripped this pass) specifically so an on-device
+    // capture can confirm this new gating actually removes the bad visual
+    // window before the instrumentation itself is removed — see the
+    // implementation report for why.
+    diagMark(
+      isBootstrap ? 'first-pose-applied (bootstrap, unchecked)' : 'trustworthy-pose-applied',
+      `ratio=${ratio.toFixed(2)}`
+    );
+    if (isBootstrap || this.stable) return;
+    this.stable = true;
+    this.group.visible = true;
+    console.log(
+      `[${traceT()}] [ImageTargetAnchorSource] first trustworthy pose accepted (ratio=${ratio.toFixed(2)}) ` +
+        '— revealing anchor group.'
+    );
+    for (const resolve of this.stableResolvers) resolve();
+    this.stableResolvers.length = 0;
+    // Guarded: this class's own unit tests run under plain Node (node:test),
+    // which has no `window` global.
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('ar-diag:trustworthy-pose'));
+    }
+  }
 
   constructor(
     private readonly session: EightWallSession,
@@ -238,6 +302,23 @@ export class ImageTargetAnchorSource implements AnchorSource {
     if (this.acquired) return Promise.resolve();
     return new Promise<void>((resolve) => {
       this.acquireResolve = resolve;
+    });
+  }
+
+  /**
+   * See AnchorSource.whenStable's own doc comment for the contract. Distinct
+   * from acquire(): acquire() resolves on the unchecked bootstrap sample
+   * (so the anchor is never left un-placed — same reasoning as
+   * isSampleTrustworthy's doc comment); whenStable() resolves only once a
+   * pose has independently passed isSampleTrustworthy(), which is also the
+   * exact instant `group.visible` flips true (onPoseApplied above) — the
+   * two are the same event by construction, not two signals that could
+   * drift out of sync.
+   */
+  whenStable(): Promise<void> {
+    if (this.stable) return Promise.resolve();
+    return new Promise<void>((resolve) => {
+      this.stableResolvers.push(resolve);
     });
   }
 
@@ -339,17 +420,17 @@ export class ImageTargetAnchorSource implements AnchorSource {
               ? trustworthy
                 ? ' (re-detection — firing onOriginChanged, pose discontinuity)'
                 : ' (re-detection REJECTED — see warning below — keeping previous anchor)'
-              : ' (first acquire — group visible, resolving acquire())')
+              : ' (first acquire — pose applied, anchor stays hidden until a trustworthy sample lands)')
         );
         this.imageVisible = true;
         if (trustworthy) {
           this.applyPose(event, target);
+          this.onPoseApplied(!wasAcquired, ratio);
         } else {
           this.logSampleRejected(event, target, ratio);
         }
         if (!this.acquired) {
           this.acquired = true;
-          this.group.visible = true;
           this.acquireResolve?.();
           this.acquireResolve = null;
         } else if (trustworthy) {
@@ -374,6 +455,7 @@ export class ImageTargetAnchorSource implements AnchorSource {
           const ratio = scaleRatio(event, target.physicalTargetWidthMeters);
           if (this.isSampleTrustworthy(ratio)) {
             this.applyPose(event, target);
+            this.onPoseApplied(false, ratio);
           } else {
             this.logSampleRejected(event, target, ratio);
           }

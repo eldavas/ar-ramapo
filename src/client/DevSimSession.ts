@@ -36,6 +36,11 @@ class SimulatedAnchorSource implements AnchorSource {
     return Promise.resolve();
   }
 
+  /** Always-tracking desk simulation — nothing to wait out. */
+  whenStable(): Promise<void> {
+    return Promise.resolve();
+  }
+
   isTracking(): boolean {
     return true;
   }

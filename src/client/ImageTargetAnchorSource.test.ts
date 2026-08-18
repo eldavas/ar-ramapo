@@ -49,6 +49,11 @@ class FakeSession {
   fire(kind: 'found' | 'updated', event: Xr8ImageTrackedEvent): void {
     this.handler?.(kind, event);
   }
+  /** The three pose-less lifecycle kinds — always fire with a null event,
+   * matching EightWallSession.emitImage()'s real behavior for these. */
+  fireLifecycle(kind: 'loading' | 'scanning' | 'lost'): void {
+    this.handler?.(kind, null);
+  }
 }
 
 /** Builds the Xr8ImageTrackedEvent a real tracker would report for `target`
@@ -247,9 +252,158 @@ test('the very first acquisition applies even with an implausible scale — boot
   );
   session.fire('found', badFirstEvent);
 
-  assert.equal(anchor.group.visible, true); // acquired, not stuck waiting forever
+  // The transform still applies (bootstrap must not hang forever), but —
+  // cold-start stabilization, AR_SYSTEM.md §G — it must NOT be revealed to
+  // the user off an unchecked sample. isTracking() (which gates markers)
+  // is also true, confirming acquire()'s contract is unaffected: only the
+  // GROUP's own visibility flips off the bootstrap sample.
+  assert.equal(anchor.group.visible, false, 'bootstrap sample must not reveal the group');
   assertVectorClose(anchor.group.position, pos);
   assertQuatClose(anchor.group.quaternion, quat);
+});
+
+// --- Cold-start reveal gating (2026-08-18, AR_SYSTEM.md §G "Cold-start
+// stabilization") ---
+//
+// The bootstrap pose above is intentionally still applied — the anchor
+// must never be left un-placed — but it must not be REVEALED. These tests
+// cover the new whenStable()/group.visible contract layered on top of the
+// existing plausibility gates, which stay unmodified (verified by every
+// test above still passing unchanged).
+
+test('a bootstrap-only pose does not reveal the scene (group stays hidden, whenStable() unresolved)', async () => {
+  const session = new FakeSession();
+  const scene = new THREE.Scene();
+  const anchor = new ImageTargetAnchorSource(session as never, scene, [FRONT]);
+
+  let resolved = false;
+  anchor.whenStable().then(() => {
+    resolved = true;
+  });
+
+  session.fire('found', simulateEventFor(FRONT.name, FRONT, new THREE.Vector3(1, 0, -1), new THREE.Quaternion()));
+
+  assert.equal(anchor.group.visible, false);
+  // Flush one microtask turn — whenStable()'s promise must still not have
+  // resolved off the bootstrap sample alone.
+  await Promise.resolve();
+  assert.equal(resolved, false);
+});
+
+test('the first trustworthy sample after bootstrap reveals the scene and resolves whenStable()', async () => {
+  const session = new FakeSession();
+  const scene = new THREE.Scene();
+  const anchor = new ImageTargetAnchorSource(session as never, scene, [FRONT]);
+
+  let resolved = false;
+  anchor.whenStable().then(() => {
+    resolved = true;
+  });
+
+  // Bootstrap: applied, but hidden (previous test covers this in isolation).
+  session.fire('found', simulateEventFor(FRONT.name, FRONT, new THREE.Vector3(1, 0, -1), new THREE.Quaternion()));
+  assert.equal(anchor.group.visible, false);
+
+  // First independently-checked sample (an 'updated' — the common case,
+  // since 'found' only re-fires on re-detection): scale-plausible,
+  // trackingStatus NORMAL (FakeSession's default) — must reveal.
+  const stablePos = new THREE.Vector3(1.2, 0, -3.4);
+  const stableQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), 0.2);
+  session.fire('updated', simulateEventFor(FRONT.name, FRONT, stablePos, stableQuat));
+
+  assert.equal(anchor.group.visible, true);
+  assertVectorClose(anchor.group.position, stablePos);
+  assertQuatClose(anchor.group.quaternion, stableQuat);
+  await Promise.resolve();
+  assert.equal(resolved, true, 'whenStable() must resolve once the group is revealed');
+
+  // whenStable() called again after the fact resolves immediately (latched,
+  // not re-armed) — the same idiom acquire() already uses.
+  let resolvedAgain = false;
+  anchor.whenStable().then(() => {
+    resolvedAgain = true;
+  });
+  await Promise.resolve();
+  assert.equal(resolvedAgain, true);
+});
+
+test('reveal happens only once — further trustworthy samples after the first do not re-trigger it', async () => {
+  const session = new FakeSession();
+  const scene = new THREE.Scene();
+  const anchor = new ImageTargetAnchorSource(session as never, scene, [FRONT]);
+
+  let resolveCount = 0;
+  anchor.whenStable().then(() => {
+    resolveCount += 1;
+  });
+
+  session.fire('found', simulateEventFor(FRONT.name, FRONT, new THREE.Vector3(1, 0, -1), new THREE.Quaternion()));
+  session.fire('updated', simulateEventFor(FRONT.name, FRONT, new THREE.Vector3(1.2, 0, -3.4), new THREE.Quaternion()));
+  await Promise.resolve();
+  assert.equal(anchor.group.visible, true);
+  assert.equal(resolveCount, 1, 'whenStable() handler must fire exactly once');
+
+  // Several more good samples in a row — a real session keeps sending
+  // 'updated' every frame while the target is in view. None of them should
+  // re-resolve whenStable() a second time, and group.visible must simply
+  // stay true (not re-toggle).
+  for (let i = 0; i < 5; i += 1) {
+    session.fire(
+      'updated',
+      simulateEventFor(FRONT.name, FRONT, new THREE.Vector3(1.2 + i * 0.01, 0, -3.4), new THREE.Quaternion())
+    );
+  }
+  await Promise.resolve();
+  assert.equal(anchor.group.visible, true);
+  assert.equal(resolveCount, 1, 'whenStable() handler must still have fired exactly once after more good samples');
+});
+
+test('4. an already-stabilized anchor is unaffected by later scanning/loading/lost lifecycle events', () => {
+  const session = new FakeSession();
+  const scene = new THREE.Scene();
+  const anchor = new ImageTargetAnchorSource(session as never, scene, [FRONT]);
+
+  session.fire('found', simulateEventFor(FRONT.name, FRONT, new THREE.Vector3(1, 0, -1), new THREE.Quaternion()));
+  const stablePos = new THREE.Vector3(1.2, 0, -3.4);
+  const stableQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), 0.2);
+  session.fire('updated', simulateEventFor(FRONT.name, FRONT, stablePos, stableQuat));
+  assert.equal(anchor.group.visible, true);
+
+  // Pose-less lifecycle events carry no tracked pose at all (EightWallSession
+  // dispatches them with a null event) and, per onImageEvent's switch, only
+  // ever log — there is no code path from 'loading'/'scanning'/'lost' to
+  // group.visible or the transform. This test asserts that stays true: the
+  // already-revealed scene must not hide, move, or otherwise react.
+  session.fireLifecycle('scanning');
+  session.fireLifecycle('loading');
+  session.fireLifecycle('lost');
+
+  assert.equal(anchor.group.visible, true, 'an already-stabilized scene must remain visible');
+  assertVectorClose(anchor.group.position, stablePos);
+  assertQuatClose(anchor.group.quaternion, stableQuat);
+});
+
+test('an implausible sample arriving before any trustworthy one is rejected without reveal or corruption', () => {
+  const session = new FakeSession();
+  const scene = new THREE.Scene();
+  const anchor = new ImageTargetAnchorSource(session as never, scene, [FRONT]);
+
+  const bootstrapPos = new THREE.Vector3(1, 0, -1);
+  session.fire('found', simulateEventFor(FRONT.name, FRONT, bootstrapPos, new THREE.Quaternion()));
+  assert.equal(anchor.group.visible, false);
+
+  // A second implausible sample before any good one — must stay hidden and
+  // must not move the anchor off the bootstrap transform either (the
+  // existing scale-rejection gate, unmodified, already prevents the move;
+  // this test's own concern is specifically that rejection never
+  // accidentally reveals the group).
+  const badEvent = withScale(
+    simulateEventFor(FRONT.name, FRONT, new THREE.Vector3(50, 12, -80), new THREE.Quaternion()),
+    FRONT.physicalTargetWidthMeters * 3
+  );
+  session.fire('updated', badEvent);
+  assert.equal(anchor.group.visible, false);
+  assertVectorClose(anchor.group.position, bootstrapPos);
 });
 
 // --- trackingStatus gating (2026-08-14, third physical test, second audit
@@ -307,7 +461,11 @@ test('the very first acquisition applies even while trackingStatus is not NORMAL
   const quat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), 0.37);
   session.fire('found', simulateEventFor(FRONT.name, FRONT, pos, quat));
 
-  assert.equal(anchor.group.visible, true);
+  // Transform still applies even before trackingStatus has reported
+  // anything real (bootstrap can't hang forever) — but per the cold-start
+  // reveal gate, it stays hidden until an independently-checked sample
+  // lands, same as the scale-only case above.
+  assert.equal(anchor.group.visible, false);
   assertVectorClose(anchor.group.position, pos);
   assertQuatClose(anchor.group.quaternion, quat);
 });

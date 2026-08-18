@@ -4,6 +4,10 @@ import { OneEuroFilter1D } from './OneEuroFilter.js';
 import type { Hotspot } from './SceneGraphLoader.js';
 import type { ProjectedHotspot } from './HotspotProjector.js';
 import { traceT } from './TraceLog.js';
+// TEMPORARY diagnostic instrumentation — see DiagnosticTimeline.ts's own
+// doc comment. Remove this import and the diagMark()/dispatchEvent() call
+// site once the 5-6s startup investigation is closed.
+import { diagMark } from './DiagnosticTimeline.js';
 
 /**
  * Per the Golden Rule (AR_SYSTEM.md §E), everything a marker binds to comes
@@ -98,6 +102,8 @@ export class MarkerLayer {
   // breaking the layer silently (see update()).
   private readonly warnedMissingState = new Set<Hotspot>();
   private tapHandler: ((hotspot: Hotspot) => void) | null = null;
+  // TEMPORARY diagnostic instrumentation — see DiagnosticTimeline.ts.
+  private diagFirstVisibleMarked = false;
 
   constructor(private readonly riveFile: RiveFile) {
     this.container = document.createElement('div');
@@ -171,6 +177,13 @@ export class MarkerLayer {
             `[${traceT()}] [MarkerLayer] "${hotspot.name}" -> display:block ` +
               `(projection visible at ${projection.screenX.toFixed(0)},${projection.screenY.toFixed(0)})`
           );
+          if (!this.diagFirstVisibleMarked) {
+            this.diagFirstVisibleMarked = true;
+            diagMark('first-marker-visible', hotspot.name);
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new Event('ar-diag:marker-visible'));
+            }
+          }
         }
 
         // One Euro per axis: kills at-rest tracking tremor without

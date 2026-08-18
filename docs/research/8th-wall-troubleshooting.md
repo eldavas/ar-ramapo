@@ -1220,3 +1220,99 @@ for this marker shape, and reusing an already-validated same-project
 value is stronger footing than a fresh guess, but it is not the same as
 an on-device 8th Wall confirmation — that still doesn't exist for this
 specific hardware/plaque combination.
+
+## 19. Cold-start stabilization (2026-08-18): the bootstrap pose was
+being revealed to the user, not just applied
+
+**Symptom (production, `site`):** after scanning a plaque, buildings
+appeared tiny/mis-oriented and markers were absent for ~5–6 seconds,
+self-correcting with no user action — a production-visible consequence
+of a mechanism this log already understood in isolation, just never
+connected to a visibility decision before now.
+
+**Root cause, confirmed against the code, not assumed:** two facts that
+were each already documented separately in this file finally compose
+into one user-facing bug:
+
+- §13's fix (`isSampleTrustworthy()`) made the anchor's TRANSFORM immune
+  to a bad sample once a good one exists — but the very first, bootstrap
+  sample has never gone through that gate at all (`trustworthy =
+  !wasAcquired || isSampleTrustworthy(ratio)` in `onImageEvent`'s
+  `'found'` case — the bootstrap sample short-circuits the check
+  entirely, by design, per `isSampleTrustworthy`'s own doc comment: "the
+  very first acquisition always applies regardless — refusing to ever
+  place the scene would be worse than an imperfect first placement").
+- Until this pass, `group.visible = true` ran in that exact same
+  bootstrap branch — the instant the FIRST sample landed, correct or
+  not. §4's own absolute-scale convergence note ("needs a few seconds of
+  device parallax to converge") means that first sample is routinely not
+  yet converged, so the scene rendered at whatever pose the engine's
+  early estimate produced, then silently snapped once a LATER sample
+  independently passed `isSampleTrustworthy()`.
+
+Markers were absent over the identical window for a coincident,
+independent reason: `isTracking()` (gating marker visibility, unchanged
+by this pass) has always required `trackingStatus==='NORMAL'` — the same
+convergence-dependent signal driving the scale gate. Two different gates,
+same underlying engine latency, never coordinated by any code that
+connected them — which is exactly why the building and the markers
+appeared to "fix themselves" in lockstep.
+
+**Fix:** applying a pose to the anchor's transform and revealing that
+transform to the user are now two separate decisions.
+`ImageTargetAnchorSource.group.visible` flips `true` exactly once — the
+first time a sample independently passes `isSampleTrustworthy()` — via a
+new private `onPoseApplied()` hook, which also resolves a new
+`whenStable(): Promise<void>` added to the `AnchorSource` interface.
+`main.ts` gates the `'Loading…'` → revealed transition (reusing
+`UxOverlay.showHint()`, not a new UI system) on `whenStable()`, never on
+`acquire()` alone. `TapPlacedAnchorSource`/the `?fakear=1` desk-sim's
+`SimulatedAnchorSource` both implement `whenStable()` as an immediate
+resolve — neither has a bootstrap-pose ambiguity to wait out. No change
+to `applyPose()`, `TARGET_FRAME_TO_WORLD_FIX`, `rotationYawDeg`,
+`originOffsetMeters`, or either existing plausibility gate.
+
+**Secondary finding, same pass: GLB/Rive/marker/card loading was
+serialized strictly after image-target acquisition, with no
+architectural reason.** `runEightWallExperience()` now kicks off GLB
+fetch+parse, Rive fetch+parse, `MarkerLayer.attach()`, and
+`CardPanel.attach()` (respecting their real dependency graph — see the
+new `loadEightWallSceneContent()` in `main.ts`) at the top of the
+function, before the arrival gate or "Start AR" even run, instead of
+after acquisition. This does not by itself fix the bootstrap-pose bug
+above (parallelizing asset loading doesn't touch pose plausibility at
+all) but removes real, unnecessary serial latency stacked on top of it.
+
+**QR first-scan UX, investigated in the same pass:** current 8th Wall
+docs (checked this session) don't describe "first QR scan opens the
+site but doesn't start AR" as expected browser/engine behavior — no
+official page covers it. The strongest code-grounded explanation found:
+after "Start AR" is tapped, `EightWallSession.start()` awaits the engine
+module import, `configure()`, and `xr8.run()` (camera/motion permission
+chain) with zero loading feedback — on a cold cellular connection right
+after a QR scan, long enough to read as "nothing happened." Fixed with a
+synchronous `overlay.showHint('Starting camera…')` in the click handler,
+before `session.start()` — confirms the tap without touching the still-
+mandatory iOS gesture requirement for `DeviceMotionEvent.requestPermission()`.
+Explicitly NOT attempted: transferring the QR scanner's visual
+recognition of the plaque into the browser's camera session — no browser
+API exists for that, so the physical plaque must always be re-seen by
+whichever camera session does AR tracking. No cookie/localStorage
+persistence added — nothing here needed it.
+
+**Verified in software:** `npm run typecheck`/`build`/`test` clean, 19/19
+unit tests (3 new: bootstrap-only pose does not reveal or resolve
+`whenStable()`; first trustworthy sample after bootstrap does, exactly
+once; an implausible pre-trustworthy sample is rejected without
+revealing or corrupting the anchor). The two pre-existing tests that
+asserted `group.visible === true` off the bootstrap sample were updated
+to assert `false`, matching this pass's contract change; every other
+existing test, including the 4-plaque composition self-consistency
+suite, passes unmodified. **Not verifiable in software, requires a real
+device:** whether the reveal lands meaningfully faster than the reported
+5–6 seconds, and whether the "Starting camera…" feedback measurably
+reduces double-QR-scans in the field. The temporary diagnostic
+instrumentation (`DiagnosticTimeline.ts`, `?debug=1`) is deliberately
+still in the codebase to capture exactly that on the next physical pass
+— see its own doc comment for what to remove once a capture confirms
+the fix.

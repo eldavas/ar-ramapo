@@ -28,6 +28,7 @@ import { UxOverlay } from './UxOverlay.js';
 import { PlacementController } from './PlacementController.js';
 import { TapPlacedAnchorSource } from './TapPlacedAnchorSource.js';
 import { ImageTargetAnchorSource } from './ImageTargetAnchorSource.js';
+import { ImageEventHintGate } from './ImageEventHintGate.js';
 import {
   loadImageTargetData,
   loadImageTargetDataForTargets,
@@ -35,6 +36,10 @@ import {
 } from './ImageTargetLoader.js';
 import { runRecordGeoMode } from './RecordGeoMode.js';
 import { traceT } from './TraceLog.js';
+// TEMPORARY diagnostic instrumentation — see DiagnosticTimeline.ts's own
+// doc comment. Remove this import and every diagMark()/diagPrintTimeline()
+// call site once the 5-6s startup investigation is closed.
+import { diagMark, diagPrintTimeline } from './DiagnosticTimeline.js';
 
 // State machine name inside ui-test.riv, the legacy single-card experience
 // (proxy-target). Spatial experiences don't use this — their Rive bindings
@@ -85,7 +90,9 @@ async function main(): Promise<void> {
     return;
   }
 
+  diagMark('main-start');
   const experience = resolveExperience(ACTIVE_TARGET_ID);
+  diagMark('manifest-resolved', experience.targetId);
 
   if (experience.placement !== undefined) {
     // 8th Wall path (AR_SYSTEM.md's 8th-wall decision record) — fully
@@ -281,6 +288,70 @@ async function loadSingleImageTargetAsMulti(
   };
 }
 
+interface EightWallSceneContent {
+  root: THREE.Group;
+  hotspots: Hotspot[];
+  occluders: THREE.Object3D[];
+  markers: MarkerLayer;
+  card: CardPanel;
+  contentProvider: GoogleSheetContentProvider;
+}
+
+/**
+ * Fetches/parses the GLB, fetches/parses the Rive file, prefetches content,
+ * and mounts the marker layer + card panel — every piece of scene content
+ * that depends only on the manifest, never on the AR session or tracking
+ * state. Cold-start stabilization (AR_SYSTEM.md §G): kicked off as early as
+ * runEightWallExperience() can call it — before the arrival gate, before
+ * "Start AR", before any image target is found — so it runs IN PARALLEL
+ * with AR session bootstrap instead of serialized strictly after it, which
+ * is where it ran before this pass with no architectural reason to.
+ *
+ * Internal ordering here is a real dependency graph, not a blind
+ * Promise.all of everything: MarkerLayer needs both the GLB's hotspots AND
+ * the parsed Rive file, so it waits on both; CardPanel needs neither (it's
+ * plain HTML/CSS, §G Phase 3's fifth physical-device-test entry) so it
+ * attaches fully in parallel via its own promise, not serialized behind
+ * the GLB/Rive fetch at all.
+ */
+async function loadEightWallSceneContent(
+  modelUrl: string,
+  sceneWidthMeters: number,
+  riveUrl: string,
+  contentUrl: string
+): Promise<EightWallSceneContent> {
+  diagMark('glb-load-start');
+  diagMark('rive-file-load-start');
+  const loader = new SceneGraphLoader(modelUrl, sceneWidthMeters, '8thwall');
+  const contentProvider = new GoogleSheetContentProvider(contentUrl);
+  contentProvider.prefetch();
+  const cardPromise = (async (): Promise<CardPanel> => {
+    const card = new CardPanel();
+    await card.attach();
+    diagMark('card-attach-end');
+    return card;
+  })();
+
+  const [{ root, hotspots, occluders }, riveFile] = await Promise.all([loader.load(), loadRiveFile(riveUrl)]);
+  diagMark('glb-load-end', `${hotspots.length} hotspots, ${occluders.length} occluders`);
+  diagMark('rive-file-load-end');
+  console.log(
+    `[runEightWallExperience] SceneGraphLoader found ${hotspots.length} hotspot_* node(s) ` +
+      `and ${occluders.length} occluder mesh(es) in ${modelUrl}.`
+  );
+
+  diagMark('markers-attach-start');
+  const markers = new MarkerLayer(riveFile);
+  await markers.attach(hotspots);
+  diagMark('markers-attach-end');
+
+  const card = await cardPromise;
+  console.log('[runEightWallExperience] MarkerLayer and CardPanel attached — content pipeline is live.');
+  diagMark('scene-content-ready');
+
+  return { root, hotspots, occluders, markers, card, contentProvider };
+}
+
 /**
  * 8th Wall execution path (AR_SYSTEM.md's 8th-wall decision record),
  * transplanted from the spike's own main.ts. Shares SceneGraphLoader,
@@ -304,6 +375,32 @@ async function runEightWallExperience(experience: ExperienceManifest): Promise<v
   }
   const { modelUrl, contentUrl } = experience;
 
+  // '8thwall': SceneGraphLoader mounts the mesh at identity rotation/scale
+  // 1 — anchorSource.group (TapPlacedAnchorSource / ImageTargetAnchorSource)
+  // already supplies the correct frame and the real-meters absolute scale
+  // (Phase 2B decision record); physicalTargetWidthMeters is provably
+  // unread by SceneGraphLoader's '8thwall' branch (see its own source —
+  // only the 'mindar' branch's metersToMarkerWidths() consumes it), so a
+  // targets[] experience (§E "Multi-target plaques" — no singular
+  // physicalTargetWidthMeters at this level, each plaque has its own) can
+  // pass any one of its targets' widths here without it mattering; the
+  // singular-field path still requires its own value, same as before.
+  const sceneWidthMeters =
+    experience.physicalTargetWidthMeters ??
+    (experience.targets !== undefined ? experience.targets[0]?.physicalTargetWidthMeters : undefined);
+  if (sceneWidthMeters === undefined) {
+    // ManifestResolver enforces physicalTargetWidthMeters (singular) or a
+    // non-empty targets[] (each validated with its own) whenever modelUrl
+    // is declared — the recheck exists for type narrowing and to keep the
+    // invariant local and loud, same pattern as the throws below.
+    throw new Error(
+      `Experience "${experience.targetId}" declares modelUrl without physicalTargetWidthMeters (or a non-empty targets[]).`
+    );
+  }
+  // Kicked off now, deliberately before the arrival gate / "Start AR" tap /
+  // any AR session or tracking state — see the function's own doc comment.
+  const sceneContentPromise = loadEightWallSceneContent(modelUrl, sceneWidthMeters, experience.riveUrl, contentUrl);
+
   const overlay = new UxOverlay();
 
   // Image-target data fetches in parallel with the arrival gate below — it
@@ -313,6 +410,7 @@ async function runEightWallExperience(experience: ExperienceManifest): Promise<v
   // targets map with identity offset/rotation, so everything downstream
   // (session.start(), ImageTargetAnchorSource) is one code path regardless
   // of how many plaques this experience declares.
+  diagMark('image-target-json-fetch-start');
   const imageTargetsPromise: Promise<LoadedMultiImageTargets> | null =
     experience.placement !== 'image'
       ? null
@@ -321,6 +419,9 @@ async function runEightWallExperience(experience: ExperienceManifest): Promise<v
         : experience.imageTargetUrl !== undefined
           ? loadSingleImageTargetAsMulti(experience.imageTargetUrl, experience)
           : null;
+  if (imageTargetsPromise !== null) {
+    imageTargetsPromise.then(() => diagMark('image-target-json-fetch-end'));
+  }
 
   // ---- Arrival gate ------------------------------------------------------
   // Runs whenever the experience declares a geofence, regardless of
@@ -378,6 +479,12 @@ async function runEightWallExperience(experience: ExperienceManifest): Promise<v
   let camera: THREE.PerspectiveCamera;
   let renderer: THREE.WebGLRenderer;
   let anchorSource: AnchorSource;
+  // Only assigned on the image-target path (below) — the one-way latch that
+  // stops 'scanning'/'loading' coaching hints from re-entering the loading
+  // UX after the first stable reveal (AR_SYSTEM.md §G follow-up,
+  // 2026-08-18). null on the tap-placement/FAKE_AR paths, which never
+  // register this listener in the first place.
+  let hintGate: ImageEventHintGate | null = null;
 
   if (FAKE_AR) {
     // Desk simulation: no camera, no SLAM, no placement — an always-tracking
@@ -385,7 +492,6 @@ async function runEightWallExperience(experience: ExperienceManifest): Promise<v
     // below this branch runs unmodified.
     ({ scene, camera, renderer, anchorSource } = startDevSim(canvas, frameBus));
     await anchorSource.acquire();
-    overlay.hideAll();
   } else {
     // start() must run inside a user gesture: iOS Safari only shows the
     // motion-sensor permission prompt (which 8th Wall requests during
@@ -393,6 +499,7 @@ async function runEightWallExperience(experience: ExperienceManifest): Promise<v
     // same tap.
     const session = new EightWallSession(canvas, frameBus);
     const imageTargets = imageTargetsPromise === null ? null : await imageTargetsPromise;
+    diagMark('start-ar-button-shown');
 
     const handles = await new Promise<Awaited<ReturnType<EightWallSession['start']>>>((resolve, reject) => {
       overlay.showPanel(
@@ -401,6 +508,17 @@ async function runEightWallExperience(experience: ExperienceManifest): Promise<v
           : "You've arrived!\nNext: camera + motion access, then scan the ground to place the scene.",
         'Start AR',
         () => {
+          diagMark('start-ar-tapped');
+          // QR first-scan UX (AR_SYSTEM.md §G "Cold-start stabilization"):
+          // confirm the tap registered immediately. Before this pass the
+          // panel sat unchanged through the whole engine-import +
+          // camera/motion-permission gap with no feedback at all — the
+          // leading, code-confirmed explanation for users re-scanning the
+          // QR, believing nothing happened, when the assets/engine were
+          // simply still loading (see the investigation report). showHint()
+          // is non-blocking and cannot swallow the OS permission prompts
+          // that follow.
+          overlay.showHint('Starting camera…');
           session
             .start(imageTargets !== null ? { imageTargetData: imageTargets.imageTargetData } : {})
             .then(resolve, (error: unknown) => {
@@ -416,17 +534,17 @@ async function runEightWallExperience(experience: ExperienceManifest): Promise<v
       );
     });
     ({ scene, camera, renderer } = handles);
+    diagMark('xr8-onstart-fired');
 
     if (imageTargets !== null) {
       // ---- Image-target origin ---------------------------------------------
       overlay.showHint('Point your camera at the plaque.');
-      session.onImageEvent((kind) => {
-        if (kind === 'loading') overlay.showHint('Loading image target…');
-        if (kind === 'scanning') overlay.showHint('Point your camera at the plaque.');
-      });
+      hintGate = new ImageEventHintGate((text) => overlay.showHint(text));
+      session.onImageEvent((kind) => hintGate?.handle(kind));
 
       const imageAnchor = new ImageTargetAnchorSource(session, scene, [...imageTargets.targetsByName.values()]);
       await imageAnchor.acquire();
+      diagMark('first-image-found-acquired (bootstrap, not yet revealed)');
       anchorSource = imageAnchor;
     } else {
       // ---- Tap placement -----------------------------------------------------
@@ -438,54 +556,34 @@ async function runEightWallExperience(experience: ExperienceManifest): Promise<v
       await tapAnchor.acquire();
       anchorSource = tapAnchor;
     }
-    overlay.hideAll();
   }
 
-  // ---- Scene content -------------------------------------------------
-  // '8thwall': SceneGraphLoader mounts the mesh at identity rotation/scale
-  // 1 — anchorSource.group (TapPlacedAnchorSource / ImageTargetAnchorSource)
-  // already supplies the correct frame and the real-meters absolute scale
-  // (Phase 2B decision record); physicalTargetWidthMeters is provably
-  // unread by SceneGraphLoader's '8thwall' branch (see its own source —
-  // only the 'mindar' branch's metersToMarkerWidths() consumes it), so a
-  // targets[] experience (§E "Multi-target plaques" — no singular
-  // physicalTargetWidthMeters at this level, each plaque has its own) can
-  // pass any one of its targets' widths here without it mattering; the
-  // singular-field path still requires its own value, same as before.
-  // Piping anchorSource.group in below is the same seam the MindAR path
-  // uses with anchor.group.
-  const sceneWidthMeters =
-    experience.physicalTargetWidthMeters ??
-    (experience.targets !== undefined ? experience.targets[0]?.physicalTargetWidthMeters : undefined);
-  if (sceneWidthMeters === undefined) {
-    // ManifestResolver enforces physicalTargetWidthMeters (singular) or a
-    // non-empty targets[] (each validated with its own) whenever modelUrl
-    // is declared — the recheck exists for type narrowing and to keep the
-    // invariant local and loud, same pattern as the MindAR path above.
-    throw new Error(
-      `Experience "${experience.targetId}" declares modelUrl without physicalTargetWidthMeters (or a non-empty targets[]).`
-    );
-  }
-  const loader = new SceneGraphLoader(modelUrl, sceneWidthMeters, '8thwall');
-  const { root, hotspots, occluders } = await loader.load();
-  console.log(
-    `[runEightWallExperience] SceneGraphLoader found ${hotspots.length} hotspot_* node(s) ` +
-      `and ${occluders.length} occluder mesh(es) in ${modelUrl}.`
-  );
-  anchorSource.group.add(root);
+  // ---- Cold-start stabilization: reveal gate (AR_SYSTEM.md §G) ----------
+  // Neither wait blocks the other: sceneContentPromise has been loading
+  // since before the arrival gate even started, and anchorSource.whenStable()
+  // resolves independently (immediately for tap-placed/dev-sim — the
+  // placement gesture IS the trust signal; only after a checked,
+  // non-bootstrap pose sample for an image target — see
+  // ImageTargetAnchorSource's own doc comment). The scene is mounted under
+  // anchorSource.group (already hidden — ImageTargetAnchorSource keeps
+  // group.visible=false through the bootstrap sample) before either wait
+  // resolves, so there's nothing to "pop in" once revealed: the transform
+  // is already correct, only visibility flips.
+  overlay.showHint('Loading…');
+  const sceneContent = await sceneContentPromise;
+  anchorSource.group.add(sceneContent.root);
+  const { hotspots, occluders, markers, card, contentProvider } = sceneContent;
 
-  // One fetch/parse of the .riv serves all marker instances — the Card is
-  // plain HTML/CSS (CardPanel.ts), no Rive involved.
-  const riveFile = await loadRiveFile(experience.riveUrl);
-
-  const contentProvider = new GoogleSheetContentProvider(contentUrl);
-  contentProvider.prefetch();
-
-  const markers = new MarkerLayer(riveFile);
-  await markers.attach(hotspots);
-  const card = new CardPanel();
-  await card.attach();
-  console.log('[runEightWallExperience] MarkerLayer and CardPanel attached — content pipeline is live.');
+  await anchorSource.whenStable();
+  // One-way: the coaching hint listener (if any — only the image-target
+  // path registers one) can never re-show the loading UX after this,
+  // however many more 'scanning'/'loading' events arrive later. Does not
+  // touch the scene/anchor itself — see ImageEventHintGate's own doc
+  // comment.
+  hintGate?.markRevealed();
+  diagMark('scene-revealed');
+  diagPrintTimeline();
+  overlay.hideAll();
 
   let selected: Hotspot | null = null;
   const closeCard = (): void => {

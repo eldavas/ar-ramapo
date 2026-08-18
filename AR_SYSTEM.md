@@ -1995,3 +1995,121 @@ schema above.
   physical tracking-quality issue, documented with a mitigation.
 
   No iOS work. No WebXR work. No changes to the MindAR runtime path.
+
+  **Progress (2026-08-18): cold-start stabilization — the scene no longer
+  reveals itself off an unchecked bootstrap pose.** A user-reported
+  production symptom on the `site` experience: after scanning a plaque,
+  buildings appeared tiny/mis-oriented and markers were absent for
+  ~5–6 seconds, self-correcting with no user action. Root-caused against
+  this file's own pre-existing behavior (not assumed): `ImageTargetAnchorSource
+  .onImageEvent`'s `'found'` case has always applied the very first tracked
+  pose sample unconditionally (`trustworthy = !wasAcquired || ...` —
+  the bootstrap sample never goes through `isSampleTrustworthy()` at all —
+  see that method's own doc comment, unchanged by this pass: "refusing to
+  ever place the scene would be worse than an imperfect first placement")
+  and, until this pass, set `group.visible = true` in that same branch —
+  the instant the bootstrap sample landed, whatever pose it carried. 8th
+  Wall's own absolute-scale estimate (`scale:'absolute'`,
+  `EightWallSession.ts`'s own comment: "needs a few seconds of device
+  parallax to converge") is routinely not yet converged on that very first
+  sample, so the scene rendered at whatever mis-scaled/mis-oriented pose
+  the engine reported until a LATER sample independently passed
+  `isSampleTrustworthy()` (scale ratio ±25% AND `trackingStatus==='NORMAL'`)
+  and silently snapped the anchor to the right place — the exact "wrong,
+  then self-corrects" symptom reported, and consistent with this file's own
+  §10/§13 telemetry (a bad-pose re-detection "converged... and stayed there
+  for ~a minute," filed watch-only at the time because nothing depended on
+  anchor VISIBILITY stability yet — it does now). Markers were independently
+  absent over the same window for an unrelated but coincident reason:
+  `isTracking()` (which gates marker visibility) has always required
+  `trackingStatus==='NORMAL'`, the same convergence-dependent signal — the
+  two symptoms shared a root mechanism without being coordinated by any
+  code that connected them.
+
+  **Fix: applying a pose and revealing it are now two different decisions,
+  not one.** `ImageTargetAnchorSource` still applies the bootstrap sample
+  unconditionally (unchanged — an anchor must never be left un-placed) but
+  no longer reveals `group` for it. `group.visible` now flips true exactly
+  once, the first time a sample independently passes
+  `isSampleTrustworthy()` — the same event now also resolves a new
+  `whenStable(): Promise<void>` on the `AnchorSource` interface
+  (`AnchorSource.ts`), distinct from `acquire()` (which still resolves on
+  the bootstrap sample, so downstream code can start mounting content
+  immediately — see below). `TapPlacedAnchorSource.whenStable()` and the
+  `?fakear=1` desk-sim's `SimulatedAnchorSource.whenStable()` both resolve
+  immediately — tap placement and the desk sim have no bootstrap-pose
+  ambiguity to wait out; only the image-target path has one. No change to
+  `applyPose()`'s composition math, `TARGET_FRAME_TO_WORLD_FIX`,
+  `rotationYawDeg`, `originOffsetMeters`, or the existing scale/tracking
+  plausibility gates — this is a visibility decision layered on top of
+  already-correct, already-tested pose logic, not a rewrite of it.
+
+  **`main.ts`'s `runEightWallExperience()` reveal sequence, before/after:**
+  before, `overlay.hideAll()` ran immediately after `anchorSource.acquire()`
+  (i.e., off the bootstrap sample), then the GLB/Rive/marker/card pipeline
+  loaded serially, fully AFTER acquisition, with no architectural reason
+  tying that ordering to tracking state. After: GLB fetch+parse, Rive
+  fetch+parse, `MarkerLayer.attach()`, and `CardPanel.attach()` (new
+  `loadEightWallSceneContent()`, respecting their real dependency graph —
+  markers need both the GLB's hotspots and the parsed Rive file;
+  `CardPanel` needs neither, since Phase 3's fifth physical-device-test
+  entry made it plain HTML/CSS, so it attaches on its own parallel promise)
+  are kicked off at the TOP of `runEightWallExperience()` — before the
+  arrival gate, before "Start AR," before any AR session exists at all —
+  instead of after acquisition. The scene mounts under `anchorSource.group`
+  (already hidden) as soon as that load finishes; the overlay shows
+  `'Loading…'` (reusing the existing `UxOverlay.showHint()` primitive —
+  the same non-blocking, screen-space coaching-strip component already
+  used for "Point your camera at the plaque," never a new UI system) from
+  the moment the anchor is acquired until BOTH the scene content is
+  mounted AND `anchorSource.whenStable()` resolves, at which point
+  `overlay.hideAll()` runs once. Because `group.visible` only ever flips
+  `false→true` (never back), a later brief tracking loss cannot re-trigger
+  the loading state — the existing marker-hysteresis and
+  last-known-good-pose behavior (unchanged) handles that exactly as it did
+  before this pass.
+
+  **QR first-scan UX**: a second, related gap found in the same pass —
+  after tapping "Start AR," `EightWallSession.start()` awaits the engine
+  module import, `XrController.configure()`, and `xr8.run()`
+  (camera/motion permission prompts) with NO loading feedback of any kind;
+  the panel sat unchanged. On a slow/cold cellular connection right after a
+  QR scan, this is the strongest code-grounded explanation for users
+  re-scanning the QR believing nothing happened (assets/engine already
+  cached by the second load, so it then appears instant) — not a browser
+  or 8th Wall limitation (confirmed against current 8th Wall docs: no
+  official guidance describes this as expected browser behavior). Fixed by
+  calling `overlay.showHint('Starting camera…')` synchronously inside the
+  "Start AR" click handler, before `session.start()` — confirms the tap
+  registered immediately, without touching the still-mandatory iOS
+  gesture requirement for `DeviceMotionEvent.requestPermission()`.
+  Distinguished explicitly (not assumed): the QR scanner's visual
+  recognition of the printed plaque cannot be transferred into the
+  browser's own camera session — there is no browser API for that — so the
+  physical plaque must always be seen again by whichever camera session is
+  doing AR tracking, regardless of any loading-feedback fix. No
+  cookie/localStorage persistence was added: nothing about "remembering
+  intent to start AR" was found to solve a real problem here — the URL
+  itself already carries that intent, and today's flow has exactly one
+  required gesture tap, not several.
+
+  **Verified in software** (`npm run typecheck`/`build`/`test`, 19/19 unit
+  tests — 3 new, covering exactly this contract: a bootstrap-only pose does
+  not reveal the scene or resolve `whenStable()`; the first trustworthy
+  sample after bootstrap does, exactly once; an implausible sample arriving
+  before any trustworthy one is rejected without revealing or corrupting
+  the anchor; the two pre-existing tests that asserted `group.visible ===
+  true` off the bootstrap sample were updated to assert the new, correct
+  `false`, per this pass's own contract change). The 4-plaque composition
+  self-consistency tests, unmodified and still passing, confirm this pass
+  did not touch that math. **Not verifiable in software, requires physical
+  device testing:** whether the reveal actually lands meaningfully faster
+  than 5–6 seconds after a real absolute-scale convergence, and whether the
+  "Starting camera…" feedback actually reduces double-QR-scans in the
+  field — both need an on-device capture with the temporary diagnostic
+  instrumentation (`DiagnosticTimeline.ts`, `?debug=1`) still present in
+  this codebase for exactly that purpose; see that file's own doc comment
+  for removal instructions once a capture confirms the fix. GLB weight was
+  re-confirmed NOT the cause during the original investigation (2.6&nbsp;MB,
+  27 meshes, ~38.6K triangles, zero textures) — nothing in this pass
+  touched `site-scene.glb` or any Blender asset.

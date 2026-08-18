@@ -10,6 +10,10 @@ import type {
 } from './types/xr8.js';
 import type { FrameBus } from './FrameBus.js';
 import { traceT } from './TraceLog.js';
+// TEMPORARY diagnostic instrumentation — see DiagnosticTimeline.ts's own
+// doc comment. Remove this import and every diagMark() call site once the
+// 5-6s startup investigation is closed.
+import { diagMark } from './DiagnosticTimeline.js';
 
 export type TrackingStatusHandler = (status: Xr8TrackingStatus) => void;
 
@@ -97,8 +101,10 @@ export class EightWallSession {
       window.THREE = { ...THREE };
     }
 
+    diagMark('xr8-engine-module-import-start');
     const { XR8Promise } = await import('@8thwall/engine-binary');
     const xr8 = await XR8Promise;
+    diagMark('xr8-engine-module-ready');
     this.xr8 = xr8;
 
     xr8.XrController.configure({
@@ -127,6 +133,7 @@ export class EightWallSession {
         {
           name: 'bench-app',
           onStart: () => {
+            diagMark('xr8-pipeline-onstart');
             const handles = xr8.Threejs.xrScene();
             // Eye-height start pose: with absolute scale the estimated
             // ground then lands near y≈0, which keeps hit-test results and
@@ -190,6 +197,9 @@ export class EightWallSession {
                 console.log(
                   `[${traceT()}] [TrackingStatus] ${status} reason=${reasonText} — was ${previous}`
                 );
+                if (status === 'NORMAL') {
+                  diagMark('tracking-status-first-normal');
+                }
                 for (const handler of this.statusHandlers) {
                   handler(status);
                 }
@@ -207,6 +217,7 @@ export class EightWallSession {
         },
       ]);
 
+      diagMark('xr8-run-invoked');
       xr8.run({ canvas: this.canvas });
     });
 

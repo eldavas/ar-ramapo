@@ -60,6 +60,17 @@ export class TapPlacedAnchorSource implements AnchorSource {
     this.placed = true;
   }
 
+  /**
+   * Tap placement has no bootstrap-pose ambiguity to wait out: the user's
+   * tap against a confirmed hit-test ring (PlacementController.run()) IS
+   * the trust signal, already applied before acquire() resolves — so this
+   * is the same instant, not a separate wait (see AnchorSource.whenStable's
+   * own doc comment for the image-target case this differs from).
+   */
+  whenStable(): Promise<void> {
+    return Promise.resolve();
+  }
+
   isTracking(): boolean {
     const result = this.placed && this.session.trackingStatus === 'NORMAL';
     if (result !== this.lastLoggedTrackingResult) {

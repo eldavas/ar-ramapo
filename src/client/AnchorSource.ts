@@ -23,6 +23,19 @@ export interface AnchorSource {
    * valid mount point until this resolves.
    */
   acquire(): Promise<void>;
+  /**
+   * Resolves once the group's transform is trustworthy enough to reveal to
+   * the user — distinct from acquire(), which only means "some pose
+   * exists." For a tap-placed origin the two are the same instant (the
+   * user's tap against a confirmed hit-test ring already IS the trust
+   * signal). For an image-target origin, acquire() resolves on the first
+   * detection's unchecked bootstrap pose (kept, so the anchor is never
+   * left un-placed — see ImageTargetAnchorSource's own doc comment), while
+   * whenStable() resolves only once a pose has passed the source's own
+   * plausibility/tracking-quality gate — the signal callers should gate a
+   * scene reveal on, never acquire() alone.
+   */
+  whenStable(): Promise<void>;
   /** Feeds HotspotProjector's isTrackingActive closure, polled per frame. */
   isTracking(): boolean;
   /** Origin moved after acquire() — e.g. re-place, or image re-detection. */
