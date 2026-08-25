@@ -1575,6 +1575,127 @@ schema above.
     on whichever plaque is scanned, so they have no `originOffsetMeters`
     to begin with and are translation-invariant.
 
+  **Progress (2026-08-2x): QR-plaque artwork identified as a real
+  tracking-quality defect, candidate replacement built and on-device
+  tested, one open issue found and diagnosed but NOT fixed — handed off
+  for the next session (own or collaborator's) to pick up.**
+
+  **Root cause, cross-checked against two independent sources:** on-device
+  testing of the printed QR plaques (`tools/build_site_plaques.py`) showed
+  slow acquisition, wrong initial pose, and continuous jitter. Both
+  `docs/asset-authoring-guide.md` §3.1 (this project's own guidance) and
+  8th Wall's own docs (8thwall.org/docs/engine/guides/image-targets: "a
+  lot of varied detail" + "high contrast"; avoid "repetitive patterns,"
+  "excessive dead space"; "detection cannot distinguish between colors")
+  independently say the same thing. A QR code IS a repeating module grid,
+  and since all 4 plaques encode the SAME experience URL (§A: identity
+  resolved by tracking, never the QR payload), that grid is
+  pixel-identical across all 4 "distinct" plaques — violating the
+  repetition rule twice over, and undermining the very distinctness the
+  per-side badge shapes were meant to provide.
+
+  **Decision: decouple session-bootstrap (QR) from pose-tracking (image
+  target) entirely**, rather than iterate on QR-based artwork further:
+  - QR code becomes pure "open the web app," moved OFF the 3.5cm ledge
+    entirely (signage decision, not a geometry/manifest one) — however
+    many copies make sense for reachability, no longer part of the
+    tracked scene or coordinate system at all.
+  - 4 dedicated image targets stay on the ledge (same mount footprint),
+    purpose-built for tracking only: no QR, no shared regions between
+    sides, true binary black/white (monochrome laser printer; 8th Wall's
+    own docs confirm color doesn't help detection anyway), closer to
+    square than the old 90×30mm (3:1) shape — §3.1 also flags "extremely
+    thin/long" aspect ratios as less reliable.
+  - Organization-logo-as-tracking-target was discussed and explicitly
+    deferred (not rejected): a shared logo mark recreates the same
+    "identical region across all 4 targets" problem the QR caused, unless
+    the logo itself is made non-uniform per side (varying treatment, not
+    just a different border around an identical center) — revisit once
+    the abstract-pattern approach is validated or found insufficient.
+
+  **Built, phase 1 (abstract patterns, `tools/build_site_tracking_
+  targets.py`, new tool):** 4 independent-seed Voronoi cell patterns
+  (`scipy.spatial.cKDTree` nearest-seed lookup), each cell pure black or
+  white, roughly balanced so no tone dominates. First pass used pure
+  uniform-random seed points and visibly produced oversized cells (large
+  flat regions — the same "dead space" problem in miniature); fixed by
+  switching to blue-noise/Poisson-disc-style rejection sampling
+  (`sample_points()`), which evens out cell sizes with no other change.
+  30mm square, 24px/mm (matches `build_site_plaques.py`'s density
+  convention — 640px minimum enforced by `@8thwall/image-target-cli`). A
+  small side label (FRONT/BACK/LEFT/RIGHT) is stamped in one corner —
+  both installer verification and a substitute orientation cue now that
+  the shape is square (the old landscape aspect ratio used to make a
+  90°-rotation mounting mistake obvious on its own).
+
+  **Compiled + wired as a NEW validation harness, not the production
+  entry:** `tools/compile_8thwall_target.mjs` (already-existing tool,
+  reused as-is) compiled all 4 into `public/assets/image-targets/
+  site-tracking-{front,back,left,right}/` — verified 720×720,
+  `isRotated: false` (nothing cropped). `manifest.ts` gained 4 new
+  single-image-target entries (`site-tracking-front`/etc., same shape as
+  `8thwall-test` — no `targets[]` composition), so each candidate can be
+  tested independently on real 8th Wall hardware before the production
+  `'site'` entry's `targets[]`/geometry get touched at all.
+
+  **On-device test result (site-tracking-front, real printed candidate,
+  not a screen):** two findings, one expected-and-fine, one real and
+  still open.
+  1. **World origin appears at the plaque's own center, not the baseboard
+     corner — this is correct, not a regression.** `site-tracking-front`
+     is a single-image-target harness entry by design (mirrors
+     `site-front`), which re-centers the WHOLE scene on itself (§A's
+     original single-plaque-center rule) rather than applying the
+     calibrated `originOffsetMeters` the production `targets[]` entry
+     computes. That composition only happens once the artwork is
+     confirmed good and promoted to the production entry — not done yet,
+     intentionally.
+  2. **Pose still visibly spins/scales while the camera holds roughly on
+     the target and the angle is adjusted — real, diagnosed, NOT fixed.**
+     `ImageTargetAnchorSource.applyPose()` applies every sample that
+     passes `isSampleTrustworthy()` (scale ratio + `trackingStatus===
+     'NORMAL'`) directly to the 3D anchor's rotation/position, every
+     frame, with zero temporal filtering — only a binary accept/reject
+     gate exists, confirmed by reading the current source (unaffected by
+     the collaborator's 3 most-recent commits, all of which explicitly
+     state no change to `applyPose()`'s composition math). The improved
+     artwork reduces raw pose noise but can't eliminate this class of
+     jitter by itself.
+
+     **Proposed fix, NOT implemented — a naive version of this was
+     already tried and reverted once in this codebase, so don't just
+     add smoothing back blindly:** `OneEuroFilter.ts`'s own doc comment
+     says pose-smoothing was tried for MindAR and reverted because it
+     "made the whole scene visibly lag behind the physical model" —
+     jitter absorption was moved to the 2D screen-space marker stage
+     (`MarkerLayer.ts`) instead. `ARSessionManager.ts`'s
+     `TRACKING_PROFILE_RIGID_ANCHOR` confirms why: a LOW-beta filter
+     causes visible lag/"swim" for a rigidly-anchored scene, so it uses a
+     HIGH beta (1000) instead — still damps at-rest tremor
+     (`filterMinCF: 0.001`) but gets out of the way almost entirely
+     during real motion. That's a different claim than "smoothing is
+     unsafe here" — it's "low-beta smoothing is unsafe here," and 8th
+     Wall's path currently has zero filtering of any kind, not even a
+     high-beta one. Proposed: port `OneEuroFilter1D` into
+     `ImageTargetAnchorSource.applyPose()` — one instance per position
+     axis (x/y/z), tuned like `TRACKING_PROFILE_RIGID_ANCHOR` (high
+     beta/low minCF), not the low-beta profile that caused the original
+     regression. Rotation needs one extra step beyond position: filtering
+     the quaternion's x/y/z/w components independently requires flipping
+     the incoming quaternion's sign when it's on the opposite hemisphere
+     from the previous filtered one (quaternions double-cover rotation
+     space) before filtering, then renormalizing the result.
+
+  **Status at handoff:** candidates generated and validated as "more
+  stable, not yet stable enough," root cause of the remaining jitter is
+  diagnosed with a concrete fix proposed (not guessed at), but nothing
+  in `ImageTargetAnchorSource.ts` has been changed. `-back`/`-left`/
+  `-right` candidates are compiled and wired but not yet on-device
+  tested. The production `'site'` entry is untouched by any of this
+  session's tracking-target work. Full session narrative, including the
+  discarded logo idea and the 8th-Wall-docs research, in
+  `docs/research/8th-wall-troubleshooting.md`'s latest section.
+
 - **Phase 4 — Native iOS App Clip. (OPEN)**
   Goal: the iOS delivery path promised in §A — a native App Clip
   (Swift / SwiftUI / ARKit / RealityKit / Rive iOS runtime) that consumes

@@ -1,0 +1,23 @@
+{
+  "imagePath": "/assets/image-targets/site-tracking-back/site-tracking-back_luminance.png",
+  "metadata": null,
+  "name": "site-tracking-back",
+  "type": "PLANAR",
+  "properties": {
+    "top": 0,
+    "left": 0,
+    "width": 720,
+    "height": 720,
+    "isRotated": false,
+    "originalWidth": 720,
+    "originalHeight": 720
+  },
+  "resources": {
+    "originalImage": "site-tracking-back_original.png",
+    "croppedImage": "site-tracking-back_cropped.png",
+    "thumbnailImage": "site-tracking-back_thumbnail.png",
+    "luminanceImage": "site-tracking-back_luminance.png"
+  },
+  "created": 1787684469127,
+  "updated": 1787684469127
+}

@@ -331,6 +331,77 @@ export const experienceManifest: ExperienceManifest[] = [
     physicalTargetWidthMeters: 0.09,
     version: '0.1.0',
   },
+  // ---------------------------------------------------------------------
+  // SINGLE-ENGINE VALIDATION HARNESS, 8th Wall, candidate tracking artwork
+  // (2026-08-2x planning session): NOT the production entry, and NOT the
+  // same thing as site-front/etc. above (those are MindAR). These 4 exist
+  // to validate the abstract Voronoi tracking-target candidates
+  // (tools/build_site_tracking_targets.py) on the actual engine the
+  // production 'site' entry uses, one at a time, before recomputing any
+  // of that entry's targets[] geometry. Each is a standalone single-image
+  // 8th Wall entry (same shape as '8thwall-test' above), not part of a
+  // targets[] array — no shared-corner offset composition here, same
+  // simplification site-front/etc. make for MindAR.
+  //
+  // Background: on-device testing of the QR-plaque artwork (the
+  // production entry's current targets[]) showed slow acquisition, wrong
+  // initial pose, and continuous jitter. Root cause (cross-checked
+  // against docs/asset-authoring-guide.md §3.1 and 8th Wall's own
+  // image-target guidance): the QR module grid is a repeating pattern,
+  // and since all 4 plaques encode the same URL, that block is
+  // pixel-identical across all 4 "distinct" targets. These candidates
+  // replace it with purpose-built abstract artwork, no QR, no shared
+  // regions between sides, true binary black/white (see the tool's own
+  // module docstring for the full reasoning).
+  //
+  // physicalTargetWidthMeters: 0.03 -- the candidate artwork is a 30mm
+  // square (TARGET_SIZE_MM in the generating script), not the old
+  // 90x30mm landscape plaque.
+  {
+    targetId: 'site-tracking-front',
+    riveUrl: '/assets/bench-ui.riv',
+    modelUrl: '/assets/site-scene.glb',
+    usdzUrl: '/assets/site-scene.usdz',
+    placement: 'image',
+    imageTargetUrl: '/assets/image-targets/site-tracking-front/site-tracking-front.json',
+    physicalTargetWidthMeters: 0.03,
+    contentUrl: 'https://docs.google.com/spreadsheets/d/1O4Zq8ggc7TgjKZIuUtufO-G9hJiK2KalJpD2Cux2sN8/gviz/tq?tqx=out:json',
+    version: '0.1.0',
+  },
+  {
+    targetId: 'site-tracking-back',
+    riveUrl: '/assets/bench-ui.riv',
+    modelUrl: '/assets/site-scene.glb',
+    usdzUrl: '/assets/site-scene.usdz',
+    placement: 'image',
+    imageTargetUrl: '/assets/image-targets/site-tracking-back/site-tracking-back.json',
+    physicalTargetWidthMeters: 0.03,
+    contentUrl: 'https://docs.google.com/spreadsheets/d/1O4Zq8ggc7TgjKZIuUtufO-G9hJiK2KalJpD2Cux2sN8/gviz/tq?tqx=out:json',
+    version: '0.1.0',
+  },
+  {
+    targetId: 'site-tracking-left',
+    riveUrl: '/assets/bench-ui.riv',
+    modelUrl: '/assets/site-scene.glb',
+    usdzUrl: '/assets/site-scene.usdz',
+    placement: 'image',
+    imageTargetUrl: '/assets/image-targets/site-tracking-left/site-tracking-left.json',
+    physicalTargetWidthMeters: 0.03,
+    contentUrl: 'https://docs.google.com/spreadsheets/d/1O4Zq8ggc7TgjKZIuUtufO-G9hJiK2KalJpD2Cux2sN8/gviz/tq?tqx=out:json',
+    version: '0.1.0',
+  },
+  {
+    targetId: 'site-tracking-right',
+    riveUrl: '/assets/bench-ui.riv',
+    modelUrl: '/assets/site-scene.glb',
+    usdzUrl: '/assets/site-scene.usdz',
+    placement: 'image',
+    imageTargetUrl: '/assets/image-targets/site-tracking-right/site-tracking-right.json',
+    physicalTargetWidthMeters: 0.03,
+    contentUrl: 'https://docs.google.com/spreadsheets/d/1O4Zq8ggc7TgjKZIuUtufO-G9hJiK2KalJpD2Cux2sN8/gviz/tq?tqx=out:json',
+    version: '0.1.0',
+  },
+  // ---------------------------------------------------------------------
   // PRODUCTION ENTRY (2026-08-14): the real four-plaque experience — 8th
   // Wall, `targets[]`, any of the 4 real plaques converges on the same
   // site-scene/hotspots/Marker/Card/content pipeline, correctly positioned

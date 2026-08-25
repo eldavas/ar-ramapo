@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>site tracking-target candidates — print sheet</title>
+<style>
+  @page { margin: 12mm; }
+  body { font: 11pt/1.5 system-ui, sans-serif; color: #111; margin: 0; }
+  h1 { font-size: 14pt; }
+  .grid { display: grid; grid-template-columns: repeat(2, 30.0mm); gap: 14mm; margin-top: 8mm; }
+  .target { position: relative; width: 30.0mm; height: 30.0mm; }
+  .target img { width: 30.0mm; height: 30.0mm; display: block; }
+  .tag { position: absolute; bottom: -6mm; left: 0; font-size: 8pt; font-weight: bold; }
+  .ruler { width: 100mm; height: 8mm; margin-top: 20mm; border: 0.3mm solid #000;
+            background: repeating-linear-gradient(to right,
+              #000 0, #000 0.25mm, transparent 0.25mm, transparent 10mm); }
+  .ruler-label { font-size: 9pt; margin-top: 1mm; }
+  ol { max-width: 150mm; }
+  .note { max-width: 150mm; padding: 3mm; border: 0.3mm dashed #000; font-size: 9pt; }
+</style>
+</head>
+<body>
+<h1>Site tracking-target candidates — 4 × 30mm × 30mm</h1>
+<div class="note">
+  <strong>These are CANDIDATES, not final artwork.</strong> Print for visual
+  review and hand-testing only — not yet compiled into an 8th Wall/MindAR
+  target or wired into the app. Do not remove/replace the existing printed
+  QR plaques on the ledge yet.
+</div>
+<ol>
+  <li>Print at <strong>100% scale / "Actual Size"</strong> — never "Fit to page".</li>
+  <li>Verify the calibration bar below measures exactly 100mm with a ruler
+      before trusting anything else on this page.</li>
+</ol>
+<div class="grid">
+<div class="target">
+  <img src="tracking-front.png" alt="front tracking-target candidate">
+  <div class="tag">FRONT</div>
+</div>
+<div class="target">
+  <img src="tracking-back.png" alt="back tracking-target candidate">
+  <div class="tag">BACK</div>
+</div>
+<div class="target">
+  <img src="tracking-left.png" alt="left tracking-target candidate">
+  <div class="tag">LEFT</div>
+</div>
+<div class="target">
+  <img src="tracking-right.png" alt="right tracking-target candidate">
+  <div class="tag">RIGHT</div>
+</div>
+</div>
+<div class="ruler"></div>
+<div class="ruler-label">calibration bar — must measure exactly 100 mm (ticks every 10 mm)</div>
+</body>
+</html>

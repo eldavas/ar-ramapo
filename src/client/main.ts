@@ -74,6 +74,29 @@ const STATE_MACHINE_NAME = 'State Machine 1';
 // '8thwall-test' remain the synthetic-rig coordinate/engine validation
 // rigs (AR_SYSTEM.md §G); 'proxy-target' the pre-Phase-3 anchored-plane
 // experience. Flip to any of these for that path — no other change needed.
+//
+// 2026-08-2x (candidate tracking-artwork validation harness): 'site-tracking-
+// front'/'-back'/'-left'/'-right' are 4 new single-image-target 8th Wall
+// entries (same shape as 'site-front'/etc. above, i.e. re-center the WHOLE
+// scene on themselves — no shared-corner offset composition) for testing the
+// abstract Voronoi tracking-target candidates (tools/build_site_tracking_
+// targets.py) one side at a time, before recomputing the production 'site'
+// entry's targets[] against whichever artwork is ultimately kept. On-device
+// test of 'site-tracking-front' (this session): acquisition/tracking felt
+// more stable than the old QR-plaque artwork, but pose still visibly
+// spins/scales while holding the camera on the target and adjusting angle —
+// root-caused to ImageTargetAnchorSource.applyPose() applying every
+// trustworthy sample's raw rotation/position with zero temporal filtering
+// (only a binary scale+trackingStatus accept/reject gate exists). A fix is
+// proposed but NOT YET IMPLEMENTED — see docs/research/
+// 8th-wall-troubleshooting.md's latest section and AR_SYSTEM.md §G Phase 6
+// for the full write-up, including why naive smoothing isn't safe to just
+// add (a low-beta pose filter was already tried and reverted for MindAR's
+// rigid-anchor case — see OneEuroFilter.ts/ARSessionManager.ts — so any fix
+// here needs the same adaptive/high-beta pattern MindAR already validates,
+// not a plain low-pass filter). Flip ACTIVE_TARGET_ID to any of the 4
+// site-tracking-* ids to resume testing; reverted to 'site' here since this
+// was a desk-testing detour, not a production change.
 const ACTIVE_TARGET_ID = 'site';
 
 // 8th Wall desk-testing bypasses — query params, not build flags, so the
