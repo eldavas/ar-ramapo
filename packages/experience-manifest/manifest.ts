@@ -331,7 +331,6 @@ export const experienceManifest: ExperienceManifest[] = [
     physicalTargetWidthMeters: 0.09,
     version: '0.1.0',
   },
-  // ---------------------------------------------------------------------
   // PRODUCTION ENTRY (2026-08-14): the real four-plaque experience — 8th
   // Wall, `targets[]`, any of the 4 real plaques converges on the same
   // site-scene/hotspots/Marker/Card/content pipeline, correctly positioned
@@ -361,6 +360,18 @@ export const experienceManifest: ExperienceManifest[] = [
   // own binary vertex data (not just the generating script's formulas) —
   // and will move again if LEDGE_WIDTH_M or the plaque size changes and
   // the scene is re-exported, same as before.
+  //
+  // RECOMPUTED AGAIN 2026-08-18 (same day, origin-corner fix):
+  // `AR_World_Origin` moved from the terrain crop-rectangle's own corner
+  // to the TRUE baseboard's bottom-left corner (tools/build_site_buildings.py
+  // third-pass REVISION note) — world (0,0,0) was previously ~3.4cm/3.5cm
+  // inside the real physical board edge, not on it. Pure translation, not
+  // a re-derivation: every value below shifted by the same (dx, dz), and
+  // rotationYawDeg/physicalTargetWidthMeters are unaffected (re-verified,
+  // not assumed). Cross-checked directly against the regenerated GLB's
+  // binary vertex data: site_ledge (the baseboard mesh) now spans exactly
+  // X:[0, 1.675], Z:[-1.414, 0] — its bottom-left corner sits at (0,0,0)
+  // to the sub-millimeter, confirming the fix.
   {
     targetId: 'site',
     riveUrl: '/assets/bench-ui.riv',
@@ -372,28 +383,28 @@ export const experienceManifest: ExperienceManifest[] = [
       {
         imageTargetUrl: '/assets/image-targets/site-front/site-front.json',
         physicalTargetWidthMeters: 0.09,
-        originOffsetMeters: { x: 0.803275, z: 0.020488 },
+        originOffsetMeters: { x: 0.8375, z: -0.015 },
         rotationYawDeg: 0,
       },
       {
         imageTargetUrl: '/assets/image-targets/site-back/site-back.json',
         physicalTargetWidthMeters: 0.09,
-        originOffsetMeters: { x: 0.803275, z: -1.363513 },
+        originOffsetMeters: { x: 0.8375, z: -1.399 },
         rotationYawDeg: 180,
       },
       {
         imageTargetUrl: '/assets/image-targets/site-left/site-left.json',
         physicalTargetWidthMeters: 0.09,
-        originOffsetMeters: { x: -0.019225, z: -0.671513 },
+        originOffsetMeters: { x: 0.015, z: -0.707 },
         rotationYawDeg: 90,
       },
       {
         imageTargetUrl: '/assets/image-targets/site-right/site-right.json',
         physicalTargetWidthMeters: 0.09,
-        originOffsetMeters: { x: 1.625775, z: -0.671513 },
+        originOffsetMeters: { x: 1.66, z: -0.707 },
         rotationYawDeg: -90,
       },
     ],
-    version: '0.1.0',
+    version: '0.1.1',
   },
 ];

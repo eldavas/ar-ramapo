@@ -122,6 +122,23 @@ either way. Ledge/plaque/marker positions in this file updated to match
 back-side from beyond -depth_m to beyond +depth_m) — pure relabeling, not
 a position change, confirmed by identical building matches and terrain
 relief before/after in both extraction scripts.
+
+REVISION (2026-08-18, third pass): `AR_World_Origin` moved from the
+terrain's own crop-rectangle corner to the TRUE baseboard's bottom-left
+corner. Both origin fixes above (u_sign, v_sign) only ever repositioned
+which corner of the TERRAIN counted as (0,0) — they never accounted for
+the baseboard extending beyond the terrain by the ledge width on every
+side, so world (0,0,0) was still ~3.4-3.5cm inside the true physical
+board edge, not on it. Caught by explicit user request to double-check
+origin-vs-baseboard-corner alignment. `compute_baseboard_origin_offset()`
+derives the (dx, dy) needed to slide everything so the real baseboard
+corner lands exactly at (0,0) — every builder function below now takes
+that offset and adds it to whatever x/y it authors. Pure translation, not
+a re-derivation: rotations/dimensions/relative positions are all
+unaffected, only what counts as (0,0) moves. `manifest.ts`'s `'site'`
+entry `targets[].originOffsetMeters` needs the matching recompute (same
+translation applied in glTF X/Z) — tracked separately, not implied by
+this script alone.
 """
 
 import json
@@ -226,11 +243,30 @@ def load_json(path: Path, stage_script: str) -> dict:
     return json.loads(path.read_text())
 
 
-def build_terrain_mesh(data: dict) -> bpy.types.Object:
+def compute_baseboard_origin_offset(terrain_data: dict) -> tuple:
+    """(dx, dy) to add to every x/y this module authors so that world
+    (0, 0, 0) lands on the TRUE baseboard's bottom-left corner instead of
+    the terrain crop-rectangle's own corner (see the 2026-08-18 third-pass
+    REVISION above). The terrain sits centered within the baseboard, so
+    this is exactly half the terrain-vs-baseboard size difference on each
+    axis — independent of LEDGE_WIDTH_M, since BASEBOARD_WIDTH_M/DEPTH_M
+    are their own direct measurement, not derived from the ledge."""
+    width_ft, depth_ft = terrain_data["crop_size_ft"]
+    ft_to_model_m = terrain_data["ft_to_model_m"]
+    width_m = width_ft * ft_to_model_m
+    depth_m = depth_ft * ft_to_model_m
+    dx = (BASEBOARD_WIDTH_M - width_m) / 2.0
+    dy = (BASEBOARD_DEPTH_M - depth_m) / 2.0
+    return dx, dy
+
+
+def build_terrain_mesh(data: dict, offset: tuple) -> bpy.types.Object:
     """Same construction as build_site_terrain.py — see that file for the
     meshing rationale (Delaunay TIN over all contour points)."""
+    dx, dy = offset
+    verts = [(x + dx, y + dy, z) for x, y, z in data["vertices_m"]]
     mesh = bpy.data.meshes.new("site_terrain")
-    mesh.from_pydata(data["vertices_m"], [], data["triangles"])
+    mesh.from_pydata(verts, [], data["triangles"])
     mesh.validate()
     mesh.update()
 
@@ -247,7 +283,7 @@ def build_terrain_mesh(data: dict) -> bpy.types.Object:
     return obj
 
 
-def build_buildings(data: dict) -> list:
+def build_buildings(data: dict, offset: tuple) -> list:
     """base_z_m comes straight from stage 1 now — either the real Ground
     MSL (table-matched buildings) or a terrain-nearest-vertex sample
     (unmatched ones), both already resolved in extract_site_buildings.py.
@@ -270,10 +306,11 @@ def build_buildings(data: dict) -> list:
     "Set Origin" family of operators on the group, not a plain
     `.location` assignment, which would otherwise drag all children with
     it since they inherit the parent transform)."""
+    dx, dy = offset
     group = make_empty("Buildings")
     objects = []
     for b in data["buildings"]:
-        footprint = b["footprint_m"]
+        footprint = [(x + dx, y + dy) for x, y in b["footprint_m"]]
         base_z = b["base_z_m"]
         height = b["height_m"]
 
@@ -315,7 +352,7 @@ def slugify(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", text.strip().lower()).strip("-")
 
 
-def build_building_hotspots(data: dict, building_objects: list) -> list:
+def build_building_hotspots(data: dict, offset: tuple, building_objects: list) -> list:
     """One hotspot_* empty per building with a real matched name (12 of 21
     — see REVISION 2026-08-13 in the module docstring). Positioned at each
     building's roof-center (footprint centroid, base_z + height) so the
@@ -324,6 +361,7 @@ def build_building_hotspots(data: dict, building_objects: list) -> list:
     `hotspot.parent = domino` — building objects have identity transform
     (mesh data already holds absolute coordinates), so the hotspot's
     `.location` is both its local and world position either way."""
+    dx, dy = offset
     by_id = {obj.name: obj for obj in building_objects}
     hotspots = []
     for b in data["buildings"]:
@@ -331,8 +369,8 @@ def build_building_hotspots(data: dict, building_objects: list) -> list:
         if not name:
             continue
         footprint = b["footprint_m"]
-        cx = sum(p[0] for p in footprint) / len(footprint)
-        cy = sum(p[1] for p in footprint) / len(footprint)
+        cx = sum(p[0] for p in footprint) / len(footprint) + dx
+        cy = sum(p[1] for p in footprint) / len(footprint) + dy
         cz = b["base_z_m"] + b["height_m"]
 
         hotspot = make_empty(f"{HOTSPOT_PREFIX}{b['id']}")
@@ -350,7 +388,7 @@ def build_building_hotspots(data: dict, building_objects: list) -> list:
     return hotspots
 
 
-def build_ledge_and_plaques(terrain_data: dict) -> tuple:
+def build_ledge_and_plaques(terrain_data: dict, offset: tuple) -> tuple:
     """Mounting ledge (now the FULL baseboard rectangle, real measured
     dimensions as of 2026-08-18 -- see BASEBOARD_WIDTH_M/DEPTH_M) + 4
     QR-plaque markers. Plaque size/thickness are still best-guess
@@ -364,14 +402,18 @@ def build_ledge_and_plaques(terrain_data: dict) -> tuple:
     ft_to_model_m = terrain_data["ft_to_model_m"]
     width_m = width_ft * ft_to_model_m
     depth_m = depth_ft * ft_to_model_m
+    dx, dy = offset
 
     # Full baseboard as a single rectangle (not a border ring), centered
     # on the terrain rectangle -- i.e. the terrain sits inset within it by
     # roughly LEDGE_WIDTH_M on every side (BASEBOARD_WIDTH_M/DEPTH_M are
     # an independent direct measurement, so the actual margin isn't
     # exactly LEDGE_WIDTH_M on every side to the sub-mm, matching
-    # real-world measurement noise).
-    board_cx, board_cy = width_m / 2.0, depth_m / 2.0
+    # real-world measurement noise). board_cx/board_cy include `offset`,
+    # so they reduce exactly to (BASEBOARD_WIDTH_M/2, BASEBOARD_DEPTH_M/2)
+    # -- the baseboard's own center relative to its own bottom-left corner,
+    # now that (0,0) IS that corner (2026-08-18 origin fix).
+    board_cx, board_cy = width_m / 2.0 + dx, depth_m / 2.0 + dy
     x0, x1 = board_cx - BASEBOARD_WIDTH_M / 2.0, board_cx + BASEBOARD_WIDTH_M / 2.0
     y0, y1 = board_cy - BASEBOARD_DEPTH_M / 2.0, board_cy + BASEBOARD_DEPTH_M / 2.0
 
@@ -441,7 +483,7 @@ def build_ledge_and_plaques(terrain_data: dict) -> tuple:
     return ledge, plaque_group
 
 
-def build_ramapo_site_marker(terrain_data: dict) -> bpy.types.Object:
+def build_ramapo_site_marker(terrain_data: dict, offset: tuple) -> bpy.types.Object:
     """Rough visual-reference marker for "front" -- a flat placeholder
     box + text label near the front-left corner, roughly where the real
     engraved "RAMAPO SITE" title block sits (2026-08-18). Dimensions are
@@ -452,8 +494,9 @@ def build_ramapo_site_marker(terrain_data: dict) -> bpy.types.Object:
     ft_to_model_m = terrain_data["ft_to_model_m"]
     width_m = width_ft * ft_to_model_m
     depth_m = depth_ft * ft_to_model_m
+    dx, dy = offset
 
-    board_cx, board_cy = width_m / 2.0, depth_m / 2.0
+    board_cx, board_cy = width_m / 2.0 + dx, depth_m / 2.0 + dy
     x0 = board_cx - BASEBOARD_WIDTH_M / 2.0
     y0 = board_cy - BASEBOARD_DEPTH_M / 2.0  # front edge of the baseboard (v now increases toward the back)
     mw, md = RAMAPO_MARKER_SIZE_M
@@ -497,21 +540,25 @@ def build_scene() -> None:
     print(f"loaded terrain ({len(terrain_data['vertices_m'])} verts) and "
           f"{len(buildings_data['buildings'])} buildings")
 
+    offset = compute_baseboard_origin_offset(terrain_data)
+    print(f"  baseboard-origin shift: dx={offset[0]:+.4f} m, dy={offset[1]:+.4f} m "
+          f"(world 0,0,0 now the baseboard's bottom-left corner, not the terrain's)")
+
     origin = make_empty("AR_World_Origin")
-    terrain = build_terrain_mesh(terrain_data)
+    terrain = build_terrain_mesh(terrain_data, offset)
     terrain.parent = origin
 
-    buildings_group = build_buildings(buildings_data)
+    buildings_group = build_buildings(buildings_data, offset)
     if buildings_group:
         buildings_group[0].parent.parent = origin
 
-    build_building_hotspots(buildings_data, buildings_group)
+    build_building_hotspots(buildings_data, offset, buildings_group)
 
-    ledge, plaque_group = build_ledge_and_plaques(terrain_data)
+    ledge, plaque_group = build_ledge_and_plaques(terrain_data, offset)
     ledge.parent = origin
     plaque_group.parent = origin
 
-    ramapo_marker = build_ramapo_site_marker(terrain_data)
+    ramapo_marker = build_ramapo_site_marker(terrain_data, offset)
     ramapo_marker.parent = origin
 
     bpy.context.view_layer.update()

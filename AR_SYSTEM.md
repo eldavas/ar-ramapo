@@ -1532,6 +1532,49 @@ schema above.
   entry internally consistent again, it doesn't add new on-device
   evidence beyond what §G's existing open items already track.
 
+  **Progress (2026-08-18, origin-corner fix, same day):** user explicitly
+  asked to double-check `AR_World_Origin` against the physical baseboard
+  rather than the site model — a real gap: the two prior origin fixes
+  (`u_sign`, `v_sign`) only ever repositioned which corner of the
+  *terrain* counted as (0,0), never accounting for the baseboard
+  extending past the terrain by the ledge width on every side. World
+  (0,0,0) sat ~3.4cm/3.5cm inside the true physical board edge, not on
+  it, since the ledge/baseboard additions (2026-08-13/2026-08-18) were
+  layered on top of an origin convention (`build_site_terrain.py`,
+  2026-08-12) written before the baseboard existed as real geometry.
+
+  - `tools/build_site_buildings.py`'s `compute_baseboard_origin_offset()`
+    derives `(dx, dy) = ((BASEBOARD_WIDTH_M - terrain_width_m) / 2,
+    (BASEBOARD_DEPTH_M - terrain_depth_m) / 2)` and every builder function
+    (terrain, buildings, hotspots, ledge/plaques, RAMAPO SITE marker) now
+    adds it — a pure translation, not a re-derivation; rotations,
+    dimensions, and relative positions are all unaffected. Duplicated into
+    `tools/build_site_terrain.py` (the terrain-only staging script) for
+    consistency, matching that file's existing convention of duplicating
+    `build_terrain_mesh()` rather than sharing a module.
+  - **Verified against the regenerated GLB's own binary vertex data**
+    (`pygltflib`, not just the generating script's formulas): `site_ledge`
+    (the baseboard mesh) now spans exactly X:[0, 1.675], Z:[-1.414, 0] in
+    glTF space — its bottom-left corner sits at (0,0,0) to the
+    sub-millimeter.
+  - `cad-source/out/`, `cad-source/handoff/`, and `public/assets/
+    site-scene.glb`/`.usdz` all regenerated and MD5-verified in sync.
+  - `manifest.ts`'s `'site'` entry `targets[].originOffsetMeters`
+    recomputed the same way as the 2026-08-18 pass above (mesh-bounds
+    center of each `plaque_{side}` object, cross-checked against the GLB
+    binary data) — every value shifted by the same translation:
+    front (0.8375, -0.015), back (0.8375, -1.399), left (0.015, -0.707),
+    right (1.66, -0.707). `rotationYawDeg`/`physicalTargetWidthMeters`
+    re-verified unchanged (translation doesn't affect either). Version
+    bumped 0.1.0 → 0.1.1. `docs/asset-authoring-guide.md` §3.5's plaque
+    table updated to match.
+  - **Verified:** `npm run typecheck`/`build`/`test` clean, `public/
+    assets/site-scene.glb` MD5-matches `cad-source/handoff/`.
+  - **Not affected, confirmed by design:** the single-plaque MindAR
+    harness entries (`site-front`/etc.) — they re-center the whole scene
+    on whichever plaque is scanned, so they have no `originOffsetMeters`
+    to begin with and are translation-invariant.
+
 - **Phase 4 — Native iOS App Clip. (OPEN)**
   Goal: the iOS delivery path promised in §A — a native App Clip
   (Swift / SwiftUI / ARKit / RealityKit / Rive iOS runtime) that consumes

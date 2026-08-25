@@ -303,23 +303,42 @@ inside manual-measurement tolerance. `site_ledge` in the Blender scene is
 now a single full-rectangle mesh at this real size (previously a 4-strip
 border ring at the guessed width).
 
+**`AR_World_Origin` — moved 2026-08-18 (origin-corner fix) from the
+terrain crop-rectangle's own corner to the TRUE baseboard's bottom-left
+corner.** Both prior origin fixes (u_sign, v_sign) only ever repositioned
+which corner of the *terrain* counted as (0,0); neither accounted for the
+baseboard extending past the terrain by the ledge width on every side, so
+world (0,0,0) sat ~3.4cm/3.5cm inside the real physical board edge, not on
+it. `tools/build_site_buildings.py`'s `compute_baseboard_origin_offset()`
+now derives the shift and applies it everywhere the scene is authored
+(terrain, buildings, hotspots, ledge, plaques, the RAMAPO SITE marker).
+Confirmed against the regenerated GLB's own binary vertex data (not just
+the generating script's formulas): `site_ledge` (the baseboard mesh) spans
+exactly X:[0, 1675mm], Z:[-1414mm, 0] — its bottom-left corner sits at
+(0,0,0) to the sub-millimeter.
+
 **Plaque position on the model — derived from `site-scene.glb`, not
-independently measured. Recomputed 2026-08-18** against the real ledge
-width above and the new 90×30mm plaque geometry (previously derived
-against the 76.2mm guess and the old 50mm square — both stale numbers
-this recompute replaces). Implemented in `manifest.ts`'s `'site'` entry
-`targets[].originOffsetMeters` — AR_SYSTEM.md §G has the full derivation
-history. Each plaque's mesh-bounds center in `site-scene.glb`, relative
-to `AR_World_Origin`, in glTF X/Z (Blender authors Y-up→export flips Y to
-−Z, §F), cross-checked directly against the GLB's own binary vertex data,
-not just the generating script's formulas:
+independently measured. Recomputed 2026-08-18 (origin-corner fix, same
+day as the ledge/plaque-geometry recompute above)** — both share the same
+underlying translation, so every value below moved by the same amount as
+the origin itself, and only that. Implemented in `manifest.ts`'s `'site'`
+entry `targets[].originOffsetMeters` — AR_SYSTEM.md §G has the full
+derivation history. Each plaque's mesh-bounds center in `site-scene.glb`,
+relative to `AR_World_Origin`, in glTF X/Z (Blender authors Y-up→export
+flips Y to −Z, §F), cross-checked directly against the GLB's own binary
+vertex data, not just the generating script's formulas:
 
 | Plaque | X from origin | Z from origin |
 |---|---:|---:|
-| front | 803.275 mm | 20.488 mm |
-| back | 803.275 mm | −1363.513 mm |
-| left | −19.225 mm | −671.513 mm |
-| right | 1625.775 mm | −671.513 mm |
+| front | 837.5 mm | −15 mm |
+| back | 837.5 mm | −1399 mm |
+| left | 15 mm | −707 mm |
+| right | 1660 mm | −707 mm |
+
+(These now land on clean numbers — half the plaque depth in from each
+edge, and exactly `BASEBOARD_WIDTH_M`/`2`/`BASEBOARD_DEPTH_M`/`2` for the
+centered axis — because the origin itself is now the baseboard's own
+corner, not an arbitrary offset from it.)
 
 **Plaque mounting rotation (`rotationYawDeg`) — derived, not measured or
 invented, 2026-08-14, implemented in the same manifest entry.** Computed

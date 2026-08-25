@@ -30,12 +30,18 @@ manifest entry is a deliberate future step once building data lands and the
 four-plaque origin numbers (§A/§E) are computed, not implied by this script
 existing.
 
-Origin convention: world (0, 0, 0) is the crop rectangle's own (u=0, v=0)
-reference corner (matching the four-plaque design's origin-corner amendment
-in AR_SYSTEM.md §A) — NOT a plaque center, unlike build_bench_scene.py's
-single-plaque convention. Z = 0 is the lowest elevation point in the
-triangulated surface; the 0.5 in base riser measured on the physical model
-is structural support below the visible surface and is deliberately not
+Origin convention: world (0, 0, 0) is the TRUE baseboard's bottom-left
+corner (matching the four-plaque design's origin-corner amendment in
+AR_SYSTEM.md §A, and the 2026-08-18 baseboard-corner fix — see
+build_site_buildings.py's REVISION notes) — NOT the terrain crop
+rectangle's own corner, and NOT a plaque center either, unlike
+build_bench_scene.py's single-plaque convention. This script has no ledge
+or baseboard geometry of its own (terrain-only staging export), so it
+duplicates BASEBOARD_WIDTH_M/DEPTH_M from build_site_buildings.py purely
+to compute the same origin shift, keeping both scripts' world (0,0,0)
+consistent. Z = 0 is the lowest elevation point in the triangulated
+surface; the 0.5 in base riser measured on the physical model is
+structural support below the visible surface and is deliberately not
 modeled here.
 """
 
@@ -52,6 +58,12 @@ GLB_PATH = REPO_ROOT / "cad-source" / "out" / "site-terrain.glb"
 USDZ_PATH = REPO_ROOT / "cad-source" / "out" / "site-terrain.usdz"
 
 TERRAIN_COLOR = (0.55, 0.52, 0.45, 1.0)
+
+# Real baseboard measurements (2026-08-18), duplicated from
+# build_site_buildings.py purely to compute the same origin shift — see
+# that file's BASEBOARD_WIDTH_M/DEPTH_M for the source of truth.
+BASEBOARD_WIDTH_M = 1.675       # 167.5cm
+BASEBOARD_DEPTH_M = 1.414       # 141.4cm
 
 
 def link(obj: bpy.types.Object) -> bpy.types.Object:
@@ -81,9 +93,22 @@ def load_terrain_data() -> dict:
     return json.loads(JSON_PATH.read_text())
 
 
-def build_terrain_mesh(data: dict) -> bpy.types.Object:
+def compute_baseboard_origin_offset(data: dict) -> tuple:
+    """(dx, dy) to add to every x/y so world (0,0,0) lands on the true
+    baseboard's bottom-left corner — see the module docstring and
+    build_site_buildings.py's matching function."""
+    width_ft, depth_ft = data["crop_size_ft"]
+    ft_to_model_m = data["ft_to_model_m"]
+    width_m = width_ft * ft_to_model_m
+    depth_m = depth_ft * ft_to_model_m
+    return (BASEBOARD_WIDTH_M - width_m) / 2.0, (BASEBOARD_DEPTH_M - depth_m) / 2.0
+
+
+def build_terrain_mesh(data: dict, offset: tuple) -> bpy.types.Object:
+    dx, dy = offset
+    verts = [(x + dx, y + dy, z) for x, y, z in data["vertices_m"]]
     mesh = bpy.data.meshes.new("site_terrain")
-    mesh.from_pydata(data["vertices_m"], [], data["triangles"])
+    mesh.from_pydata(verts, [], data["triangles"])
     mesh.validate()
     mesh.update()
 
@@ -111,8 +136,11 @@ def build_scene() -> None:
     print(f"loaded {JSON_PATH.name}: crop {data['crop_size_ft'][0]:.0f}x{data['crop_size_ft'][1]:.0f} ft, "
           f"relief {data['min_elevation_ft']:.0f}-{data['max_elevation_ft']:.0f} ft")
 
+    offset = compute_baseboard_origin_offset(data)
+    print(f"  baseboard-origin shift: dx={offset[0]:+.4f} m, dy={offset[1]:+.4f} m")
+
     origin = make_empty("AR_World_Origin")
-    terrain = build_terrain_mesh(data)
+    terrain = build_terrain_mesh(data, offset)
     terrain.parent = origin
 
     bpy.context.view_layer.update()
