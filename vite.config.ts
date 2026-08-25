@@ -31,7 +31,11 @@ export default defineConfig({
         manualChunks(id: string): string | undefined {
           if (
             id.includes('node_modules') &&
-            (id.includes('/three/') || id.includes('/mind-ar/') || id.includes('@rive-app'))
+            (id.includes('/three/') ||
+              id.includes('/mind-ar/') ||
+              id.includes('@rive-app') ||
+              id.includes('framer-motion') ||
+              id.includes('/zustand/'))
           ) {
             return 'vendor';
           }

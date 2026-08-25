@@ -25,6 +25,9 @@ import { startDevSim } from './DevSimSession.js';
 import { FrameBus } from './FrameBus.js';
 import { GeoFenceService, FakePositionSource, type GeoState } from './GeoFenceService.js';
 import { UxOverlay } from './UxOverlay.js';
+import { OnboardingFlow } from './OnboardingFlow.js';
+import { GuidanceOverlay } from './GuidanceOverlay.js';
+import { arStatusStore } from './store/arStatusStore.js';
 import { PlacementController } from './PlacementController.js';
 import { TapPlacedAnchorSource } from './TapPlacedAnchorSource.js';
 import { ImageTargetAnchorSource } from './ImageTargetAnchorSource.js';
@@ -426,6 +429,15 @@ async function runEightWallExperience(experience: ExperienceManifest): Promise<v
   const sceneContentPromise = loadEightWallSceneContent(modelUrl, sceneWidthMeters, experience.riveUrl, contentUrl);
 
   const overlay = new UxOverlay();
+  // Live in-AR guidance illustration (AR_SYSTEM.md §G onboarding UX entry) —
+  // additive sibling of `overlay`, driven entirely by arStatusStore, which
+  // this function writes to only at the real signal points below (never a
+  // new timer). Mounted unconditionally: for FAKE_AR / experiences with no
+  // image targets, arStatusStore's phase never leaves 'idle'/'stable', so
+  // the illustration simply never shows — harmless, same as `overlay`
+  // itself being created unconditionally today.
+  const guidance = new GuidanceOverlay();
+  guidance.mount();
 
   // Image-target data fetches in parallel with the arrival gate below — it
   // must be ready before the Start AR gesture calls session.start(). Both
@@ -526,36 +538,54 @@ async function runEightWallExperience(experience: ExperienceManifest): Promise<v
     diagMark('start-ar-button-shown');
 
     const handles = await new Promise<Awaited<ReturnType<EightWallSession['start']>>>((resolve, reject) => {
-      overlay.showPanel(
-        imageTargets !== null
-          ? "You've arrived!\nNext: camera + motion access, then point your camera at the plaque."
-          : "You've arrived!\nNext: camera + motion access, then scan the ground to place the scene.",
-        'Start AR',
-        () => {
-          diagMark('start-ar-tapped');
-          // QR first-scan UX (AR_SYSTEM.md §G "Cold-start stabilization"):
-          // confirm the tap registered immediately. Before this pass the
-          // panel sat unchanged through the whole engine-import +
-          // camera/motion-permission gap with no feedback at all — the
-          // leading, code-confirmed explanation for users re-scanning the
-          // QR, believing nothing happened, when the assets/engine were
-          // simply still loading (see the investigation report). showHint()
-          // is non-blocking and cannot swallow the OS permission prompts
-          // that follow.
-          overlay.showHint('Starting camera…');
-          session
-            .start(imageTargets !== null ? { imageTargetData: imageTargets.imageTargetData } : {})
-            .then(resolve, (error: unknown) => {
-              // Dedicated log for this specific phase, distinct from the
-              // generic top-level "fatal startup error" catch in main() —
-              // on a small on-screen console, knowing it was
-              // EightWallSession.start() specifically (vs. manifest
-              // resolution, asset fetch, etc.) narrows the search a lot.
-              console.error('[runEightWallExperience] EightWallSession.start() rejected:', error);
-              reject(error);
-            });
-        }
-      );
+      // Shared by both onboarding paths below — the actual Start-AR
+      // gesture. Must stay synchronous end-to-end from the tap (no
+      // await/microtask boundary before session.start()): iOS Safari only
+      // shows the motion-sensor permission prompt from a real gesture
+      // handler, and both OnboardingFlow's and UxOverlay's button click
+      // listeners call this directly, synchronously.
+      const startSession = (): void => {
+        diagMark('start-ar-tapped');
+        // QR first-scan UX (AR_SYSTEM.md §G "Cold-start stabilization"):
+        // confirm the tap registered immediately. Before this pass the
+        // panel sat unchanged through the whole engine-import +
+        // camera/motion-permission gap with no feedback at all — the
+        // leading, code-confirmed explanation for users re-scanning the
+        // QR, believing nothing happened, when the assets/engine were
+        // simply still loading (see the investigation report). showHint()
+        // is non-blocking and cannot swallow the OS permission prompts
+        // that follow.
+        overlay.showHint('Starting camera…');
+        arStatusStore.getState().setPhase('starting', 'Starting camera…');
+        session
+          .start(imageTargets !== null ? { imageTargetData: imageTargets.imageTargetData } : {})
+          .then(resolve, (error: unknown) => {
+            // Dedicated log for this specific phase, distinct from the
+            // generic top-level "fatal startup error" catch in main() —
+            // on a small on-screen console, knowing it was
+            // EightWallSession.start() specifically (vs. manifest
+            // resolution, asset fetch, etc.) narrows the search a lot.
+            console.error('[runEightWallExperience] EightWallSession.start() rejected:', error);
+            reject(error);
+          });
+      };
+
+      if (imageTargets !== null) {
+        // Image-target path (the production 'site' experience): the full
+        // 3-step onboarding (AR_SYSTEM.md §G) — its last step's CTA IS
+        // startSession(). Scope note: this richer flow is specific to the
+        // image-target path's "point at one of the 4 references" framing;
+        // the tap-placement path below is unaffected, unchanged.
+        new OnboardingFlow().show(startSession);
+      } else {
+        // Tap-placement path (non-'site' experiences) — unchanged from
+        // before this pass, on purpose (out of scope; see plan doc).
+        overlay.showPanel(
+          "You've arrived!\nNext: camera + motion access, then scan the ground to place the scene.",
+          'Start AR',
+          startSession
+        );
+      }
     });
     ({ scene, camera, renderer } = handles);
     diagMark('xr8-onstart-fired');
@@ -563,7 +593,14 @@ async function runEightWallExperience(experience: ExperienceManifest): Promise<v
     if (imageTargets !== null) {
       // ---- Image-target origin ---------------------------------------------
       overlay.showHint('Point your camera at the plaque.');
-      hintGate = new ImageEventHintGate((text) => overlay.showHint(text));
+      arStatusStore.getState().setPhase('searching', 'Point your camera at the plaque.');
+      hintGate = new ImageEventHintGate((text) => {
+        overlay.showHint(text);
+        // Keyed off ImageEventHintGate's own two literal hint strings — no
+        // new engine event needed; 'Loading image target…' isn't a
+        // "move your phone" moment, so it shows no illustration.
+        arStatusStore.getState().setPhase(text.startsWith('Loading') ? 'loading-target' : 'searching', text);
+      });
       session.onImageEvent((kind) => hintGate?.handle(kind));
 
       const imageAnchor = new ImageTargetAnchorSource(session, scene, [...imageTargets.targetsByName.values()]);
@@ -594,6 +631,9 @@ async function runEightWallExperience(experience: ExperienceManifest): Promise<v
   // resolves, so there's nothing to "pop in" once revealed: the transform
   // is already correct, only visibility flips.
   overlay.showHint('Loading…');
+  // The image target (if any) is already found by this point — this hint is
+  // about scene-asset loading, not "move your phone," so no illustration.
+  arStatusStore.getState().setPhase('loading-target', 'Loading…');
   const sceneContent = await sceneContentPromise;
   anchorSource.group.add(sceneContent.root);
   const { hotspots, occluders, markers, card, contentProvider } = sceneContent;
@@ -612,7 +652,9 @@ async function runEightWallExperience(experience: ExperienceManifest): Promise<v
   let stableResolved = false;
   const coachingTimer = setTimeout(() => {
     if (!stableResolved) {
-      overlay.showHint('Still locking on — try moving your phone slightly closer, then farther from the plaque.');
+      const text = 'Still locking on — try moving your phone slightly closer, then farther from the plaque.';
+      overlay.showHint(text);
+      arStatusStore.getState().setPhase('stabilizing', text);
     }
   }, POSE_COACHING_DELAY_MS);
 
@@ -628,6 +670,7 @@ async function runEightWallExperience(experience: ExperienceManifest): Promise<v
   diagMark('scene-revealed');
   diagPrintTimeline();
   overlay.hideAll();
+  arStatusStore.getState().setPhase('stable');
 
   // Physical-device follow-up (2026-08-19): explain SUSTAINED tracking loss
   // after reveal instead of leaving the user with no signal at all — the
@@ -638,8 +681,17 @@ async function runEightWallExperience(experience: ExperienceManifest): Promise<v
   // origins; inert for the FAKE_AR desk sim (isTracking() always true).
   const TRACKING_LOSS_HINT_DELAY_MS = 2000;
   const trackingLossHint = new TrackingLossHint(
-    (text) => overlay.showHint(text),
-    () => overlay.hideHint(),
+    (text) => {
+      overlay.showHint(text);
+      // Re-finding a lost target is the same physical action as finding it
+      // the first time — reuses the 'search' illustration variant (DRY),
+      // not a distinct "lost" one.
+      arStatusStore.getState().setPhase('searching', text);
+    },
+    () => {
+      overlay.hideHint();
+      arStatusStore.getState().setPhase('stable');
+    },
     TRACKING_LOSS_HINT_DELAY_MS
   );
   frameBus.onFrame((deltaMs) => {

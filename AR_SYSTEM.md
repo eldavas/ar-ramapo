@@ -2400,3 +2400,124 @@ schema above.
   re-detection-rejection instrumentation and the `trackingStatus`-lag
   hypothesis both remain open/unrefuted for a FUTURE capture against the
   real print — this capture simply wasn't able to test either one.
+
+  **Progress (2026-08-25): onboarding UX overhaul — 3-step onboarding,
+  shared live guidance illustration, Framer Motion, and Zustand adopted
+  under a documented state boundary.** Scope: the QR-scan → intuitive
+  "start the AR experience" gap flagged by field feedback (users unsure
+  they'd entered an AR experience, unsure how to point/move the phone to
+  help acquisition). No change to tracking math, `AnchorSource`
+  implementations, `TARGET_FRAME_TO_WORLD_FIX`, `originOffsetMeters`,
+  `rotationYawDeg`, the manifest schema, or the content pipeline.
+
+  **New dependencies and why:**
+  - **`framer-motion@13`**, imported ONLY via its DOM-only subpath
+    (`framer-motion/dom`'s `animate()`) — never the React entry point.
+    Verified via `npm view`: React is an *optional* peer dependency, not
+    pulled in by this import path. Responsibility: onboarding
+    step-to-step crossfades (`OnboardingFlow.ts`) and the shared vector
+    guidance illustration's looping motion (`ui/PhoneGuidanceIllustration.ts`).
+    Rive is completely unaffected — `RiveController`/`MarkerLayer`/the
+    Marker and Card `.riv` artboards keep doing exactly what they did
+    before this change; Framer Motion never touches a Rive canvas or
+    state machine.
+  - **`zustand@5`**, imported ONLY via `zustand/vanilla`'s `createStore`
+    — never the React `create()` hook, so React never enters the client
+    bundle from this dependency either. Two small, separate stores, not
+    one general-purpose store:
+    - `store/onboardingStore.ts` — UI-only pre-AR flow step
+      (`'intro' | 'locate' | 'stabilize'`). Read only by `OnboardingFlow.ts`.
+    - `store/arStatusStore.ts` — a derived mirror of AR/tracking status
+      (`ArPhase`), written ONLY from `main.ts`'s existing callback call
+      sites, read only by `GuidanceOverlay.ts`.
+    Deliberately store-free: every engine module
+    (`EightWallSession`, `AnchorSource` implementations, `SceneGraphLoader`,
+    `HotspotProjector`, `MarkerLayer`, `RiveController`) — framework
+    coupling stops at `main.ts`, the existing composition root. `CardPanel`
+    also deliberately stays out of Zustand: its drag gesture needs
+    synchronous transform writes on every `pointermove`, where a pub-sub
+    store adds indirection with no benefit — it remains the same
+    self-contained, app-owns-its-transform class it always was, per
+    `CardPanel.ts`'s own doc comment.
+
+  **No new signals, no new timers.** `arStatusStore` is written to
+  exclusively at points that already existed and were already
+  justified in this file: `ImageEventHintGate`'s real
+  `EightWallSession.onImageEvent` `'loading'`/`'scanning'` callback, the
+  pre-existing `POSE_COACHING_DELAY_MS` coaching timer (already
+  documented above as changing only hint TEXT, never the reveal
+  criterion), `TrackingLossHint`'s real per-frame `isTracking()` tick,
+  and `AnchorSource.whenStable()`'s resolution. None of those three
+  classes gained a Zustand/Framer Motion import — `main.ts` is the only
+  place that bridges their existing callbacks into a store write.
+
+  **Onboarding flow (`OnboardingFlow.ts`, image-target path only —
+  `placement:'image'`, i.e. `site` today; the tap-placement path used by
+  other experiences is unchanged, out of scope for this pass):**
+  1. *Welcome* — "You're about to start an AR experience..." — no
+     illustration yet.
+  2. *Find a target* — "Point your camera at one of the 4 image
+     references on the model." — shared illustration, `'search'` variant.
+  3. *Almost there* — "Move your phone slowly to help it lock on." —
+     shared illustration, `'stabilize'` variant, restyled per the
+     supplied Figma reference (node 2:5: gradient scrim, pill CTA). This
+     step's CTA click handler directly contains the exact body that used
+     to live inside the old single `overlay.showPanel(..., 'Start AR',
+     ...)` call — `session.start()` is still invoked synchronously from
+     a real click handler, so the iOS motion-permission gesture
+     requirement is unchanged.
+
+  **Live in-AR guidance (`GuidanceOverlay.ts`):** a small additive
+  sibling of `UxOverlay` (never a modification of it — `UxOverlay.ts` has
+  zero diff in this pass), subscribed to `arStatusStore`, rendering only
+  the same shared vector illustration used in onboarding — reused live
+  whenever `ImageEventHintGate`/`TrackingLossHint` signal the user needs
+  to search for or re-find a target, or the coaching timer signals a
+  "hold on, move slowly" moment. Hint TEXT keeps flowing through the
+  existing `overlay.showHint()`/`hideHint()` exactly as before — no
+  duplicated text-rendering path.
+
+  **Card (`CardPanel.ts`): a third snap point, `'peek'`, added between
+  `'closed'` and `'open'`** (Figma nodes 6:40 "collapsed" / 6:383
+  "open" — a real 2-snap-point bottom sheet, not just a reskin). Peek
+  height is derived from the header's own rendered height (no hardcoded
+  constant) — grabber/title/subtitle visible, body/image below the
+  fold, exactly matching 6:40. `open(content)` now lands on `'peek'`;
+  a new `expand()` goes `'peek' -> 'open'`; the drag-release math was
+  generalized from a single close threshold into a pure, unit-tested
+  `resolveSnapPoint()` (`CardPanel.test.ts`, 8 cases) reusing the exact
+  existing `DRAG_CLOSE_FRACTION`/`DRAG_CLOSE_VELOCITY_PX_MS` constants.
+  The header stays the only drag surface and `contentWrapper` stays the
+  only scroll surface, unchanged — grabber/close-button visibility and
+  swipe-to-dismiss hold by construction, not by new special-casing.
+
+  **Verified in software:** `npm run typecheck`, `npm run build`, and
+  `npm test` all clean (43/43 tests — 12 new: `CardPanel.test.ts`'s
+  snap-point resolver, `store/onboardingStore.test.ts`'s step table,
+  `store/arStatusStore.test.ts`'s phase-to-illustration mapping). A
+  headless-Chrome, real-build smoke test (raw CDP over WebSocket, no
+  puppeteer — same dependency-free pattern this repo's `tools/*.mjs`
+  probes already use) at 320/393/430px against the actual `dist/server.js`
+  confirmed, at every width: all 3 onboarding headings/CTA labels render
+  correctly, zero console errors before the Start-AR tap, the onboarding
+  overlay is correctly removed after that tap, and the existing "Starting
+  camera…" hand-off hint still fires — i.e. the new UI and the existing
+  gesture-gated `session.start()` hand-off compose correctly. (`?fakear=1`
+  was deliberately NOT used for this test — it bypasses straight into
+  `startDevSim()`, which never shows `OnboardingFlow` at all; testing
+  past the real Start-AR gesture hits the same pre-existing
+  no-GPU/no-camera headless-Chrome ceiling this file's Phase 1 notes
+  already documented, not a new limitation.)
+
+  **Requires physical device testing, not verifiable in software:**
+  whether the search/stabilize illustrations read as intuitive during
+  real phone motion; real on-device image-target loss/reacquisition
+  timing against the live `GuidanceOverlay`; the `prefers-reduced-motion`
+  fallback on an actual notched iPhone; and the Card's drag-to-peek/
+  drag-to-expand feel on a real touchscreen (the pointer-capture-based
+  drag math itself is unchanged and was already field-tested pre-peek —
+  only the added third snap point is new and untested on-device; per
+  this file's own prior note, a JS-dispatched `PointerEvent` can't
+  satisfy `Element.setPointerCapture`, so this class of interaction has
+  never been headlessly automatable in this repo, before or after this
+  pass).

@@ -1512,3 +1512,19 @@ is a proposal with a concrete implementation sketch, not code. Production
 `'site'` entry untouched by any of this. `ACTIVE_TARGET_ID` (`main.ts`)
 reverted to `'site'` before this session's changes were committed — flip
 it to any `site-tracking-*` id to resume testing a specific candidate.
+
+## 23. Onboarding UX overhaul (2026-08-25): the §19/§20 coaching signals now also drive a live visual guidance illustration — no new signal added
+
+Cross-reference only — the full write-up lives in AR_SYSTEM.md §G Phase 6's
+"Progress (2026-08-25)" entry. Noted here because it directly reuses two
+signals this file already documented: `ImageEventHintGate` (§19's
+'searching'/'loading' hint gate) and the `POSE_COACHING_DELAY_MS` coaching
+timer (§20, "Fixed with a 2.5s coaching-copy timer... text only, cleared the
+instant `whenStable()` resolves"). Both now also drive a small `arStatusStore`
+(Zustand, `zustand/vanilla`) phase alongside the hint text they already set,
+read by a new `GuidanceOverlay.ts` that shows a shared vector "move your
+phone" illustration (Framer Motion, `framer-motion/dom`) — the same
+illustration a new 3-step onboarding (`OnboardingFlow.ts`) shows before the
+AR session even starts. No new timer, no new engine event: the coaching
+timer's criterion (`whenStable()`) and its text are exactly what §20 shipped;
+this pass only mirrors that same signal into one more place to look at.
