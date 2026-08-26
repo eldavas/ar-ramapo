@@ -593,6 +593,20 @@ async function runEightWallExperience(experience: ExperienceManifest): Promise<v
 
     if (imageTargets !== null) {
       // ---- Image-target origin ---------------------------------------------
+      // Live-AR "Help": present from the moment world tracking actually
+      // starts (this line), not gated behind a successful lock — a user
+      // who never manages to acquire a target still needs a way to
+      // re-open onboarding. Reuses the existing UxOverlay.showCornerButton
+      // seam (previously only used for tap-placed's "Re-place"; mutually
+      // exclusive by anchorSource.kind, so no conflict there). Re-opens
+      // OnboardingFlow in `replay: true` mode: the running AR session is
+      // never touched, never re-triggered — see OnboardingFlow.ts's doc
+      // comment on that mode. (No FAKE_AR guard needed here — this whole
+      // branch is already inside the non-FAKE_AR `else` above.)
+      overlay.showCornerButton('Help', () => {
+        onboardingStore.getState().reset();
+        new OnboardingFlow().show(() => {}, { replay: true });
+      });
       overlay.showHint('Point your camera at the plaque.');
       arStatusStore.getState().setPhase('searching', 'Point your camera at the plaque.');
       hintGate = new ImageEventHintGate((text) => {
@@ -672,20 +686,6 @@ async function runEightWallExperience(experience: ExperienceManifest): Promise<v
   diagPrintTimeline();
   overlay.hideAll();
   arStatusStore.getState().setPhase('stable');
-
-  // Live-AR "Help": exclusive to this already-in-AR screen (not onboarding
-  // itself, which has its own in-flow "Back" — see OnboardingFlow.ts's doc
-  // comment), scoped to the image-target path (mirrors this file's other
-  // image-target-only additions). Re-opens OnboardingFlow in `replay: true`
-  // mode: the AR session keeps running underneath untouched — replay's
-  // onComplete is a no-op dismiss, never session.start() again — reset()
-  // first so it always restarts from step 1, not wherever it last left off.
-  if (!FAKE_AR && anchorSource.kind === 'image-target') {
-    overlay.showCornerButton('Help', () => {
-      onboardingStore.getState().reset();
-      new OnboardingFlow().show(() => {}, { replay: true });
-    });
-  }
 
   // Physical-device follow-up (2026-08-19): explain SUSTAINED tracking loss
   // after reveal instead of leaving the user with no signal at all — the

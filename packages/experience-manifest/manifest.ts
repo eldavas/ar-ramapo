@@ -443,6 +443,27 @@ export const experienceManifest: ExperienceManifest[] = [
   // binary vertex data: site_ledge (the baseboard mesh) now spans exactly
   // X:[0, 1.675], Z:[-1.414, 0] — its bottom-left corner sits at (0,0,0)
   // to the sub-millimeter, confirming the fix.
+  // 2026-08-25: production ARTWORK swap (not a geometry recalibration) —
+  // targets[] now points at the abstract Voronoi tracking targets
+  // (tools/build_site_tracking_targets.py, previously only the
+  // 'site-tracking-*' single-target harness entries below) instead of the
+  // old QR plaques, so physical-device testing exercises the new artwork.
+  // originOffsetMeters/rotationYawDeg are UNCHANGED on purpose — those
+  // describe each plaque's mounted position/rotation on the ledge, which
+  // the artwork swap does not move (AR_SYSTEM.md §G's own decision record:
+  // "4 dedicated image targets stay on the ledge, same mount footprint").
+  // physicalTargetWidthMeters changed 0.09 -> 0.03 because the new artwork
+  // is physically smaller (30mm square vs. the old 90x30mm landscape) —
+  // this is the one field that describes the artwork's own size, not its
+  // placement. Known, documented, NOT fixed by this swap (AR_SYSTEM.md §G,
+  // "site-tracking-front" on-device entry): ImageTargetAnchorSource
+  // .applyPose() has zero temporal filtering, so pose can still visibly
+  // spin/scale while the camera holds on a target — pre-existing, not
+  // specific to either artwork. Also unverified before this swap:
+  // site-tracking-back/left/right had only been compiled, never
+  // individually on-device tested (only -front had); this production
+  // change is what puts all 4 in front of a real device for the first
+  // time.
   {
     targetId: 'site',
     riveUrl: '/assets/bench-ui.riv',
@@ -452,30 +473,30 @@ export const experienceManifest: ExperienceManifest[] = [
     contentUrl: 'https://docs.google.com/spreadsheets/d/1O4Zq8ggc7TgjKZIuUtufO-G9hJiK2KalJpD2Cux2sN8/gviz/tq?tqx=out:json',
     targets: [
       {
-        imageTargetUrl: '/assets/image-targets/site-front/site-front.json',
-        physicalTargetWidthMeters: 0.09,
+        imageTargetUrl: '/assets/image-targets/site-tracking-front/site-tracking-front.json',
+        physicalTargetWidthMeters: 0.03,
         originOffsetMeters: { x: 0.8375, z: -0.015 },
         rotationYawDeg: 0,
       },
       {
-        imageTargetUrl: '/assets/image-targets/site-back/site-back.json',
-        physicalTargetWidthMeters: 0.09,
+        imageTargetUrl: '/assets/image-targets/site-tracking-back/site-tracking-back.json',
+        physicalTargetWidthMeters: 0.03,
         originOffsetMeters: { x: 0.8375, z: -1.399 },
         rotationYawDeg: 180,
       },
       {
-        imageTargetUrl: '/assets/image-targets/site-left/site-left.json',
-        physicalTargetWidthMeters: 0.09,
+        imageTargetUrl: '/assets/image-targets/site-tracking-left/site-tracking-left.json',
+        physicalTargetWidthMeters: 0.03,
         originOffsetMeters: { x: 0.015, z: -0.707 },
         rotationYawDeg: 90,
       },
       {
-        imageTargetUrl: '/assets/image-targets/site-right/site-right.json',
-        physicalTargetWidthMeters: 0.09,
+        imageTargetUrl: '/assets/image-targets/site-tracking-right/site-tracking-right.json',
+        physicalTargetWidthMeters: 0.03,
         originOffsetMeters: { x: 1.66, z: -0.707 },
         rotationYawDeg: -90,
       },
     ],
-    version: '0.1.1',
+    version: '0.2.0',
   },
 ];

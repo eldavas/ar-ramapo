@@ -2717,3 +2717,60 @@ schema above.
   (needs a real running AR session to test against), and whether the
   `100dvh`/`100dvw` change measurably changes what's visible around
   Safari's chrome on an actual device.
+
+  **Progress (2026-08-25, later still): production `'site'` entry
+  connected to the new Voronoi tracking artwork (explicit user request,
+  for physical-device testing) — and the live-AR "Help" button now
+  appears from the start of tracking, not gated behind a successful
+  lock.**
+
+  **Artwork swap, `packages/experience-manifest/manifest.ts`:** the
+  earlier `'site-tracking-front/back/left/right'` entries (the
+  single-image-target validation harness this file's prior entry
+  describes as "more stable, not yet stable enough," with `-back/-left
+  /-right` compiled but never individually on-device tested) were never
+  promoted into the production `'site'` entry's `targets[]` — this pass
+  does exactly that: `targets[].imageTargetUrl` now points at
+  `/assets/image-targets/site-tracking-{front,back,left,right}/...json`
+  (verified reachable — `curl -I` 200 on all 4 — before wiring, not
+  assumed), `physicalTargetWidthMeters` changed `0.09` → `0.03` (the new
+  artwork's real size: 30mm square, not the old 90×30mm landscape).
+  `originOffsetMeters`/`rotationYawDeg` are UNCHANGED — those describe
+  each plaque's mounted position/rotation, which this artwork-only swap
+  does not move (per this file's own prior decision record: "4 dedicated
+  image targets stay on the ledge, same mount footprint"). Manifest
+  version `0.1.1` → `0.2.0`. **Explicitly not fixed by this swap, and not
+  claimed to be:** `ImageTargetAnchorSource.applyPose()`'s zero-temporal-
+  filtering pose jitter (still only a proposed, unimplemented fix per
+  the prior entry) — pre-existing, not artwork-specific, so this swap
+  makes tracking-quality no worse, but doesn't resolve that open item
+  either. `site-tracking-back/left/right` are now live on a physical
+  device for the first time ever via this change (previously compiled
+  and wired but never worn on a real test).
+
+  **Help button timing, `main.ts`:** previously only registered
+  (`overlay.showCornerButton('Help', ...)`) after `anchorSource
+  .whenStable()` resolved — a user who never achieves a stable lock
+  never saw it at all. Moved to fire at the top of the image-target
+  branch, immediately after `session.start()` resolves (i.e., the moment
+  world tracking actually begins, before the first `imageAnchor
+  .acquire()` even starts) — present through searching, acquiring, and
+  stable states alike. No FAKE_AR guard needed at the new call site (it's
+  already inside the non-FAKE_AR branch); the desk-testing bypass is
+  unaffected.
+
+  **Verified in software:** `npm run typecheck`/`build`/`test` clean
+  (47/47, unchanged — this pass touched no pure-logic modules).
+  `GET /api/manifest` confirmed serving the updated `'site'` entry
+  (new URLs, `physicalTargetWidthMeters: 0.03`, `version: '0.2.0'`,
+  offsets/rotations byte-identical to before); HTTP HEAD 200 on all 4
+  new asset paths. Onboarding headless smoke test (320/393/430px)
+  re-run clean after the `main.ts` edit — no regression. **Requires
+  physical device testing, not verifiable in software (the whole point
+  of this change):** whether the new artwork actually tracks better on
+  the real printed plaques at their real mounted positions; whether the
+  reused `originOffsetMeters`/`rotationYawDeg` values still line up
+  correctly now that the artwork's footprint is smaller and (per the
+  design docstring, unconfirmed against an actual print) centered the
+  same way the old landscape plaques were; and whether "Help" appearing
+  before a lock is achieved reads as useful rather than distracting.
