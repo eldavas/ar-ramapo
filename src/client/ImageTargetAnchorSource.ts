@@ -8,6 +8,7 @@ import { traceT } from './TraceLog.js';
 // doc comment. Remove this import and every diagMark()/dispatchEvent() call
 // site once the 5-6s startup investigation is closed.
 import { diagMark } from './DiagnosticTimeline.js';
+import { OneEuroFilter1D } from './OneEuroFilter.js';
 
 /**
  * §F axis-convention lockdown, image-target edition — the ONLY place the
@@ -148,6 +149,40 @@ function yawCorrectionQuaternion(rotationYawDeg: number): THREE.Quaternion {
   );
 }
 
+/**
+ * One Euro Filter tuning for the composed world anchor (2026-08-26,
+ * AR_SYSTEM.md §G, docs/research/8th-wall-troubleshooting.md §22's
+ * proposal, now implemented). applyPose() previously applied every
+ * trustworthy sample's raw rotation/position directly, every frame, with
+ * zero temporal filtering — confirmed on-device as visible spin/scale
+ * jitter while holding the camera roughly on a target.
+ *
+ * Deliberately HIGH beta / LOW minCF, mirroring
+ * ARSessionManager.ts's TRACKING_PROFILE_RIGID_ANCHOR (MindAR's own
+ * defaults for this exact scenario — a spatial scene rigidly anchored to
+ * a physical model) rather than MarkerLayer.ts's screen-space marker
+ * filter (low beta, tuned for a UI element floating over the scene, not
+ * for the scene's own anchor). A LOW-beta filter here was already tried
+ * and reverted once for MindAR specifically because it "made the whole
+ * scene visibly lag behind the physical model" — see OneEuroFilter.ts's
+ * own doc comment. High beta keeps this filter almost fully out of the
+ * way during real camera motion while still damping at-rest tremor.
+ * dCutoff uses the canonical Casiez et al. default (also what
+ * MARKER_FILTER_DERIVATIVE_CUTOFF_HZ uses) — nothing in this project's
+ * own tuning history singles out a different value for it.
+ */
+const RIGID_ANCHOR_FILTER_MIN_CUTOFF_HZ = 0.001;
+const RIGID_ANCHOR_FILTER_BETA = 1000;
+const RIGID_ANCHOR_FILTER_DERIVATIVE_CUTOFF_HZ = 1.0;
+
+function newRigidAnchorFilter(): OneEuroFilter1D {
+  return new OneEuroFilter1D(
+    RIGID_ANCHOR_FILTER_MIN_CUTOFF_HZ,
+    RIGID_ANCHOR_FILTER_BETA,
+    RIGID_ANCHOR_FILTER_DERIVATIVE_CUTOFF_HZ
+  );
+}
+
 /** Compact pose formatter for the telemetry lines below. */
 function formatPose(event: Xr8ImageTrackedEvent): string {
   const p = event.position;
@@ -242,6 +277,37 @@ export class ImageTargetAnchorSource implements AnchorSource {
   // true exactly once, here, never on the bootstrap sample alone.
   private stable = false;
   private readonly stableResolvers: Array<() => void> = [];
+  // Multi-target switching fix (2026-08-26, physical-device finding — see
+  // onImageEvent's 'found' case doc comment): names that have ever passed
+  // isSampleTrustworthy() at least once. Distinct from `acquired`, which is
+  // global across the whole anchor — this is per physical plaque, so the
+  // FIRST sighting of a plaque this anchor has never seen before (even
+  // after a DIFFERENT plaque already acquired the anchor) gets the same
+  // "bootstrap, apply unconditionally" treatment the very first-ever
+  // sighting already got, instead of being held to the strict re-detection
+  // gate meant for noise around an EXISTING good anchor.
+  private readonly seenTargetNames = new Set<string>();
+  // Composed-world-anchor smoothing (2026-08-26, docs/research/
+  // 8th-wall-troubleshooting.md §22 — implemented). One filter per
+  // position axis and per quaternion component; reset together whenever a
+  // 'found' event represents a pose discontinuity (see resetPoseFilters's
+  // call sites) so the filter never smooths ACROSS a legitimate jump.
+  private readonly filterPosX = newRigidAnchorFilter();
+  private readonly filterPosY = newRigidAnchorFilter();
+  private readonly filterPosZ = newRigidAnchorFilter();
+  private readonly filterRotX = newRigidAnchorFilter();
+  private readonly filterRotY = newRigidAnchorFilter();
+  private readonly filterRotZ = newRigidAnchorFilter();
+  private readonly filterRotW = newRigidAnchorFilter();
+  // Quaternions double-cover rotation space (q and -q are the same
+  // rotation) — component-wise filtering only works if consecutive raw
+  // samples stay on the same hemisphere as the last FILTERED output, so
+  // this tracks that output for the sign-flip check in filterPose(). Reset
+  // has no separate hook: it's naturally consistent again the instant the
+  // per-component filters take their next (post-reset, unconditionally
+  // accepted) sample.
+  private readonly prevFilteredQuat = new THREE.Quaternion();
+  private lastFilterTimeMs: number | null = null;
 
   /**
    * Called for every APPLIED pose (bootstrap or checked) — see
@@ -283,7 +349,16 @@ export class ImageTargetAnchorSource implements AnchorSource {
     private readonly session: EightWallSession,
     private readonly scene: THREE.Scene,
     /** One entry per plaque this experience should recognize (§E). */
-    targets: readonly ResolvedPlaqueTarget[]
+    targets: readonly ResolvedPlaqueTarget[],
+    /**
+     * Clock for the pose filters' elapsed-time (see nextFilterDtSeconds) —
+     * real `performance.now` in production, an injectable fake in tests
+     * (ImageTargetAnchorSource.test.ts fires synthetic events back to
+     * back, which under a real clock would measure near-zero elapsed
+     * time and over-smooth every test sample; a controllable clock lets
+     * tests assert on realistic frame-to-frame timing instead).
+     */
+    private readonly now: () => number = () => performance.now()
   ) {
     this.targetsByName = new Map(targets.map((target) => [target.name, target]));
     this.group.name = 'image-target-anchor';
@@ -406,24 +481,51 @@ export class ImageTargetAnchorSource implements AnchorSource {
       case 'found': {
         if (event === null || target === undefined) return;
         const wasAcquired = this.acquired;
+        // Multi-target switching fix (2026-08-26, physical-device finding:
+        // on the real four-plaque 'site' entry, once one plaque acquired
+        // the anchor, scanning any of the OTHER three plaques for the
+        // first time silently failed unless a sample happened to land
+        // exactly when trackingStatus was NORMAL — every other sighting
+        // was rejected as if it were noisy re-detection of the SAME
+        // plaque already anchoring the scene, which is a different
+        // situation with a different appropriate trust level). A plaque
+        // this anchor has never seen before is new information, not
+        // suspect continuation of an existing one — its first sighting
+        // gets the same "apply unconditionally, there's no prior good
+        // reading to protect" treatment isSampleTrustworthy's own doc
+        // comment already grants the anchor's very first-ever sample.
+        // Every LATER sighting of that same name (another re-detection,
+        // or a per-frame 'updated') still goes through the full gate
+        // below — this only widens the bootstrap exception from "the
+        // whole anchor's first sample" to "this specific plaque's first
+        // sample."
+        const isNewTarget = !this.seenTargetNames.has(event.name);
         const ratio = scaleRatio(event, target.physicalTargetWidthMeters);
-        // First-ever acquisition always applies — there is no prior
-        // known-good anchor to fall back to (see isSampleTrustworthy's doc
-        // comment).
-        const trustworthy = !wasAcquired || this.isSampleTrustworthy(ratio);
+        const trustworthy = !wasAcquired || isNewTarget || this.isSampleTrustworthy(ratio);
         console.log(
           `[${traceT()}] [ImageTarget] FOUND "${event.name}"\n` +
             `  scale=${event.scale.toFixed(3)}m ${formatPose(event)}\n` +
             `  trackingStatus=${this.session.trackingStatus}\n` +
             `  acquired: ${wasAcquired} -> true` +
-            (wasAcquired
-              ? trustworthy
-                ? ' (re-detection — firing onOriginChanged, pose discontinuity)'
-                : ' (re-detection REJECTED — see warning below — keeping previous anchor)'
-              : ' (first acquire — pose applied, anchor stays hidden until a trustworthy sample lands)')
+            (!wasAcquired
+              ? ' (first acquire — pose applied, anchor stays hidden until a trustworthy sample lands)'
+              : isNewTarget
+                ? ' (first sighting of a NEW plaque — applied unconditionally, firing onOriginChanged)'
+                : trustworthy
+                  ? ' (re-detection — firing onOriginChanged, pose discontinuity)'
+                  : ' (re-detection REJECTED — see warning below — keeping previous anchor)')
         );
         this.imageVisible = true;
         if (trustworthy) {
+          this.seenTargetNames.add(event.name);
+          if (wasAcquired) {
+            // Any 'found' past the very first-ever bootstrap is a pose
+            // discontinuity — either this same plaque re-detected after a
+            // loss, or (the fix above) a genuinely different plaque's
+            // first sighting — so the last filtered sample is no longer a
+            // meaningful "previous value" to smooth continuity against.
+            this.resetPoseFilters();
+          }
           this.applyPose(event, target);
           this.onPoseApplied(!wasAcquired, ratio);
         } else {
@@ -449,8 +551,9 @@ export class ImageTargetAnchorSource implements AnchorSource {
           this.acquireResolve?.();
           this.acquireResolve = null;
         } else if (trustworthy) {
-          // Re-detection after a lost = pose discontinuity (only when the
-          // anchor actually moved — a rejected sample changed nothing).
+          // Re-detection after a lost, OR the first sighting of a
+          // different plaque = pose discontinuity (only when the anchor
+          // actually moved — a rejected sample changed nothing).
           for (const handler of this.originChangedHandlers) {
             handler();
           }
@@ -511,9 +614,34 @@ export class ImageTargetAnchorSource implements AnchorSource {
    * the tracked position MINUS that offset rotated into world space, not
    * the tracked position itself (which is where the pre-multi-target code
    * put it — correct only when offsetMeters is exactly {0,0}).
+   *
+   * The RAW tracked position/rotation are filtered (2026-08-26, see
+   * RIGID_ANCHOR_FILTER_* doc comment) before any of the composition
+   * above runs — not the other way around (filter, then compose, never
+   * compose then filter the result) — so the offset is always rotated by
+   * a quaternion that's internally consistent with the filtered position,
+   * the same invariant the unfiltered code always had.
    */
   private applyPose(event: Xr8ImageTrackedEvent, target: ResolvedPlaqueTarget): void {
+    const dtSeconds = this.nextFilterDtSeconds();
     this.scratchQuat.set(event.rotation.x, event.rotation.y, event.rotation.z, event.rotation.w);
+    // Quaternions double-cover rotation space (q and -q are the same
+    // rotation) — component-wise filtering only works if consecutive raw
+    // samples stay on the same hemisphere as the last FILTERED output, so
+    // flip the incoming sign when it's nearer to that output's negation.
+    if (this.scratchQuat.dot(this.prevFilteredQuat) < 0) {
+      this.scratchQuat.set(-this.scratchQuat.x, -this.scratchQuat.y, -this.scratchQuat.z, -this.scratchQuat.w);
+    }
+    this.scratchQuat
+      .set(
+        this.filterRotX.filter(this.scratchQuat.x, dtSeconds),
+        this.filterRotY.filter(this.scratchQuat.y, dtSeconds),
+        this.filterRotZ.filter(this.scratchQuat.z, dtSeconds),
+        this.filterRotW.filter(this.scratchQuat.w, dtSeconds)
+      )
+      .normalize();
+    this.prevFilteredQuat.copy(this.scratchQuat);
+
     this.group.quaternion
       .copy(this.scratchQuat)
       .multiply(TARGET_FRAME_TO_WORLD_FIX)
@@ -523,9 +651,50 @@ export class ImageTargetAnchorSource implements AnchorSource {
       .set(target.originOffsetMeters.x, 0, target.originOffsetMeters.z)
       .applyQuaternion(this.group.quaternion);
     this.group.position
-      .set(event.position.x, event.position.y, event.position.z)
+      .set(
+        this.filterPosX.filter(event.position.x, dtSeconds),
+        this.filterPosY.filter(event.position.y, dtSeconds),
+        this.filterPosZ.filter(event.position.z, dtSeconds)
+      )
       .sub(this.scratchOffset);
 
     this.group.scale.setScalar(anchorScaleForEvent());
+  }
+
+  /**
+   * Elapsed time since the last filtered sample, for the One Euro
+   * filters' speed-adaptive cutoff. `null` on the very first call (each
+   * filter's own `prevValue === null` branch ignores dt entirely on ITS
+   * first call, so any placeholder value here is inert) and immediately
+   * after resetPoseFilters() — a discontinuity's first post-reset sample
+   * must not be smoothed against whatever dt elapsed since the LAST
+   * (now-irrelevant) sample, which OneEuroFilter1D.filter() already
+   * guarantees as long as this returns a value at all.
+   */
+  private nextFilterDtSeconds(): number {
+    const now = this.now();
+    const dtSeconds = this.lastFilterTimeMs === null ? 1 / 60 : (now - this.lastFilterTimeMs) / 1000;
+    this.lastFilterTimeMs = now;
+    return dtSeconds > 0 ? dtSeconds : 1 / 60;
+  }
+
+  /**
+   * Called on every 'found' past the very first-ever bootstrap sample
+   * (see onImageEvent) — a pose discontinuity, whether this is the same
+   * plaque re-detected after a loss or a different plaque's first
+   * sighting. Forgetting all filter history here is what stops the
+   * filters from smoothing a slow "swim" across a jump they should
+   * instead snap through immediately, exactly like the unfiltered code
+   * already did at every discontinuity before this pass.
+   */
+  private resetPoseFilters(): void {
+    this.filterPosX.reset();
+    this.filterPosY.reset();
+    this.filterPosZ.reset();
+    this.filterRotX.reset();
+    this.filterRotY.reset();
+    this.filterRotZ.reset();
+    this.filterRotW.reset();
+    this.lastFilterTimeMs = null;
   }
 }

@@ -1528,3 +1528,24 @@ illustration a new 3-step onboarding (`OnboardingFlow.ts`) shows before the
 AR session even starts. No new timer, no new engine event: the coaching
 timer's criterion (`whenStable()`) and its text are exactly what §20 shipped;
 this pass only mirrors that same signal into one more place to look at.
+
+## 24. "Only one of the 4 targets works" (2026-08-26) — a real multi-target bug, not artwork; §22's smoothing proposal also implemented
+
+Cross-reference only — the full write-up lives in AR_SYSTEM.md §G Phase 6's
+"Progress (2026-08-26)" entry, right after the §22-referencing 2026-08-25
+artwork-swap entry above it. Summary for anyone jumping straight to this
+file: a physical test of the new Voronoi tracking targets (§22) reported
+only one plaque tracking; found by reading `ImageTargetAnchorSource.ts`,
+not from a new capture — the anchor's `acquired` gate was class-wide, so a
+DIFFERENT plaque's first-ever sighting was held to the strict
+re-detection-trust gate meant for the SAME already-anchored plaque, and
+silently rejected whenever `trackingStatus` wasn't `NORMAL` at that exact
+moment (common while walking to a different physical plaque). Fixed with a
+`seenTargetNames` set — a name's first sighting is now exempt, a repeat
+sighting is not. §22's pose-smoothing proposal (OneEuroFilter1D per
+position axis and quaternion component, tuned like
+`TRACKING_PROFILE_RIGID_ANCHOR`) was implemented in the same pass, exactly
+as sketched there, with filter resets wired to the same discontinuity
+points (re-detection, or the new fix's "different plaque" case). 51/51
+tests pass (4 new). Neither fix has a fresh on-device confirmation yet —
+see AR_SYSTEM.md's entry for exactly what's still open.
