@@ -17,10 +17,15 @@ import type { AnimationPlaybackControls } from 'framer-motion/dom';
  *   wide area).
  *
  * Both motions are driven by ONE small `requestAnimationFrame` loop
- * computing a single eased progress value `t` per frame and deriving
- * EVERY visual element (phone position/rotation, and either the trail's
- * `stroke-dashoffset` or the two arrows' growth) from that SAME `t` in the
- * SAME tick — analytic formulas, not discrete sampled keyframes. This is a
+ * computing a single linear progress value per frame (`raw`, 0..1 through
+ * the current cycle) and deriving EVERY visual element (phone
+ * position/rotation, and either the trail's `stroke-dashoffset` or the
+ * two arrows' growth) from that SAME value in the SAME tick — analytic
+ * formulas, not discrete sampled keyframes. `'orbit'` eases `raw`
+ * internally before using it (a one-shot journey, where an eased start/end
+ * reads correctly); `'voronoi'` uses it directly (see that section's own
+ * doc comment for why stacking an extra ease on top of an already-periodic
+ * sine caused a real, reported right/left speed-asymmetry bug). This is a
  * deliberate choice, not a fallback: two independently-timed animations
  * (framer-motion's keyframe `animate()` for the phone, a separate CSS
  * `@keyframes` for the trail — both tried first, for the orbit variant)
@@ -54,7 +59,7 @@ export type GuidanceVariant = 'orbit' | 'voronoi';
 export type GuidanceSize = 'small' | 'large';
 
 const FADE_MS = 200;
-const CYCLE_DURATION_S = 2.6;
+const ORBIT_CYCLE_DURATION_S = 2.6;
 
 // ---- 'orbit' motion: a left-to-right quadratic-bezier arc -----------------
 
@@ -102,19 +107,41 @@ function lengthAtT(t: number): number {
 }
 
 // ---- 'voronoi' motion: nudge right, then left, in place -------------------
-
-const OSC_CENTER = { x: 100, y: 62 };
-const OSC_AMPLITUDE_X = 32; // phone ranges OSC_CENTER.x ± this
-const OSC_ROTATE_DEG = 10;
-const ARROW_LENGTH = 46;
+//
+// Deliberately driven by RAW (linear) time, not an eased t like 'orbit'
+// uses — a real bug, found from a physical-device report, not a style
+// preference: composing an ease-in-out curve as sin()'s own input produces
+// a front-loaded-slow / back-loaded-fast velocity profile (the sin peak
+// lands near the END of each eased half-interval, not its middle), which
+// read as "movement right is slow, but the return left is fast" — exactly
+// what was reported. A plain sine of raw time is already naturally
+// "eased" at its own extrema (zero velocity at the rightmost/leftmost
+// points, matching normal simple-harmonic motion) with no further easing
+// needed, and — critically — no asymmetry: `x(1-raw) = 2*center - x(raw)`
+// holds exactly, so the right and left excursions are honest mirror
+// images in both duration and shape.
+//
+// Slower and smaller than 'orbit' on purpose — 8th Wall's own official
+// world-tracking guidance (quoted in EightWallSession.ts) says to move
+// slowly, especially while pose is converging; this variant's whole job
+// is to depict that, not a broad sweeping gesture.
+const VORONOI_CYCLE_DURATION_S = 3.2;
+const OSC_CENTER = { x: 82, y: 62 };
+const OSC_AMPLITUDE_X = 18; // phone ranges OSC_CENTER.x ± this
+const OSC_ROTATE_DEG = 6;
+const ARROW_LENGTH = 28;
+// Matches the phone glyph's own local half-width (rect x="-10"..."10"
+// below) — the arrow now originates at the phone's CURRENT right/left
+// edge (recomputed every frame as the phone moves), not its center.
+const PHONE_HALF_WIDTH = 10;
 
 /** +1 while nudging right (first half of the cycle), 0 the rest. */
-function rightProgress(t: number): number {
-  return Math.max(0, Math.sin(2 * Math.PI * t));
+function rightProgress(raw: number): number {
+  return Math.max(0, Math.sin(2 * Math.PI * raw));
 }
 /** +1 while nudging left (second half of the cycle), 0 the rest. */
-function leftProgress(t: number): number {
-  return Math.max(0, -Math.sin(2 * Math.PI * t));
+function leftProgress(raw: number): number {
+  return Math.max(0, -Math.sin(2 * Math.PI * raw));
 }
 
 function easeInOutCubic(t: number): number {
@@ -194,9 +221,11 @@ function buildSvgMarkup(gradientId: string): string {
     <line x1="100" y1="116" x2="100" y2="127" stroke-width="2" />
   </g>
 
+  <!-- In row with the phone/arrows (same y as OSC_CENTER.y=62), to the
+       right of the oscillation+arrow zone — not stacked below it. -->
   <g data-part="target-voronoi" opacity="0" stroke="currentColor">
-    <rect x="88" y="100" width="24" height="24" rx="3" stroke-width="2" />
-    <path d="M88 106 L100 100 M88 114 L112 108 M94 122 L102 110 M110 104 L102 110 M104 122 L110 114" stroke-width="1.4" stroke-linecap="round" />
+    <rect x="148" y="50" width="24" height="24" rx="3" stroke-width="2" />
+    <path d="M148 56 L160 50 M148 64 L172 58 M154 72 L162 60 M170 54 L162 60 M164 72 L170 64" stroke-width="1.4" stroke-linecap="round" />
   </g>
 
   <g data-part="phone" stroke="currentColor">
@@ -212,8 +241,10 @@ export class PhoneGuidanceIllustration {
   private readonly container: HTMLDivElement;
   private readonly phone: SVGGElement;
   private readonly trail: SVGPathElement;
+  private readonly arrowRightGroup: SVGGElement;
   private readonly arrowRightShaft: SVGLineElement;
   private readonly arrowRightHead: SVGPolylineElement;
+  private readonly arrowLeftGroup: SVGGElement;
   private readonly arrowLeftShaft: SVGLineElement;
   private readonly arrowLeftHead: SVGPolylineElement;
   private readonly targetOrbit: SVGGElement;
@@ -233,8 +264,10 @@ export class PhoneGuidanceIllustration {
     const svg = this.container.querySelector('svg');
     const phone = this.container.querySelector<SVGGElement>('[data-part="phone"]');
     const trail = this.container.querySelector<SVGPathElement>('[data-part="trail"]');
+    const arrowRightGroup = this.container.querySelector<SVGGElement>('[data-part="arrow-right"]');
     const arrowRightShaft = this.container.querySelector<SVGLineElement>('[data-part="arrow-right-shaft"]');
     const arrowRightHead = this.container.querySelector<SVGPolylineElement>('[data-part="arrow-right-head"]');
+    const arrowLeftGroup = this.container.querySelector<SVGGElement>('[data-part="arrow-left"]');
     const arrowLeftShaft = this.container.querySelector<SVGLineElement>('[data-part="arrow-left-shaft"]');
     const arrowLeftHead = this.container.querySelector<SVGPolylineElement>('[data-part="arrow-left-head"]');
     const targetOrbit = this.container.querySelector<SVGGElement>('[data-part="target-orbit"]');
@@ -243,8 +276,10 @@ export class PhoneGuidanceIllustration {
       !svg ||
       !phone ||
       !trail ||
+      !arrowRightGroup ||
       !arrowRightShaft ||
       !arrowRightHead ||
+      !arrowLeftGroup ||
       !arrowLeftShaft ||
       !arrowLeftHead ||
       !targetOrbit ||
@@ -260,18 +295,14 @@ export class PhoneGuidanceIllustration {
     svg.style.cssText = `max-width:${maxWidthVw}vw;height:auto;`;
     this.phone = phone;
     this.trail = trail;
+    this.arrowRightGroup = arrowRightGroup;
     this.arrowRightShaft = arrowRightShaft;
     this.arrowRightHead = arrowRightHead;
+    this.arrowLeftGroup = arrowLeftGroup;
     this.arrowLeftShaft = arrowLeftShaft;
     this.arrowLeftHead = arrowLeftHead;
     this.targetOrbit = targetOrbit;
     this.targetVoronoi = targetVoronoi;
-    // Arrow groups are positioned once here (static) — only their shaft/head
-    // children's transforms change per frame, in setProgress() below.
-    this.container.querySelector<SVGGElement>('[data-part="arrow-right"]')!.style.transform =
-      `translate(${OSC_CENTER.x}px, ${OSC_CENTER.y}px)`;
-    this.container.querySelector<SVGGElement>('[data-part="arrow-left"]')!.style.transform =
-      `translate(${OSC_CENTER.x}px, ${OSC_CENTER.y}px)`;
     this.setProgress('orbit', 0); // rest position until a variant is chosen
   }
 
@@ -290,8 +321,8 @@ export class PhoneGuidanceIllustration {
     this.targetVoronoi.setAttribute('opacity', variant === 'voronoi' ? '1' : '0');
     this.trail.style.display = variant === 'orbit' ? '' : 'none';
     const arrowsDisplay = variant === 'voronoi' ? '' : 'none';
-    this.container.querySelector<SVGGElement>('[data-part="arrow-right"]')!.style.display = arrowsDisplay;
-    this.container.querySelector<SVGGElement>('[data-part="arrow-left"]')!.style.display = arrowsDisplay;
+    this.arrowRightGroup.style.display = arrowsDisplay;
+    this.arrowLeftGroup.style.display = arrowsDisplay;
 
     this.fadeAnimation?.stop();
     if (variant === null) {
@@ -311,11 +342,11 @@ export class PhoneGuidanceIllustration {
   }
 
   private startMotion(variant: GuidanceVariant): void {
-    const durationMs = CYCLE_DURATION_S * 1000;
+    const durationMs = (variant === 'orbit' ? ORBIT_CYCLE_DURATION_S : VORONOI_CYCLE_DURATION_S) * 1000;
     const start = performance.now();
     const tick = (now: number): void => {
       const raw = ((now - start) % durationMs) / durationMs;
-      this.setProgress(variant, easeInOutCubic(raw));
+      this.setProgress(variant, raw);
       this.rafId = requestAnimationFrame(tick);
     };
     this.rafId = requestAnimationFrame(tick);
@@ -328,26 +359,42 @@ export class PhoneGuidanceIllustration {
     }
   }
 
-  /** Single source of truth for one frame: every visual element derives from this same t. */
-  private setProgress(variant: GuidanceVariant, t: number): void {
+  /**
+   * Single source of truth for one frame: every visual element derives
+   * from this same `raw` (linear 0..1 progress through the current cycle).
+   * 'orbit' eases it internally (a one-shot bezier journey, where easing
+   * in/out at the endpoints reads correctly); 'voronoi' uses it directly
+   * (a plain sine already eases itself at its own extrema — composing an
+   * extra ease on top is what caused the right/left asymmetry bug, see
+   * the constants' own doc comment above).
+   */
+  private setProgress(variant: GuidanceVariant, raw: number): void {
     if (variant === 'orbit') {
+      const t = easeInOutCubic(raw);
       const point = bezierPoint(t);
       this.phone.style.transform = `translate(${point.x}px, ${point.y}px) rotate(${bezierTangentDeg(t)}deg)`;
       this.trail.style.strokeDashoffset = String(TRAIL_LENGTH - lengthAtT(t));
       return;
     }
 
-    // 'voronoi': nudge right, then left, in place — see class doc comment.
-    const x = OSC_CENTER.x + OSC_AMPLITUDE_X * Math.sin(2 * Math.PI * t);
-    const rotate = OSC_ROTATE_DEG * Math.cos(2 * Math.PI * t);
+    // 'voronoi': nudge right, then left, in place — see the constants'
+    // own doc comment above for why `raw` is used un-eased here.
+    const x = OSC_CENTER.x + OSC_AMPLITUDE_X * Math.sin(2 * Math.PI * raw);
+    const rotate = OSC_ROTATE_DEG * Math.cos(2 * Math.PI * raw);
     this.phone.style.transform = `translate(${x}px, ${OSC_CENTER.y}px) rotate(${rotate}deg)`;
 
-    const right = rightProgress(t);
+    // Arrow origin tracks the phone's CURRENT edge (its moving position ±
+    // half its own width), recomputed every frame — not a fixed point —
+    // per the physical-device report: the gesture the arrow illustrates
+    // starts at the phone's edge, not its center.
+    const right = rightProgress(raw);
+    this.arrowRightGroup.style.transform = `translate(${x + PHONE_HALF_WIDTH}px, ${OSC_CENTER.y}px)`;
     this.arrowRightShaft.style.transform = `scaleX(${right})`;
     this.arrowRightHead.style.transform = `translate(${ARROW_LENGTH * right}px, 0)`;
     this.arrowRightHead.style.opacity = String(Math.max(0, (right - 0.5) / 0.5));
 
-    const left = leftProgress(t);
+    const left = leftProgress(raw);
+    this.arrowLeftGroup.style.transform = `translate(${x - PHONE_HALF_WIDTH}px, ${OSC_CENTER.y}px)`;
     this.arrowLeftShaft.style.transform = `scaleX(${left})`;
     this.arrowLeftHead.style.transform = `translate(${-ARROW_LENGTH * left}px, 0)`;
     this.arrowLeftHead.style.opacity = String(Math.max(0, (left - 0.5) / 0.5));

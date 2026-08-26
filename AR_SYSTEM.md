@@ -2930,3 +2930,52 @@ schema above.
   closer, then farther" in real hand use; and (still open from the
   prior entry, unrelated to this pass) whether the new tracking artwork
   performs well against the real printed plaques once a print exists.
+
+  **Progress (2026-08-26, later still): physical-device report on the
+  `'voronoi'` nudge motion — a real velocity-asymmetry bug, root-caused
+  and fixed, plus two layout changes.**
+
+  **Bug: right movement read as slow, the return left read as fast.**
+  Root cause, confirmed algebraically, not guessed: the previous code fed
+  `easeInOutCubic(raw)` as the ARGUMENT to `sin()`. `easeInOutCubic`
+  reaches its own midpoint (0.5) quickly relative to how slowly it
+  approaches 0 and 1 (`4r³` for `r<0.5`, so `easeInOutCubic(0.397) ≈
+  0.25`) — meaning the sine's rightmost peak (`t=0.25`) landed at
+  `raw≈0.397`, only 21% of the "right" half's own raw-time-budget away
+  from its end. The result: a slow ~80%-of-the-half departure from
+  center out to the peak, then a fast ~20%-of-the-half snap back through
+  center into the left excursion — exactly the reported "right is slow,
+  left is fast," even though the two halves get EXACTLY equal wall-clock
+  time. Fixed by using `raw` directly for `'voronoi'` (no extra easing —
+  a plain sine already eases itself naturally at its own extrema, and
+  `x(1-raw) = 2·center − x(raw)` holds exactly, an honest mirror
+  image). `'orbit'` keeps its internal easing (a one-shot journey, where
+  an eased start/end is correct, and no periodic function is involved to
+  clash with it). Also, per the same report and 8th Wall's own quoted
+  "move slowly" guidance (`EightWallSession.ts`): the cycle slowed
+  (2.6s → 3.2s) and both the amplitude and arrow length reduced, for a
+  visibly more subtle nudge.
+
+  **Layout: target glyph moved from below the phone (column) to beside
+  it (row).** `target-voronoi`'s coordinates shifted so it shares the
+  phone/arrows' own y — a single horizontal composition (phone, its
+  arrow, the target) instead of a vertically stacked one.
+
+  **Arrow origin: now the phone's current edge, not its center.** The
+  arrow groups' position is recomputed every frame as `phoneX(raw) ±
+  PHONE_HALF_WIDTH` (10, matching the phone glyph's own local half-width)
+  instead of a fixed static point — so the right arrow visibly starts at
+  the phone's right edge and the left arrow at its left edge, tracking
+  the phone as it moves, per the physical-device report.
+
+  **Verified in software:** `npm run typecheck`/`build`/`test` clean
+  (51/51, unchanged this pass). A JS-side numeric trace (phone transform
+  + both arrows' `scaleX`, polled every ~120ms over one full cycle)
+  confirms the fix directly: right-shaft scaleX rises smoothly
+  0.68→0.995 (peak)→0.0006 and left-shaft rises smoothly
+  0→0.989 (peak)→0.05, both visibly symmetric rise/fall shapes with
+  peaks reaching ~0.99+ — no more front-loaded/back-loaded skew.
+  Screenshots confirm the row layout and edge-anchored arrow visually.
+  **Requires physical device testing, not verifiable in software:**
+  whether the corrected, slower motion now reads as the intended subtle
+  gesture in real hand use.
