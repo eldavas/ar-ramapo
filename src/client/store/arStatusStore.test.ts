@@ -6,12 +6,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { phaseToGuidanceVariant } from './arStatusStore.js';
 
-test('searching shows the search illustration', () => {
-  assert.equal(phaseToGuidanceVariant('searching'), 'search');
+test('searching shows the orbit illustration', () => {
+  assert.equal(phaseToGuidanceVariant('searching'), 'orbit');
 });
 
-test('stabilizing shows the stabilize illustration', () => {
-  assert.equal(phaseToGuidanceVariant('stabilizing'), 'stabilize');
+test('stabilizing shows the voronoi illustration', () => {
+  assert.equal(phaseToGuidanceVariant('stabilizing'), 'voronoi');
 });
 
 test('idle, starting, loading-target, and stable show no illustration', () => {

@@ -2521,3 +2521,107 @@ schema above.
   satisfy `Element.setPointerCapture`, so this class of interaction has
   never been headlessly automatable in this repo, before or after this
   pass).
+
+  **Progress (2026-08-25, later same day): first physical-device pass on
+  the onboarding above surfaced real UI/animation defects — reworked to
+  match the supplied reference design, plus three genuine implementation
+  bugs found and fixed via headless screenshot verification, not
+  assumption.** No architectural change from the entry above (still the
+  same two Zustand stores, same real-signal wiring, same
+  `framer-motion/dom`); this is a visual/behavioral revision to
+  `OnboardingFlow.ts` and `ui/PhoneGuidanceIllustration.ts` specifically.
+
+  **Onboarding shell redesign** (matches the supplied Apple-object-capture-
+  style reference, replacing this entry's earlier dark-scrim/bottom-
+  anchored layout): white background; content (illustration, then a 3-dot
+  stepper, then heading/body) vertically centered as one group above a
+  bottom button block; a "Help" corner button (`onboardingStore.reset()`)
+  restarts the flow from step 1; a "Finish" link under the primary CTA on
+  every step skips straight to the same Start-AR hand-off as the last
+  step's own CTA (both call the identical private `finishNow()`, which is
+  what actually invokes `session.start()` — the "Cancel"/"maximize" icons
+  from the reference were left out, deliberately: neither has a defined
+  destination in this single-entry-point flow, and inventing one wasn't
+  asked for). Steps renamed to what they actually teach: `find` ("Find a
+  target" / orbit illustration), `lock` ("Lock it in" / voronoi
+  illustration), `ready` (Start-AR CTA, no illustration — a clean
+  confirm-and-go screen, not a third invented motion variant).
+
+  **Illustration redesigned**: the phone now travels an actual arc (a
+  sampled quadratic-bezier x/y/rotate keyframe set, tangent-following
+  rotation) instead of oscillating in place ("looked like waving," per
+  the physical-device report), and leaves a fading trail behind it. Two
+  variants replace the earlier single one — `'orbit'` (phone arcing
+  around a wireframe target, for "find a target") and `'voronoi'` (phone
+  arcing toward a small abstract cell-pattern glyph evoking the real
+  tracking artwork, for "lock on") — reused identically by
+  `GuidanceOverlay.ts` live in AR (`arStatusStore`'s `'searching'` /
+  `'stabilizing'` phases now map to `'orbit'` / `'voronoi'` respectively,
+  same mapping shape as before, just renamed). `GuidanceOverlay` also
+  grew from a small, bottom-anchored icon to a large (280px), roughly
+  mid-screen one, matching the supplied live-AR reference.
+
+  **Three real bugs found and fixed, each confirmed by direct headless
+  screenshot evidence, not inferred from reading the code:**
+  1. **White-on-white invisibility.** The illustration's SVG hardcoded
+     `stroke="#fff"`, written when the only host was a dark scrim. The
+     new white onboarding background made it fully invisible. Fixed by
+     switching every stroke/fill to `currentColor` and having each host
+     set its own `color` (`OnboardingFlow`: dark; `GuidanceOverlay`:
+     white) — one component, two contexts, no hardcoded color anywhere
+     in it.
+  2. **framer-motion's `pathLength` value never actually drives
+     `stroke-dasharray`/`-dashoffset` through the vanilla `animate()`
+     entry point.** The trail was originally built on
+     `animate(path, { pathLength: [0,1] }, ...)` — framer-motion's
+     documented "draw an SVG path" feature. `element.getAnimations()`
+     and inline-style inspection after the call showed no native
+     Animation and a permanently unchanged inline style: the value
+     silently no-ops outside a React `motion.path` component. (Framer
+     Motion's transform properties and `opacity`, used elsewhere in this
+     same file via the same `animate()` call, work correctly — this is
+     scoped to the one property that didn't, not grounds to distrust
+     `animate()` generally.) A hand-rolled `requestAnimationFrame` loop
+     was tried next and also proved unreliable — `document.hasFocus()`
+     is `false` for an automated/backgrounded browser tab, and Chrome
+     throttles rAF delivery there, confirmed by comparing an isolated
+     121fps rAF measurement on a blank page against a near-stalled one on
+     the actual (unfocused, in this harness) app page. Fixed with a
+     native CSS `@keyframes` animation on `stroke-dashoffset` (a fixed,
+     pre-measured dasharray/length, `SVGPathElement.getTotalLength()`
+     measured once and hardcoded — the path never changes) — driven by
+     the browser's own animation engine, not app JS ticks, so neither
+     failure mode applies. Confirmed via `getAnimations()` returning a
+     real, running, correctly-timed native Animation after the fix.
+  3. **Duplicate SVG gradient `id` across the two simultaneously-mounted
+     instances.** Both `OnboardingFlow`'s and `GuidanceOverlay`'s
+     illustrations defined `<linearGradient id="trailFade">`; SVG ids
+     must be document-unique, so `url(#trailFade)` in *either* instance
+     resolved to whichever gradient landed first in the DOM — meaning
+     both trails' `currentColor` gradient stops resolved against that
+     one gradient's own ancestor color, not the referencing instance's.
+     Isolated by forcing a fully-drawn (non-animated) trail with the real
+     gradient — still invisible — against an ad hoc solid-color stroke on
+     the identical path, which rendered correctly; that isolated the
+     defect to the gradient reference, not the geometry or the animation.
+     Fixed by generating a unique gradient id per instance
+     (`ar-guidance-trail-fade-${n}`).
+
+  **Verified in software:** `npm run typecheck`/`build`/`test` clean,
+  44/44 (one new: `onboardingStore`'s `reset()`). Headless-Chrome, real
+  `dist/server.js` build, raw CDP (no puppeteer) at 320/393/430px:
+  step headings/CTA labels/illustration size correct at every width;
+  Help correctly restarts to step 1 mid-flow; Finish and the last step's
+  CTA both reach the same Start-AR hand-off with zero console errors up
+  to that point; screenshots (with the dash-animation and gradient-id
+  bugs above still both live at the time) were the actual evidence that
+  surfaced bugs 1–3 — this pass did not just trust green checkmarks, it
+  looked at what rendered. **Requires physical device testing, not
+  verifiable in software:** whether the redesigned onboarding and the
+  arc/trail motion read as intuitive during real phone handling, and
+  the live in-AR `GuidanceOverlay` (large, white-on-camera-feed) —
+  headless Chrome has no real camera and no WebGL in this sandboxed
+  environment (this file's Phase 1 notes already document that
+  ceiling), so the AR-side rendering of this same component was verified
+  by code/mechanism review (identical `currentColor` approach, now
+  proven correct on the onboarding side) rather than by direct capture.

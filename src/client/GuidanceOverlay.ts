@@ -22,10 +22,15 @@ export class GuidanceOverlay {
 
   constructor(private readonly store = arStatusStore) {
     this.container = document.createElement('div');
+    // Large and roughly mid-screen — a live camera overlay reads very
+    // differently from the onboarding icon (small, on a white page): it
+    // needs to be prominent over a busy camera feed, per the supplied
+    // reference. Sits above UxOverlay's hint strip (UxOverlay.ts's own
+    // hint is anchored to bottom:48px) so the two never overlap.
     this.container.style.cssText =
-      'position:fixed;left:50%;bottom:132px;transform:translateX(-50%);z-index:30;' +
-      'pointer-events:none;display:flex;align-items:center;justify-content:center;';
-    this.illustration = new PhoneGuidanceIllustration();
+      'position:fixed;left:50%;top:38%;transform:translate(-50%,-50%);z-index:30;' +
+      'pointer-events:none;display:flex;align-items:center;justify-content:center;color:#fff;';
+    this.illustration = new PhoneGuidanceIllustration('large');
     this.illustration.mount(this.container);
   }
 

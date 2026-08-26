@@ -12,7 +12,14 @@ import { createStore } from 'zustand/vanilla';
  */
 export type ArPhase = 'idle' | 'starting' | 'loading-target' | 'searching' | 'stabilizing' | 'stable';
 
-export type GuidanceVariant = 'search' | 'stabilize';
+/**
+ * The two shared guidance illustration variants (ui/PhoneGuidanceIllustration.ts):
+ * 'orbit' — phone arcing around a generic target, for "find one of the 4
+ * image references"; 'voronoi' — phone arcing toward the abstract tracking
+ * pattern, for "move slowly to lock on." Same two variants OnboardingFlow's
+ * "find"/"lock" steps use — one shared visual language, onboarding and live.
+ */
+export type GuidanceVariant = 'orbit' | 'voronoi';
 
 /**
  * Pure phase -> illustration mapping, unit-testable in isolation. 'idle' /
@@ -25,9 +32,9 @@ export type GuidanceVariant = 'search' | 'stabilize';
 export function phaseToGuidanceVariant(phase: ArPhase): GuidanceVariant | null {
   switch (phase) {
     case 'searching':
-      return 'search';
+      return 'orbit';
     case 'stabilizing':
-      return 'stabilize';
+      return 'voronoi';
     default:
       return null;
   }

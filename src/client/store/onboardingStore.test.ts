@@ -4,16 +4,22 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { nextOnboardingStep } from './onboardingStore.js';
+import { nextOnboardingStep, onboardingStore } from './onboardingStore.js';
 
-test('intro advances to locate', () => {
-  assert.equal(nextOnboardingStep('intro'), 'locate');
+test('find advances to lock', () => {
+  assert.equal(nextOnboardingStep('find'), 'lock');
 });
 
-test('locate advances to stabilize', () => {
-  assert.equal(nextOnboardingStep('locate'), 'stabilize');
+test('lock advances to ready', () => {
+  assert.equal(nextOnboardingStep('lock'), 'ready');
 });
 
-test('stabilize clamps at stabilize — the last step never advances past itself', () => {
-  assert.equal(nextOnboardingStep('stabilize'), 'stabilize');
+test('ready clamps at ready — the last step never advances past itself', () => {
+  assert.equal(nextOnboardingStep('ready'), 'ready');
+});
+
+test('reset() returns to the first step from anywhere in the flow', () => {
+  onboardingStore.setState({ step: 'ready' });
+  onboardingStore.getState().reset();
+  assert.equal(onboardingStore.getState().step, 'find');
 });
