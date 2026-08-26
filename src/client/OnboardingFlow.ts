@@ -1,6 +1,6 @@
 import { animate } from 'framer-motion/dom';
 import { onboardingStore, type OnboardingState, type OnboardingStep } from './store/onboardingStore.js';
-import { PhoneGuidanceIllustration, type GuidanceVariant } from './ui/PhoneGuidanceIllustration.js';
+import { PhoneGuidanceIllustration, guidanceSlotStyle, type GuidanceVariant } from './ui/PhoneGuidanceIllustration.js';
 
 /**
  * Full-screen pre-AR onboarding (AR_SYSTEM.md §G onboarding UX entry).
@@ -26,13 +26,17 @@ import { PhoneGuidanceIllustration, type GuidanceVariant } from './ui/PhoneGuida
  * real user gesture — required for iOS's motion-permission prompt exactly
  * as it was before this change. The "Finish" link (present on every step,
  * matching the reference) skips any remaining steps and invokes the same
- * `onComplete` immediately. The "Help" corner button restarts the flow via
- * `onboardingStore.reset()` — it does not call `onComplete`.
+ * `onComplete` immediately.
+ *
+ * "Back" (top-left, hidden on the first step) steps back one via
+ * `onboardingStore.back()` — plain in-flow navigation, not the corner
+ * "Help" affordance (that one lives only in the live-AR screen, wired in
+ * main.ts via `UxOverlay.showCornerButton`, and re-opens this class in
+ * `replay: true` mode — see `show()`'s doc comment).
  */
 interface StepContent {
   readonly heading: string;
   readonly body: string;
-  readonly ctaLabel: string;
   readonly illustration: GuidanceVariant | null;
 }
 
@@ -40,28 +44,28 @@ const STEPS: Record<OnboardingStep, StepContent> = {
   find: {
     heading: 'Find a target',
     body: 'Point your camera at one of the 4 image references on the model.',
-    ctaLabel: 'Continue',
     illustration: 'orbit',
   },
   lock: {
     heading: 'Lock it in',
     body: 'Move your phone slowly toward the pattern to help it lock on.',
-    ctaLabel: 'Continue',
     illustration: 'voronoi',
   },
   ready: {
     heading: 'Ready when you are',
     body: 'Tap Start AR to begin.',
-    ctaLabel: 'Start AR',
     illustration: null,
   },
 };
 
 const STEP_ORDER: readonly OnboardingStep[] = ['find', 'lock', 'ready'];
 const STEP_TRANSITION_S = 0.22;
+const READY_CTA_LABEL = 'Start AR';
+const READY_CTA_LABEL_REPLAY = 'Got it';
 
 export class OnboardingFlow {
   private readonly container: HTMLDivElement;
+  private readonly backButton: HTMLButtonElement;
   private readonly stepEl: HTMLDivElement;
   private readonly heading: HTMLHeadingElement;
   private readonly body: HTMLParagraphElement;
@@ -72,6 +76,7 @@ export class OnboardingFlow {
   private readonly illustrationSlot: HTMLDivElement;
   private unsubscribe: (() => void) | null = null;
   private onComplete: (() => void) | null = null;
+  private isReplay = false;
 
   constructor(private readonly store = onboardingStore) {
     this.container = document.createElement('div');
@@ -81,17 +86,17 @@ export class OnboardingFlow {
       'padding:calc(env(safe-area-inset-top,0px) + 16px) 24px calc(env(safe-area-inset-bottom,0px) + 32px);' +
       'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;';
 
-    const helpButton = document.createElement('button');
-    helpButton.textContent = 'Help';
-    helpButton.style.cssText =
-      'position:absolute;top:calc(env(safe-area-inset-top,0px) + 16px);right:24px;' +
+    this.backButton = document.createElement('button');
+    this.backButton.textContent = 'Back';
+    this.backButton.style.cssText =
+      'position:absolute;top:calc(env(safe-area-inset-top,0px) + 16px);left:24px;' +
       'background:none;border:none;color:#1764e4;font-size:16px;font-weight:600;' +
       'cursor:pointer;touch-action:manipulation;padding:4px;';
-    helpButton.addEventListener('click', (event) => {
+    this.backButton.addEventListener('click', (event) => {
       event.stopPropagation();
-      this.store.getState().reset();
+      this.store.getState().back();
     });
-    this.container.appendChild(helpButton);
+    this.container.appendChild(this.backButton);
 
     // Vertically centers the icon/stepper/heading/body as one group in the
     // space above the button block — matches the reference's composition
@@ -103,8 +108,15 @@ export class OnboardingFlow {
     this.stepEl = document.createElement('div');
     this.stepEl.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:20px;max-width:26em;text-align:center;';
 
+    // Fixed footprint (matches PhoneGuidanceIllustration's own "small" box
+    // exactly, via the shared guidanceSlotStyle helper) regardless of
+    // whether a step shows an illustration — the "ready" step has none,
+    // and without this the content block's total height would change when
+    // the icon disappears, causing everything below it to jump. Physical-
+    // device report: this jump also visibly caught the illustration's own
+    // fade mid-transition ("se queda pasmada").
     this.illustrationSlot = document.createElement('div');
-    this.illustrationSlot.style.cssText = 'display:flex;align-items:center;justify-content:center;min-height:0;';
+    this.illustrationSlot.style.cssText = `display:flex;align-items:center;justify-content:center;${guidanceSlotStyle('small')}`;
     this.illustration = new PhoneGuidanceIllustration('small');
     this.illustration.mount(this.illustrationSlot);
 
@@ -156,9 +168,21 @@ export class OnboardingFlow {
     this.container.appendChild(buttons);
   }
 
-  /** Mounts the flow and resolves control to onComplete once finished (last step's CTA, or "Finish"). */
-  show(onComplete: () => void): void {
+  /**
+   * Mounts the flow and resolves control to onComplete once finished (last
+   * step's CTA, or "Finish"). `replay: true` is how main.ts's live-AR
+   * "Help" corner button re-opens this flow without re-triggering the
+   * Start-AR gesture: the last step's CTA reads "Got it" instead of
+   * "Start AR" (the AR session is already running — there is nothing left
+   * to start), and `onComplete` is expected to be a plain dismiss, not
+   * `session.start()`. `onboardingStore` is a module-level singleton, so
+   * the caller is responsible for calling `onboardingStore.getState()
+   * .reset()` before a replay `show()` if it should start over from step 1
+   * rather than resuming wherever the flow last left off.
+   */
+  show(onComplete: () => void, options?: { replay?: boolean }): void {
     this.onComplete = onComplete;
+    this.isReplay = options?.replay ?? false;
     document.body.appendChild(this.container);
     this.render(this.store.getState().step, false);
     this.unsubscribe = this.store.subscribe((state: OnboardingState) => this.render(state.step, true));
@@ -175,8 +199,8 @@ export class OnboardingFlow {
 
   /** Shared by the last step's CTA and the "Finish" link — see class doc comment. */
   private finishNow(): void {
-    // This IS the Start-AR gesture. Synchronous, no await/microtask before
-    // onComplete() — see class doc comment.
+    // Outside replay mode, this IS the Start-AR gesture. Synchronous, no
+    // await/microtask before onComplete() — see class doc comment.
     const onComplete = this.onComplete;
     this.dispose();
     onComplete?.();
@@ -188,9 +212,9 @@ export class OnboardingFlow {
     const apply = (): void => {
       this.heading.textContent = content.heading;
       this.body.textContent = content.body;
-      this.cta.textContent = content.ctaLabel;
+      this.cta.textContent = step === 'ready' ? (this.isReplay ? READY_CTA_LABEL_REPLAY : READY_CTA_LABEL) : 'Continue';
+      this.backButton.style.visibility = step === 'find' ? 'hidden' : 'visible';
       this.illustration.setVariant(content.illustration);
-      this.illustrationSlot.style.display = content.illustration ? 'flex' : 'none';
       this.stepperDots.forEach((dot, index) => {
         const isCurrent = index === stepIndex;
         dot.style.background = isCurrent ? '#000' : 'transparent';
@@ -203,8 +227,10 @@ export class OnboardingFlow {
       return;
     }
     // Small crossfade + rise between steps — a microinteraction, not a
-    // scene transition; no layout thrash since heading/body/CTA keep their
-    // box sizes (max-width is fixed, text just re-flows).
+    // scene transition; no layout thrash since heading/body/CTA/illustration
+    // slot all keep their box sizes (the illustration slot's footprint is
+    // fixed regardless of content — see its own comment above — and
+    // max-width is fixed on the text, which just re-flows).
     animate(this.stepEl, { opacity: [1, 0] }, { duration: STEP_TRANSITION_S / 2, ease: 'easeIn' }).then(() => {
       apply();
       void animate(this.stepEl, { opacity: [0, 1], y: [8, 0] }, { duration: STEP_TRANSITION_S, ease: 'easeOut' });

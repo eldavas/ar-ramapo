@@ -28,6 +28,7 @@ import { UxOverlay } from './UxOverlay.js';
 import { OnboardingFlow } from './OnboardingFlow.js';
 import { GuidanceOverlay } from './GuidanceOverlay.js';
 import { arStatusStore } from './store/arStatusStore.js';
+import { onboardingStore } from './store/onboardingStore.js';
 import { PlacementController } from './PlacementController.js';
 import { TapPlacedAnchorSource } from './TapPlacedAnchorSource.js';
 import { ImageTargetAnchorSource } from './ImageTargetAnchorSource.js';
@@ -671,6 +672,20 @@ async function runEightWallExperience(experience: ExperienceManifest): Promise<v
   diagPrintTimeline();
   overlay.hideAll();
   arStatusStore.getState().setPhase('stable');
+
+  // Live-AR "Help": exclusive to this already-in-AR screen (not onboarding
+  // itself, which has its own in-flow "Back" — see OnboardingFlow.ts's doc
+  // comment), scoped to the image-target path (mirrors this file's other
+  // image-target-only additions). Re-opens OnboardingFlow in `replay: true`
+  // mode: the AR session keeps running underneath untouched — replay's
+  // onComplete is a no-op dismiss, never session.start() again — reset()
+  // first so it always restarts from step 1, not wherever it last left off.
+  if (!FAKE_AR && anchorSource.kind === 'image-target') {
+    overlay.showCornerButton('Help', () => {
+      onboardingStore.getState().reset();
+      new OnboardingFlow().show(() => {}, { replay: true });
+    });
+  }
 
   // Physical-device follow-up (2026-08-19): explain SUSTAINED tracking loss
   // after reveal instead of leaving the user with no signal at all — the

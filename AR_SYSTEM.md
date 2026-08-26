@@ -2625,3 +2625,95 @@ schema above.
   ceiling), so the AR-side rendering of this same component was verified
   by code/mechanism review (identical `currentColor` approach, now
   proven correct on the onboarding side) rather than by direct capture.
+
+  **Progress (2026-08-25, later still): first ON-DEVICE physical pass
+  (real iPhone, live camera, real AR session) surfaced four more real
+  defects — all fixed and re-verified via headless screenshot before this
+  entry was written.**
+
+  1. **Illustration too small.** Nominal render size doubled (small
+     130→260px, large 280→460px), still capped responsively via CSS
+     `max-width` (in vw, so neither ever overflows a narrow phone
+     viewport) rather than a fixed pixel ceiling.
+  2. **Trail visibly raced ahead of / lagged behind the phone** (on-device
+     photos showed the arc line crossing through the phone mid-animation).
+     Root cause: two INDEPENDENTLY-timed animations — framer-motion's
+     keyframe `animate()` for the phone and a CSS `@keyframes` animation
+     for the trail — can each be individually correct and still drift
+     relative to each other; nothing coupled them. Also found in the same
+     pass: framer-motion's default equal-time spacing across the phone's
+     intentionally uneven bezier-t keyframe samples (denser near the
+     apex) produced the reported "torpe... como un glitch" stutter — the
+     phone was moving at correct POSITIONS but wrong RELATIVE SPEEDS.
+     Both fixed by replacing both animation mechanisms with a single
+     `requestAnimationFrame` loop that computes one eased progress value
+     per frame from a continuous analytic quadratic-bezier formula (point,
+     tangent-angle, and a precomputed arc-length-vs-t table for the
+     trail's `stroke-dashoffset`) and writes both the phone's transform
+     and the trail's dash in the same tick — the trail cannot lead the
+     phone by construction, and there are no discrete keyframes left to
+     mis-space. (The earlier §G entry's finding that a hand-rolled rAF
+     loop looked stalled was a headless/unfocused-tab-only artifact,
+     confirmed irrelevant here — this on-device pass is the proof: the
+     rAF-driven animation runs correctly on a real, focused phone screen.)
+     `framer-motion/dom`'s `animate()` is kept for what it's still
+     genuinely used for in this file: the opacity show/hide crossfade.
+  3. **Onboarding's corner button was backwards.** The "Help" restart
+     button belongs only on the already-in-AR screen, not onboarding
+     itself — replaced in `OnboardingFlow.ts` with a top-left "Back"
+     button (`onboardingStore.back()`, a new pure `previousOnboardingStep()`
+     transition, hidden on the first step) for in-flow navigation. A new
+     live-AR "Help" reuses the EXISTING `UxOverlay.showCornerButton()`
+     seam (previously only used for tap-placed experiences' "Re-place" —
+     same slot, mutually exclusive by `anchorSource.kind`, no conflict),
+     wired in `main.ts` right after scene reveal, image-target path only.
+     Tapping it resets `onboardingStore` to step 1 and re-opens
+     `OnboardingFlow` in a new `replay: true` mode: the last step's CTA
+     reads "Got it" instead of "Start AR" and `onComplete` is a plain
+     dismiss — the running AR session is never touched, never
+     re-triggered.
+  4. **Step 3's layout visibly jumped** ("Ready" has no illustration,
+     unlike steps 1–2) and the illustration's own fade got caught
+     mid-transition. Root cause: the illustration slot's height changed
+     whenever the icon disappeared, reflowing everything below it in the
+     same frame the crossfade was running. Fixed with a new exported
+     `guidanceSlotStyle()` in `PhoneGuidanceIllustration.ts` — the single
+     source of truth for the illustration's own box (width + aspect-ratio,
+     not a duplicated guess) — so the host reserves the identical
+     footprint whether or not a step shows an icon.
+
+  Also reported: white bands top/bottom of the live AR camera view.
+  Investigated, not blindly "fixed": `body`'s background is already
+  `#000` (not white) and nothing this project's code sets a white
+  background behind the camera canvas, so this is not the onboarding
+  screen's white bleeding through. `#ar-container`/`#camerafeed` switched
+  from static `100vh`/`100vw` to `100dvh`/`100dvw` (dynamic viewport
+  units, with the static ones kept as a fallback rule for older browsers)
+  as a real, low-risk improvement — the canvas now re-fills automatically
+  the instant Safari's chrome auto-collapses on scroll/interaction,
+  instead of staying sized to whatever the viewport was on load. This
+  does NOT explain everything the report describes, though: the supplied
+  photos show iOS's own status bar and Safari's own URL-bar/tab toolbar
+  at top and bottom — that chrome is the browser's own UI, entirely
+  outside this page's DOM, and no page CSS can paint over or resize it
+  while browsing a plain tab (not added to the Home Screen). An
+  edge-to-edge camera view with zero browser chrome needs either
+  installing this site to the Home Screen (a standalone web app has no
+  Safari UI at all) or the native iOS App Clip already on this file's
+  roadmap (§G Phase 4, not yet started) — not a web CSS fix.
+
+  **Verified in software:** `npm run typecheck`/`build`/`test` clean,
+  47/47 (3 new: `previousOnboardingStep()`'s table). Headless-Chrome, real
+  `dist/server.js` build, raw CDP at 320/393/430px: illustration renders
+  at the doubled size; Back is hidden on step 1, visible and functional
+  on steps 2–3; "Help" is absent from onboarding; step 3's content block
+  keeps an identical bounding box whether or not an icon is showing (the
+  jump fix); screenshots at two different points in the arc/trail loop
+  both show the trail terminating exactly at the phone's position, never
+  past it. **Requires physical device testing, not verifiable in
+  software:** whether the now-analytic arc motion reads as smooth on a
+  real screen (headless screenshots can only confirm sync/position, not
+  perceived frame-to-frame smoothness), the live in-AR "Help" replay flow
+  (needs a real running AR session to test against), and whether the
+  `100dvh`/`100dvw` change measurably changes what's visible around
+  Safari's chrome on an actual device.

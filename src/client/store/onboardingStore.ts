@@ -18,15 +18,23 @@ export function nextOnboardingStep(step: OnboardingStep): OnboardingStep {
   return STEP_ORDER[Math.min(index + 1, STEP_ORDER.length - 1)];
 }
 
+/** The "Back" button's transition table — unit-testable in isolation. Clamps at the first step. */
+export function previousOnboardingStep(step: OnboardingStep): OnboardingStep {
+  const index = STEP_ORDER.indexOf(step);
+  return STEP_ORDER[Math.max(index - 1, 0)];
+}
+
 export interface OnboardingState {
   step: OnboardingStep;
   advance(): void;
-  /** The corner "Help" affordance — restarts the flow from the first step. */
+  back(): void;
+  /** Re-armed before a live-AR "Help" replay (main.ts) so it starts at step 1. */
   reset(): void;
 }
 
 export const onboardingStore = createStore<OnboardingState>((set) => ({
   step: FIRST_STEP,
   advance: (): void => set((state) => ({ step: nextOnboardingStep(state.step) })),
+  back: (): void => set((state) => ({ step: previousOnboardingStep(state.step) })),
   reset: (): void => set({ step: FIRST_STEP }),
 }));
