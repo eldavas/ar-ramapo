@@ -2775,7 +2775,97 @@ schema above.
   same way the old landscape plaques were; and whether "Help" appearing
   before a lock is achieved reads as useful rather than distracting.
 
-  **Progress (2026-08-26): on-device debug-console capture reviewed
+  **Progress (2026-08-26): first physical test of the 2026-08-25 Voronoi
+  artwork surfaced "only one of the 4 targets works" — root-caused to a
+  real multi-target bug (not artwork quality), fixed; the previously
+  proposed pose-smoothing fix (§22 of the troubleshooting doc) also
+  implemented in the same pass. Also: the flat-mount requirement
+  (§18/§G's 2026-08-17 entry) re-confirmed unchanged and made
+  unambiguous in `docs/physical-plaque-placement.md`.**
+
+  **Bug found by code review, not by a new physical capture:**
+  `ImageTargetAnchorSource.onImageEvent()`'s 'found' handler gated on a
+  single class-wide `acquired` boolean — once ANY plaque acquired the
+  anchor, every subsequent 'found' for a DIFFERENT plaque (its own
+  first-ever sighting) was held to the same `isSampleTrustworthy()` gate
+  designed for noisy re-detection of the SAME already-anchored plaque
+  (scale plausibility AND `trackingStatus === 'NORMAL'`). No unit test
+  covered "already acquired via target A, first sighting of target B" —
+  every existing test either used a single target or explicitly tested
+  re-detection of the SAME name. This is a strong, sufficient explanation
+  for "only the plaque scanned first ever works": walking to a different
+  physical plaque is exactly when `trackingStatus` commonly deviates from
+  `NORMAL` (SLAM `RELOCALIZING`/`TOO_MUCH_MOTION` during camera motion),
+  so a genuinely new plaque's first sighting had a real chance of landing
+  on a rejected sample with no automatic retry a user would perceive as
+  "recovering" — the anchor just silently stayed wherever the first
+  plaque left it.
+
+  **Fix (`ImageTargetAnchorSource.ts`):** a new `seenTargetNames: Set<string>`
+  tracks which plaque names have ever produced a trustworthy sample. A
+  'found' event is now treated as trustworthy when `!wasAcquired` (the
+  original bootstrap exception) **or** the name is new to this anchor,
+  **or** it independently passes `isSampleTrustworthy()` — generalizing
+  the existing "the very first sample must not hang forever" reasoning
+  from "the whole anchor's first-ever sample" to "this specific plaque's
+  first-ever sample." A REPEAT sighting of an already-seen name is
+  unaffected — still held to the full gate, exactly as before.
+
+  **Pose smoothing (`docs/research/8th-wall-troubleshooting.md` §22's
+  proposal, implemented as proposed):** `applyPose()` now filters the RAW
+  tracked position/rotation through a `OneEuroFilter1D` per position axis
+  and per quaternion component (hemisphere-continuity-corrected before
+  filtering, renormalized after) before composing with
+  `TARGET_FRAME_TO_WORLD_FIX`/`rotationYawDeg`/`originOffsetMeters` — not
+  the other way around, so the offset is always rotated by a quaternion
+  consistent with the filtered position. Tuned like MindAR's own
+  `TRACKING_PROFILE_RIGID_ANCHOR` (`ARSessionManager.ts`: minCF 0.001,
+  beta 1000) per the proposal's own reasoning — high beta so the filter
+  gets out of the way during real motion, unlike the low-beta profile
+  already proven to cause visible lag/"swim" when tried for MindAR's
+  rigid-anchor case. Filter state (all 7 filters plus the elapsed-time
+  clock) resets on every pose discontinuity — a re-detection of the same
+  plaque after a loss, or (the fix above) a different plaque's first
+  sighting — via the same `resetPoseFilters()` call, so a legitimate jump
+  still snaps instead of smoothing across it. The clock is injectable
+  (`now: () => number`, defaults to `performance.now`) specifically so
+  `ImageTargetAnchorSource.test.ts` can simulate realistic frame-to-frame
+  timing instead of the near-zero elapsed time synchronous test calls
+  would otherwise measure.
+
+  **Verified in software:** `npm run typecheck`/`build`/`test` clean,
+  51/51 (4 new: two covering the multi-target fix directly — a new
+  plaque's first sighting applies despite an implausible scale, and
+  despite non-`NORMAL` trackingStatus; one confirming a REPEAT sighting
+  of an already-seen plaque still gets rejected; one confirming filter
+  reset makes a plaque switch snap exactly rather than lag). Pre-existing
+  "recovered sample" assertions needed a widened epsilon (still ≤1cm) to
+  account for the filter's now-real, expected, small smoothing lag on a
+  second-in-a-row sample of the SAME target — a regression in the
+  composition math itself would be off by orders of magnitude more than
+  that, so this doesn't weaken what those tests catch.
+
+  **Docs:** `docs/physical-plaque-placement.md` rewritten where it still
+  described the retired 90×30mm QR-plaque artwork (§1's print sheet,
+  size, badge-shape convention) to instead describe the current 30×30mm
+  Voronoi targets (§1); the flat-mount requirement (unaffected by the
+  artwork swap) called out as an explicit REQUIREMENT rather than left
+  as one confirmed fact among many, since a vertical mount would track
+  against the wrong axis convention entirely.
+
+  **Requires physical device testing, not verifiable in software:**
+  whether the multi-target fix actually resolves "only one target
+  works" against the real printed artwork (the code-level explanation is
+  strong but this pass had no new physical capture to confirm it
+  against); whether the pose-filter tuning feels right on a real device
+  (screen-space marker smoothing already uses a different, lower-beta
+  profile deliberately — this is the first on-device test of ANY
+  smoothing on the 3D anchor itself for 8th Wall); and every item already
+  open from the 2026-08-25 entries above (artwork tracking quality,
+  reused offset/rotation numbers against the smaller footprint, flat-mount
+  vs. 8th Wall's own rotation convention).
+
+  **Progress (2026-08-26, later the same day): on-device debug-console capture reviewed
   (screen test, not a print — see below); `'voronoi'` guidance variant
   redesigned from a second copy of the arc motion into its own
   right/left nudge gesture; step 3 gained a camera-permission reminder.**
