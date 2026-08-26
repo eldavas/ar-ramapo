@@ -48,12 +48,15 @@ const STEPS: Record<OnboardingStep, StepContent> = {
   },
   lock: {
     heading: 'Lock it in',
-    body: 'Move your phone slowly toward the pattern to help it lock on.',
+    // Matches the live in-AR "still locking on" hint wording exactly
+    // (main.ts's POSE_COACHING_DELAY_MS text) — same illustration variant,
+    // same instruction, same words.
+    body: 'Move your phone slightly closer, then farther, to help it lock on.',
     illustration: 'voronoi',
   },
   ready: {
     heading: 'Ready when you are',
-    body: 'Tap Start AR to begin.',
+    body: "Tap Start AR to begin. You'll be asked to allow camera access — tap Allow to continue.",
     illustration: null,
   },
 };

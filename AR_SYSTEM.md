@@ -2774,3 +2774,69 @@ schema above.
   design docstring, unconfirmed against an actual print) centered the
   same way the old landscape plaques were; and whether "Help" appearing
   before a lock is achieved reads as useful rather than distracting.
+
+  **Progress (2026-08-26): on-device debug-console capture reviewed
+  (screen test, not a print — see below); `'voronoi'` guidance variant
+  redesigned from a second copy of the arc motion into its own
+  right/left nudge gesture; step 3 gained a camera-permission reminder.**
+
+  **Debug-console capture reviewed, no action needed:** the supplied
+  on-device `?debug=1` log shows repeated `[ImageTarget] FOUND
+  "site-tracking-front"` / `scale mismatch: engine sees 0.095-0.184 m,
+  manifest declares 0.03 m` / `pose sample rejected` / `LOST`. This is
+  the exact, already-documented pattern from this file's own prior §21
+  finding (testing against an on-screen image instead of a printed
+  target produces a stable-but-wrong scale ratio, correctly rejected by
+  `isSampleTrustworthy()`) — confirmed by the user's own report: testing
+  was done against an iPad screen, no printer available yet. Not a
+  regression, nothing to fix here; the gate is working as designed. Also
+  visually confirmed in the same screenshots: the live-AR "Help" button
+  IS showing from the start of tracking (the prior entry's fix), before
+  any lock was ever achieved.
+
+  **`'voronoi'` motion redesign, `ui/PhoneGuidanceIllustration.ts`:**
+  previously reused the exact same left-to-right arc as `'orbit'`, only
+  swapping the target glyph — an approximation of "move slightly closer,
+  then farther" that didn't actually depict that gesture. Replaced with
+  a dedicated nudge motion sharing the same architecture (one
+  `requestAnimationFrame` loop, one shared eased `t` per frame driving
+  every element, direct `element.style` writes — see the file's own doc
+  comment for why): the phone oscillates right then left around a fixed
+  center (`x = center ± amplitude * sin(2πt)`), and a short arrow grows
+  on whichever side it's currently moving toward (`max(0, ±sin(2πt))`,
+  the same `t`) — a shaft scaled via `scaleX` (safe under non-uniform
+  scale for a perfectly horizontal line — only its length changes, not
+  its stroke thickness) plus a fixed-shape arrowhead translated to the
+  shaft's current tip and opacity-faded in near full growth (an angled
+  shape WOULD visibly distort under `scaleX`, so it's never scaled, only
+  repositioned). `'orbit'`'s arc/trail is untouched. Verified correct
+  with real numeric data, not another screenshot guess: a JS-side trace
+  polling the phone's live `transform` and both arrows' `scaleX` every
+  120ms over 3.2s (recorded in this session, not reproduced here) shows
+  a clean, symmetric right→center→left→center cycle with each arrow
+  growing to ~0.98–0.99 exactly while the phone is on its side and
+  shrinking to 0 the instant it crosses back through center — screenshot
+  sampling had initially and coincidentally landed on stroboscopic
+  aliasing (a 260ms sample interval is an exact submultiple of the
+  2.6s cycle) plus the arrows' genuinely narrow full-extension window,
+  reading as "right arrow never appears" when it was a sampling artifact,
+  not a logic bug.
+
+  **Onboarding step 2 copy** now matches the live "still locking on"
+  hint's wording exactly ("Move your phone slightly closer, then
+  farther, to help it lock on.") — same instruction, same words, same
+  illustration variant, onboarding and live AR.
+
+  **Onboarding step 3** ("Ready when you are") now explicitly prepares
+  the user for the OS camera-permission prompt that `session.start()`
+  triggers next: "Tap Start AR to begin. You'll be asked to allow camera
+  access — tap Allow to continue."
+
+  **Verified in software:** `npm run typecheck`/`build`/`test` clean
+  (47/47, unchanged — no new pure-logic modules this pass). Headless
+  smoke test re-run clean at 320/393/430px (no regression). **Requires
+  physical device testing, not verifiable in software:** whether the
+  new right/left nudge motion reads as intuitive for "move slightly
+  closer, then farther" in real hand use; and (still open from the
+  prior entry, unrelated to this pass) whether the new tracking artwork
+  performs well against the real printed plaques once a print exists.

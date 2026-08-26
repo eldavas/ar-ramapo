@@ -4,31 +4,39 @@ import type { AnimationPlaybackControls } from 'framer-motion/dom';
 /**
  * Shared vector guidance illustration (AR_SYSTEM.md §G onboarding UX entry).
  * Thin line-art (color from `currentColor`, so each host controls it — see
- * below), in the spirit of Apple's object-capture guidance screens: a phone
- * glyph carried along a left-to-right arc, leaving a fading trail exactly
- * behind it, never ahead.
+ * below). Two variants, two different physical gestures, two different
+ * motions:
  *
- * The arc/trail motion is driven by ONE small `requestAnimationFrame` loop
- * computing a single eased progress value `t` per frame and deriving BOTH
- * the phone's position/rotation (analytic quadratic-bezier point + tangent
- * — a continuous formula, not discrete sampled keyframes) AND the trail's
- * `stroke-dashoffset` (from a precomputed arc-length-vs-t table) from that
- * SAME `t` in the SAME tick. This is a deliberate choice, not a fallback:
- * two independently-timed animations (framer-motion's keyframe `animate()`
- * for the phone, a separate CSS `@keyframes` for the trail — both tried
- * first) cannot GUARANTEE the trail never leads the phone; they can only
+ * - `'orbit'` ("find a target"): the phone travels a left-to-right arc,
+ *   leaving a fading trail exactly behind it, never ahead.
+ * - `'voronoi'` ("lock it in" / the live "still locking on, move closer
+ *   then farther" hint): the phone nudges right then left in place — a
+ *   short arrow grows on whichever side it's currently moving toward and
+ *   retracts on the other, instead of a big sweeping arc, matching the
+ *   real instruction (a small repeated adjustment, not travel across a
+ *   wide area).
+ *
+ * Both motions are driven by ONE small `requestAnimationFrame` loop
+ * computing a single eased progress value `t` per frame and deriving
+ * EVERY visual element (phone position/rotation, and either the trail's
+ * `stroke-dashoffset` or the two arrows' growth) from that SAME `t` in the
+ * SAME tick — analytic formulas, not discrete sampled keyframes. This is a
+ * deliberate choice, not a fallback: two independently-timed animations
+ * (framer-motion's keyframe `animate()` for the phone, a separate CSS
+ * `@keyframes` for the trail — both tried first, for the orbit variant)
+ * cannot GUARANTEE a trailing element never leads the phone; they can only
  * approximate it if both curves happen to line up. A single shared `t`
  * guarantees it by construction. It also sidesteps a real bug hit along
  * the way: framer-motion's default equal-time spacing across an uneven,
- * hand-sampled keyframe array (needed for the bezier's denser mid-arc
- * region) produced a visible stutter — an analytic per-frame formula has
- * no discrete keyframes to mis-space in the first place.
+ * hand-sampled keyframe array produced a visible stutter — an analytic
+ * per-frame formula has no discrete keyframes to mis-space in the first
+ * place.
  *
- * The phone's transform and the trail's dash both use direct
- * `element.style` writes for this reason; framer-motion's DOM-only
- * `animate()` (framer-motion/dom — no React in the import graph) is kept
- * for what it's genuinely good at here: the simple show/hide opacity
- * crossfade below, and OnboardingFlow.ts's step-to-step transitions.
+ * All per-frame writes use direct `element.style` assignment for this
+ * reason; framer-motion's DOM-only `animate()` (framer-motion/dom — no
+ * React in the import graph) is kept for what it's genuinely good at
+ * here: the simple show/hide opacity crossfade below, and
+ * OnboardingFlow.ts's step-to-step transitions.
  *
  * Mounted from two places: OnboardingFlow.ts (small, steps "find"/"lock")
  * and GuidanceOverlay.ts (large, live during the AR session, driven by
@@ -38,17 +46,18 @@ import type { AnimationPlaybackControls } from 'framer-motion/dom';
  *
  * `setVariant(null)` hides it; passing a variant shows/crossfades it. Honors
  * prefers-reduced-motion: the loop never starts (the SVG renders static,
- * phone resting at the arc's start, no trail) when the user's OS setting
- * requests it. Only the show/hide opacity crossfade (a small, non-parallax
- * transition) still runs either way.
+ * phone at its variant's rest position, no trail/arrows) when the user's
+ * OS setting requests it. Only the show/hide opacity crossfade (a small,
+ * non-parallax transition) still runs either way.
  */
 export type GuidanceVariant = 'orbit' | 'voronoi';
 export type GuidanceSize = 'small' | 'large';
 
 const FADE_MS = 200;
-const ARC_DURATION_S = 2.6;
+const CYCLE_DURATION_S = 2.6;
 
-// Quadratic bezier: P0 (arc start) -> P1 (control, the apex) -> P2 (arc end).
+// ---- 'orbit' motion: a left-to-right quadratic-bezier arc -----------------
+
 const P0 = { x: 20, y: 100 };
 const P1 = { x: 100, y: 20 };
 const P2 = { x: 180, y: 100 };
@@ -90,6 +99,22 @@ function lengthAtT(t: number): number {
   const i1 = Math.min(i0 + 1, LENGTH_SAMPLES);
   const frac = index - i0;
   return CUMULATIVE_LENGTH[i0] + (CUMULATIVE_LENGTH[i1] - CUMULATIVE_LENGTH[i0]) * frac;
+}
+
+// ---- 'voronoi' motion: nudge right, then left, in place -------------------
+
+const OSC_CENTER = { x: 100, y: 62 };
+const OSC_AMPLITUDE_X = 32; // phone ranges OSC_CENTER.x ± this
+const OSC_ROTATE_DEG = 10;
+const ARROW_LENGTH = 46;
+
+/** +1 while nudging right (first half of the cycle), 0 the rest. */
+function rightProgress(t: number): number {
+  return Math.max(0, Math.sin(2 * Math.PI * t));
+}
+/** +1 while nudging left (second half of the cycle), 0 the rest. */
+function leftProgress(t: number): number {
+  return Math.max(0, -Math.sin(2 * Math.PI * t));
 }
 
 function easeInOutCubic(t: number): number {
@@ -135,6 +160,13 @@ export function guidanceSlotStyle(size: GuidanceSize): string {
 // same path rendered fine — isolating the bug to the id collision.
 let nextInstanceId = 0;
 
+// The right/left arrow, each split into a `-shaft` (grown via scaleX,
+// anchored at its own base — safe under non-uniform scale because the
+// local geometry is perfectly horizontal, so only its length changes, not
+// its stroke thickness) and a `-head` (fixed shape, translated to the
+// shaft's current tip and opacity-faded in near full growth — an
+// arrowhead's angled geometry WOULD visibly distort under scaleX, so it
+// never gets scaled, only repositioned).
 function buildSvgMarkup(gradientId: string): string {
   return `
 <svg viewBox="0 0 ${VIEWBOX_W} ${VIEWBOX_H}" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -147,6 +179,15 @@ function buildSvgMarkup(gradientId: string): string {
 
   <path data-part="trail" d="M 20 100 Q 100 20 180 100" stroke="url(#${gradientId})" stroke-width="3.5" stroke-linecap="round" stroke-dasharray="${TRAIL_LENGTH}" stroke-dashoffset="${TRAIL_LENGTH}" />
 
+  <g data-part="arrow-right" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+    <line data-part="arrow-right-shaft" x1="0" y1="0" x2="${ARROW_LENGTH}" y2="0" stroke-width="3.5" />
+    <polyline data-part="arrow-right-head" points="-15,-9 0,0 -15,9" stroke-width="3.5" fill="none" />
+  </g>
+  <g data-part="arrow-left" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+    <line data-part="arrow-left-shaft" x1="0" y1="0" x2="-${ARROW_LENGTH}" y2="0" stroke-width="3.5" />
+    <polyline data-part="arrow-left-head" points="15,-9 0,0 15,9" stroke-width="3.5" fill="none" />
+  </g>
+
   <g data-part="target-orbit" opacity="0" stroke="currentColor">
     <polygon points="100,105 111,110 111,122 100,127 89,122 89,110" stroke-width="2" stroke-linejoin="round" />
     <polyline points="89,110 100,116 111,110" stroke-width="2" stroke-linejoin="round" />
@@ -154,8 +195,8 @@ function buildSvgMarkup(gradientId: string): string {
   </g>
 
   <g data-part="target-voronoi" opacity="0" stroke="currentColor">
-    <rect x="166" y="88" width="24" height="24" rx="3" stroke-width="2" />
-    <path d="M166 94 L178 88 M166 102 L190 96 M172 112 L180 100 M188 92 L180 100 M182 112 L188 104" stroke-width="1.4" stroke-linecap="round" />
+    <rect x="88" y="100" width="24" height="24" rx="3" stroke-width="2" />
+    <path d="M88 106 L100 100 M88 114 L112 108 M94 122 L102 110 M110 104 L102 110 M104 122 L110 114" stroke-width="1.4" stroke-linecap="round" />
   </g>
 
   <g data-part="phone" stroke="currentColor">
@@ -171,6 +212,10 @@ export class PhoneGuidanceIllustration {
   private readonly container: HTMLDivElement;
   private readonly phone: SVGGElement;
   private readonly trail: SVGPathElement;
+  private readonly arrowRightShaft: SVGLineElement;
+  private readonly arrowRightHead: SVGPolylineElement;
+  private readonly arrowLeftShaft: SVGLineElement;
+  private readonly arrowLeftHead: SVGPolylineElement;
   private readonly targetOrbit: SVGGElement;
   private readonly targetVoronoi: SVGGElement;
   private readonly reducedMotion: boolean;
@@ -188,12 +233,26 @@ export class PhoneGuidanceIllustration {
     const svg = this.container.querySelector('svg');
     const phone = this.container.querySelector<SVGGElement>('[data-part="phone"]');
     const trail = this.container.querySelector<SVGPathElement>('[data-part="trail"]');
+    const arrowRightShaft = this.container.querySelector<SVGLineElement>('[data-part="arrow-right-shaft"]');
+    const arrowRightHead = this.container.querySelector<SVGPolylineElement>('[data-part="arrow-right-head"]');
+    const arrowLeftShaft = this.container.querySelector<SVGLineElement>('[data-part="arrow-left-shaft"]');
+    const arrowLeftHead = this.container.querySelector<SVGPolylineElement>('[data-part="arrow-left-head"]');
     const targetOrbit = this.container.querySelector<SVGGElement>('[data-part="target-orbit"]');
     const targetVoronoi = this.container.querySelector<SVGGElement>('[data-part="target-voronoi"]');
-    if (!svg || !phone || !trail || !targetOrbit || !targetVoronoi) {
+    if (
+      !svg ||
+      !phone ||
+      !trail ||
+      !arrowRightShaft ||
+      !arrowRightHead ||
+      !arrowLeftShaft ||
+      !arrowLeftHead ||
+      !targetOrbit ||
+      !targetVoronoi
+    ) {
       // Loud, not silent (§C): a markup edit that drops one of these parts
       // must fail immediately, not render a mysteriously incomplete illustration.
-      throw new Error('PhoneGuidanceIllustration: expected SVG markup to contain phone/trail/target parts.');
+      throw new Error('PhoneGuidanceIllustration: expected SVG markup to contain phone/trail/arrow/target parts.');
     }
     const { width, height, maxWidthVw } = SIZE_PX[size];
     svg.setAttribute('width', String(width));
@@ -201,9 +260,19 @@ export class PhoneGuidanceIllustration {
     svg.style.cssText = `max-width:${maxWidthVw}vw;height:auto;`;
     this.phone = phone;
     this.trail = trail;
+    this.arrowRightShaft = arrowRightShaft;
+    this.arrowRightHead = arrowRightHead;
+    this.arrowLeftShaft = arrowLeftShaft;
+    this.arrowLeftHead = arrowLeftHead;
     this.targetOrbit = targetOrbit;
     this.targetVoronoi = targetVoronoi;
-    this.setProgress(0); // rest position: arc start, matches the loop's t=0 frame
+    // Arrow groups are positioned once here (static) — only their shaft/head
+    // children's transforms change per frame, in setProgress() below.
+    this.container.querySelector<SVGGElement>('[data-part="arrow-right"]')!.style.transform =
+      `translate(${OSC_CENTER.x}px, ${OSC_CENTER.y}px)`;
+    this.container.querySelector<SVGGElement>('[data-part="arrow-left"]')!.style.transform =
+      `translate(${OSC_CENTER.x}px, ${OSC_CENTER.y}px)`;
+    this.setProgress('orbit', 0); // rest position until a variant is chosen
   }
 
   mount(parent: HTMLElement): void {
@@ -219,6 +288,10 @@ export class PhoneGuidanceIllustration {
     this.stopMotion();
     this.targetOrbit.setAttribute('opacity', variant === 'orbit' ? '1' : '0');
     this.targetVoronoi.setAttribute('opacity', variant === 'voronoi' ? '1' : '0');
+    this.trail.style.display = variant === 'orbit' ? '' : 'none';
+    const arrowsDisplay = variant === 'voronoi' ? '' : 'none';
+    this.container.querySelector<SVGGElement>('[data-part="arrow-right"]')!.style.display = arrowsDisplay;
+    this.container.querySelector<SVGGElement>('[data-part="arrow-left"]')!.style.display = arrowsDisplay;
 
     this.fadeAnimation?.stop();
     if (variant === null) {
@@ -226,7 +299,8 @@ export class PhoneGuidanceIllustration {
       return;
     }
 
-    if (!this.reducedMotion) this.startMotion();
+    this.setProgress(variant, 0); // reset to this variant's own rest frame before (re)starting
+    if (!this.reducedMotion) this.startMotion(variant);
     if (!wasVisible) this.fadeAnimation = animate(this.container, { opacity: 1 }, { duration: FADE_MS / 1000 });
   }
 
@@ -236,16 +310,12 @@ export class PhoneGuidanceIllustration {
     this.container.remove();
   }
 
-  private startMotion(): void {
-    // Both variants share the identical arc/trail motion — only which
-    // target glyph is visible differs (toggled in setVariant above). The
-    // physical gesture ("carry the phone left to right along an arc") is
-    // the same instruction either way; DRY, not a coincidence.
-    const durationMs = ARC_DURATION_S * 1000;
+  private startMotion(variant: GuidanceVariant): void {
+    const durationMs = CYCLE_DURATION_S * 1000;
     const start = performance.now();
     const tick = (now: number): void => {
       const raw = ((now - start) % durationMs) / durationMs;
-      this.setProgress(easeInOutCubic(raw));
+      this.setProgress(variant, easeInOutCubic(raw));
       this.rafId = requestAnimationFrame(tick);
     };
     this.rafId = requestAnimationFrame(tick);
@@ -258,10 +328,28 @@ export class PhoneGuidanceIllustration {
     }
   }
 
-  /** Single source of truth for one frame: phone position/rotation AND the trail's reveal, from the same t. */
-  private setProgress(t: number): void {
-    const point = bezierPoint(t);
-    this.phone.style.transform = `translate(${point.x}px, ${point.y}px) rotate(${bezierTangentDeg(t)}deg)`;
-    this.trail.style.strokeDashoffset = String(TRAIL_LENGTH - lengthAtT(t));
+  /** Single source of truth for one frame: every visual element derives from this same t. */
+  private setProgress(variant: GuidanceVariant, t: number): void {
+    if (variant === 'orbit') {
+      const point = bezierPoint(t);
+      this.phone.style.transform = `translate(${point.x}px, ${point.y}px) rotate(${bezierTangentDeg(t)}deg)`;
+      this.trail.style.strokeDashoffset = String(TRAIL_LENGTH - lengthAtT(t));
+      return;
+    }
+
+    // 'voronoi': nudge right, then left, in place — see class doc comment.
+    const x = OSC_CENTER.x + OSC_AMPLITUDE_X * Math.sin(2 * Math.PI * t);
+    const rotate = OSC_ROTATE_DEG * Math.cos(2 * Math.PI * t);
+    this.phone.style.transform = `translate(${x}px, ${OSC_CENTER.y}px) rotate(${rotate}deg)`;
+
+    const right = rightProgress(t);
+    this.arrowRightShaft.style.transform = `scaleX(${right})`;
+    this.arrowRightHead.style.transform = `translate(${ARROW_LENGTH * right}px, 0)`;
+    this.arrowRightHead.style.opacity = String(Math.max(0, (right - 0.5) / 0.5));
+
+    const left = leftProgress(t);
+    this.arrowLeftShaft.style.transform = `scaleX(${left})`;
+    this.arrowLeftHead.style.transform = `translate(${-ARROW_LENGTH * left}px, 0)`;
+    this.arrowLeftHead.style.opacity = String(Math.max(0, (left - 0.5) / 0.5));
   }
 }
