@@ -413,6 +413,36 @@ export class ImageTargetAnchorSource implements AnchorSource {
     return isScalePlausible(ratio) && this.session.trackingStatus === 'NORMAL';
   }
 
+  /**
+   * Diagnostic-only (2026-09-01, troubleshooting doc §27): "anchor is lost
+   * easily, scale goes miniature" has (at least) two structurally
+   * different possible causes that look identical from the visual symptom
+   * alone — (a) this class's own gate/composition applying a bad pose, or
+   * (b) the CAMERA's own SLAM pose/absolute-scale estimate silently
+   * rescaling underneath an otherwise-correct, untouched anchor (a known
+   * limitation class of monocular VIO scale estimation, not something any
+   * per-sample ratio check on the TRACKED IMAGE can catch, since a global
+   * rescale moves the image's apparent size and the camera's own position
+   * by the same factor). Logging the camera's live position and its
+   * distance to this anchor's group alongside every existing FOUND/updated
+   * line is the cheapest way to tell those apart from ONE clean capture,
+   * instead of guessing which one it is and shipping another unverified
+   * fix. Never read for any tracking decision — logging only.
+   */
+  private cameraDiagnosticLine(): string {
+    const cam = this.session.getCameraPosition();
+    if (!cam) return '  camera=unavailable (session not started?)';
+    const dx = cam.x - this.group.position.x;
+    const dy = cam.y - this.group.position.y;
+    const dz = cam.z - this.group.position.z;
+    const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    return (
+      `  camera=(${cam.x.toFixed(2)}, ${cam.y.toFixed(2)}, ${cam.z.toFixed(2)}) ` +
+      `anchor=(${this.group.position.x.toFixed(2)}, ${this.group.position.y.toFixed(2)}, ${this.group.position.z.toFixed(2)}) ` +
+      `dist=${distance.toFixed(2)}m`
+    );
+  }
+
   private logSampleRejected(event: Xr8ImageTrackedEvent, target: ResolvedPlaqueTarget, ratio: number): void {
     warnIfScaleMismatch(event, target.physicalTargetWidthMeters, ratio);
     if (this.session.trackingStatus !== 'NORMAL') {
@@ -461,6 +491,7 @@ export class ImageTargetAnchorSource implements AnchorSource {
           );
           this.seenTargetNames.add(event.name);
           this.applyPose(event, target);
+          console.log(`[${traceT()}] [ImageTargetAnchorSource]${this.cameraDiagnosticLine()}`);
           this.onPoseApplied(true, ratio);
           this.acquired = true;
           this.acquireResolve?.();
@@ -496,6 +527,7 @@ export class ImageTargetAnchorSource implements AnchorSource {
         if (trustworthy) {
           this.seenTargetNames.add(event.name);
           this.applyPose(event, target);
+          console.log(`[${traceT()}] [ImageTargetAnchorSource]${this.cameraDiagnosticLine()}`);
           this.onPoseApplied(false, ratio);
           for (const handler of this.originChangedHandlers) {
             handler();
@@ -529,6 +561,7 @@ export class ImageTargetAnchorSource implements AnchorSource {
           const ratio = scaleRatio(event, target.physicalTargetWidthMeters);
           if (this.isSampleTrustworthy(ratio)) {
             this.applyPose(event, target);
+            console.log(`[${traceT()}] [ImageTargetAnchorSource]${this.cameraDiagnosticLine()}`);
             this.onPoseApplied(false, ratio);
           } else {
             this.logSampleRejected(event, target, ratio);

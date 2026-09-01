@@ -61,6 +61,10 @@ class FakeSession {
   trackingStatus: 'UNSPECIFIED' | 'NOT_AVAILABLE' | 'LIMITED' | 'NORMAL' = 'NORMAL';
   trackingReason = 'UNSPECIFIED';
   private handler: ImageEventHandler | null = null;
+  /** Diagnostic-only (§27) — stubbed null; no test asserts on this. */
+  getCameraPosition(): { x: number; y: number; z: number } | null {
+    return null;
+  }
   onImageEvent(handler: ImageEventHandler): () => void {
     this.handler = handler;
     return () => {

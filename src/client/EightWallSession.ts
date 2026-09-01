@@ -84,6 +84,14 @@ export class EightWallSession {
   private readonly statusHandlers: TrackingStatusHandler[] = [];
   private readonly imageHandlers: ImageEventHandler[] = [];
   private removeResizeListeners: (() => void) | null = null;
+  // Diagnostic only (2026-09-01, troubleshooting doc §27): the camera's own
+  // live world pose is the one signal missing from the existing FOUND/
+  // updated telemetry that can discriminate "the anchor's own transform is
+  // wrong" from "the anchor is fine but the camera's own SLAM pose/scale
+  // silently rescaled underneath it" — see ImageTargetAnchorSource's FOUND/
+  // updated logs, which now include this. Never read for any tracking
+  // decision, only logged.
+  private camera: THREE.PerspectiveCamera | null = null;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -135,6 +143,7 @@ export class EightWallSession {
           onStart: () => {
             diagMark('xr8-pipeline-onstart');
             const handles = xr8.Threejs.xrScene();
+            this.camera = handles.camera;
             // Eye-height start pose: with absolute scale the estimated
             // ground then lands near y≈0, which keeps hit-test results and
             // placed content in an intuitive frame.
@@ -231,6 +240,17 @@ export class EightWallSession {
   /** The engine's reason for the current trackingStatus (see field note). */
   get trackingReason(): string {
     return this.statusReason;
+  }
+
+  /**
+   * Diagnostic-only snapshot of the camera's own live world position (see
+   * the field's own doc comment) — `null` before `onStart` has run. Never
+   * consumed by any tracking/pose decision, only logged.
+   */
+  getCameraPosition(): { x: number; y: number; z: number } | null {
+    if (!this.camera) return null;
+    const { x, y, z } = this.camera.position;
+    return { x, y, z };
   }
 
   onTrackingStatus(handler: TrackingStatusHandler): void {

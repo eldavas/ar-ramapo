@@ -3100,3 +3100,55 @@ schema above.
   are still individually un-smoothed, single-sample snaps; and whether the
   30mm-proximity copy and the corrected pulse illustration actually make
   first lock easier in real hand use.
+
+  **Progress (2026-09-01, same day, second retest): the §26 fix did NOT
+  resolve the anchor bug — process changed from "guess, ship, retest" to
+  "instrument, capture once, diagnose from evidence."**
+
+  Reported verbatim after this fix was live: "loses anchor easily, and the
+  scale becomes miniature" — the same symptom family as before §26, not a
+  new one, and it survived a fix that should have addressed accumulated
+  drift. Full reasoning in `docs/research/8th-wall-troubleshooting.md`
+  §27; summary: three fixes in a row (§25, §26) each went straight to a
+  physical retest without a device log confirming the diagnosis first —
+  the exact anti-pattern this file's own §3 ("measuring instead of
+  guessing a fourth time") already named. "Miniature" specifically rules
+  out `group.scale` (hardcoded to `1` everywhere in this class, always) as
+  the mechanism — an apparent shrink has to be a position/perspective
+  effect. Two structurally different hypotheses remain equally consistent
+  with everything reported so far: (a) a real gate bug in
+  `ImageTargetAnchorSource` letting a bad sample through, or (b) 8th
+  Wall's `scale:'absolute'` SLAM estimate itself rescaling mid-session
+  (the target's own reported size and the camera's position could move by
+  the same factor, which no ratio check on our side would catch) — a
+  fundamentally different class of fix that no amount of anchor-gate
+  tuning would touch.
+
+  **Rather than guess between them a fourth time:** `EightWallSession.ts`
+  now retains the camera handle and exposes a diagnostic-only
+  `getCameraPosition()`; every FOUND/updated log line that results in an
+  applied pose now also logs the camera's live position, the anchor's
+  resulting position, and the distance between them — the cheapest signal
+  available to tell "the camera itself jumped/rescaled" from "the anchor's
+  own transform is what went wrong" from ONE clean capture. Next step is
+  exactly one physical session with `?debug=1`, capturing the full
+  console text (not a photo — this file's own §6 already paid that cost
+  once), read against the new lines, before any further anchor-logic
+  change.
+
+  **Unrelated, from direct on-device feedback on the same session:** the
+  §26 entry's scale-pulse `'voronoi'` illustration looked bad in real use.
+  Reverted to the pre-pulse lateral right/left nudge (same
+  asymmetry-bug-fixed mechanic as before, unchanged), but drawing a narrow
+  PROFILE (edge-on) phone silhouette for this variant only, instead of the
+  front-facing glyph `'orbit'` uses — nudging toward/away from the
+  tracking-pattern glyph beside it now reads as approach/retreat rather
+  than sliding sideways past it.
+
+  **Verified in software:** `npm run typecheck`/`build`/`test` clean,
+  53/53 (`FakeSession` gained a stubbed `getCameraPosition()` returning
+  `null`; no test asserts on the new diagnostic log content itself, which
+  carries no tracking-decision weight — it's for a human reading a real
+  capture). **Deliberately not attempted this pass:** any further change
+  to `ImageTargetAnchorSource`'s gate/composition logic — the entire point
+  of this pass is to stop changing that code without evidence.

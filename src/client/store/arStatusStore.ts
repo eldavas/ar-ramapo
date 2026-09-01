@@ -15,10 +15,11 @@ export type ArPhase = 'idle' | 'starting' | 'loading-target' | 'searching' | 'st
 /**
  * The two shared guidance illustration variants (ui/PhoneGuidanceIllustration.ts):
  * 'orbit' — phone arcing around a generic target, for "find one of the 4
- * image references"; 'voronoi' — phone pulsing bigger/smaller in place
- * beside the abstract tracking pattern, for "move slightly closer, then
- * farther, to lock on." Same two variants OnboardingFlow's "find"/"lock"
- * steps use — one shared visual language, onboarding and live.
+ * image references"; 'voronoi' — a profile (edge-on) phone nudging toward
+ * and away from the abstract tracking pattern beside it, for "move
+ * slightly closer, then farther, to lock on." Same two variants
+ * OnboardingFlow's "find"/"lock" steps use — one shared visual language,
+ * onboarding and live.
  */
 export type GuidanceVariant = 'orbit' | 'voronoi';
 
