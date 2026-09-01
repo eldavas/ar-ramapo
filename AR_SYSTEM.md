@@ -3040,3 +3040,63 @@ schema above.
   on real hardware, and whether losing continuous drift self-correction is
   noticeable over a real walkaround session — the whole reason this is
   shipping to a physical test before any further iteration.
+
+  **Progress (2026-09-01): first physical retest of the freeze above —
+  the predicted trade-off hit immediately (scene follows the user and
+  loses scale over a walkaround), refined to freeze only the CONTINUOUS
+  event stream; plus two unrelated onboarding-copy/illustration gaps
+  fixed from the same report.**
+
+  **Anchor stability, refined (`ImageTargetAnchorSource.ts`):**
+  `docs/research/8th-wall-troubleshooting.md` §26 has the full write-up.
+  Summary: freezing the anchor against EVERY image event (not just the
+  continuous `'updated'` stream) removed the only mechanism that ever
+  corrected ordinary SLAM/VIO drift during a real multi-minute
+  walkaround — re-grounding the content against a plaque's known
+  real-world position each time the user looks at one again. The fix
+  distinguishes the two event shapes 8th Wall already exposes:
+  `'updated'` (fires every frame in view — the proven §22/§24 jitter
+  source, stays permanently frozen once stabilized, unchanged) versus
+  `'found'` (fires only on a discrete transition — first detection or a
+  fresh re-detection after `imagelost`, at most a few times per minute) —
+  `'found'` now runs through the same `isSampleTrustworthy()` gate and
+  `seenTargetNames` multi-target exemption for the FULL session, exactly
+  as it did before `stable` existed. This is not a revert: the
+  pre-2026-08-31 code re-applied `'updated'` too, every frame, which is
+  what caused the jitter in the first place; this keeps that fix while
+  restoring only the bounded, occasional correction.
+
+  **Onboarding copy/illustration, from the same on-device report, found
+  by reading code against its own instructional text:**
+  1. The "find a target" copy never said the tracking targets are only
+     30×30mm (`docs/physical-plaque-placement.md` §1) — plausibly a real
+     contributor to "can't get lock," since detection needs the phone
+     much closer than "point your camera at the plaque" implies on its
+     own. Updated in `main.ts`, `ImageEventHintGate.ts`,
+     `TrackingLossHint.ts`, and `OnboardingFlow.ts`'s `find` step.
+  2. The "still locking on" hint text ("move your phone slightly closer,
+     then farther") and its `'voronoi'` illustration had drifted apart —
+     the animation showed a LATERAL nudge, not the depth motion the text
+     asks for. Traced through this file's own 2026-08-25/2026-08-26
+     onboarding entries: two separate illustration redesigns, neither of
+     which ever actually built a depth-motion depiction (the first arced
+     toward a target glyph, replaced by a lateral nudge because arcing
+     "didn't depict that gesture" either — the nudge was a different
+     wrong depiction, not a fix). `PhoneGuidanceIllustration.ts`'s
+     `'voronoi'` variant rewritten to a scale "breathing" pulse (the
+     phone and a halo ring grow/shrink in place) — the standard 2D
+     substitute for depicting motion toward/away from the camera.
+
+  **Verified in software:** `npm run typecheck`/`build`/`test` clean,
+  53/53. Three anchor tests rewritten from "once frozen, X does not move
+  the anchor" to the opposite assertion (a same-plaque re-detection and a
+  different plaque's first sighting both now correctly re-ground it), one
+  new test confirms an implausible re-detection is still rejected (gated,
+  not unconditional), and the continuous-`'updated'`-never-moves-it
+  guarantee is unchanged. **Requires the physical exhibit, not verifiable
+  in software — this pass's entire purpose:** whether periodic
+  re-grounding on discrete re-detections keeps the scene anchored over a
+  real walkaround without reintroducing any jitter, since re-detections
+  are still individually un-smoothed, single-sample snaps; and whether the
+  30mm-proximity copy and the corrected pulse illustration actually make
+  first lock easier in real hand use.

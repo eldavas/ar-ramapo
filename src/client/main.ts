@@ -601,8 +601,8 @@ async function runEightWallExperience(experience: ExperienceManifest): Promise<v
         onboardingStore.getState().reset();
         new OnboardingFlow().show(() => {}, { replay: true });
       });
-      overlay.showHint('Point your camera at the plaque.');
-      arStatusStore.getState().setPhase('searching', 'Point your camera at the plaque.');
+      overlay.showHint("Point your camera at the plaque — get close, it's small.");
+      arStatusStore.getState().setPhase('searching', "Point your camera at the plaque — get close, it's small.");
       hintGate = new ImageEventHintGate((text) => {
         overlay.showHint(text);
         // Keyed off ImageEventHintGate's own two literal hint strings — no

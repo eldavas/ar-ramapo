@@ -41,7 +41,7 @@ export class TrackingLossHint {
     this.lostForMs += deltaMs;
     if (!this.hintShown && this.lostForMs >= this.sustainedLossThresholdMs) {
       this.hintShown = true;
-      this.showHint('Lost track of the plaque — point your camera back at it to re-lock the model.');
+      this.showHint('Lost track of the plaque — point your camera back at it, up close, to re-lock the model.');
     }
   }
 }

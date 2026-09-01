@@ -13,16 +13,25 @@
  * in ImageTargetAnchorSource.ts.
  *
  * 2026-08-31: rewritten for the "anchor once, then freeze" strategy (see
- * ImageTargetAnchorSource.ts's own class doc comment). The pre-freeze
+ * ImageTargetAnchorSource.ts's own class doc comment). The
  * bootstrap/plausibility/multi-target-exemption gates are unchanged and
- * still fully covered below; what's new is a dedicated block of tests
- * confirming that once the anchor stabilizes, NOTHING moves it again —
- * not a re-detection of the same plaque, not a first-ever sighting of a
- * different one, not an implausible sample. The One Euro Filter tests
- * that used to live here (2026-08-26–2026-08-31) are gone along with the
- * filter itself — with no more continuous re-snapping there is nothing
- * left for a filter to smooth, so "filter lag" epsilons are gone too:
- * every applied sample now lands exactly.
+ * still fully covered below. The One Euro Filter tests that used to live
+ * here (2026-08-26–2026-08-31) are gone along with the filter itself —
+ * with no more continuous re-snapping there is nothing left for a filter
+ * to smooth, so "filter lag" epsilons are gone too: every applied sample
+ * now lands exactly.
+ *
+ * 2026-09-01 (§26): the FIRST physical retest of the pure "freeze
+ * forever" strategy above showed the scene drifting/losing scale over a
+ * real walkaround — nothing was left to periodically correct SLAM drift.
+ * Refined to distinguish the event shape: a continuous 'updated' sample
+ * is still permanently a no-op once stabilized (this is what actually
+ * fixed the §22/§24 jitter, and it stays fixed), but a discrete 'found'
+ * re-detection — of the same plaque or a different one, at any point in
+ * the session — still runs through the trust gate and re-grounds the
+ * anchor if it passes. The tests below reflect this: "stabilized" now
+ * means "the group is revealed and continuous per-frame samples are
+ * ignored," not "nothing can ever move it again."
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -461,7 +470,7 @@ test('the very first acquisition applies even while trackingStatus is not NORMAL
 });
 
 // --- Multi-target switching fix (2026-08-26, physical-device finding),
-// scope narrowed by the 2026-08-31 freeze strategy ---
+// now in effect for the FULL session (§26, 2026-09-01) ---
 //
 // On the real four-plaque 'site' entry, once one plaque acquired the
 // anchor, scanning any of the OTHER three plaques for the first time used
@@ -470,12 +479,13 @@ test('the very first acquisition applies even while trackingStatus is not NORMAL
 // this anchor has never seen before is applied unconditionally, the same
 // as the anchor's very first-ever sample — only a REPEAT sighting of an
 // already-seen name goes through the full scale/trackingStatus gate. These
-// tests cover that this exemption still works DURING the pre-freeze
-// window; the block after them covers why the ORIGINAL bug (a switch
-// happening well after the anchor had long stabilized) can no longer occur
-// at all post-freeze.
+// tests cover the exemption in the early convergence window; the
+// post-stabilization block further below covers the exact scenario §24
+// was originally about — a switch happening well after the anchor had
+// long stabilized — which §26 restored (§25's freeze had made it
+// structurally impossible, which is what caused the regression §26 fixes).
 
-test('a first sighting of a DIFFERENT plaque before freeze is applied unconditionally even with an implausible scale', () => {
+test('a first sighting of a DIFFERENT plaque before stabilization is applied unconditionally even with an implausible scale', () => {
   const session = new FakeSession();
   const scene = new THREE.Scene();
   const anchor = new ImageTargetAnchorSource(session as never, scene, [FRONT, BACK]);
@@ -505,7 +515,7 @@ test('a first sighting of a DIFFERENT plaque before freeze is applied unconditio
   assertQuatClose(anchor.group.quaternion, backQuat);
 });
 
-test('a first sighting of a DIFFERENT plaque before freeze is applied unconditionally even while trackingStatus is not NORMAL', () => {
+test('a first sighting of a DIFFERENT plaque before stabilization is applied unconditionally even while trackingStatus is not NORMAL', () => {
   const session = new FakeSession();
   const scene = new THREE.Scene();
   const anchor = new ImageTargetAnchorSource(session as never, scene, [FRONT, BACK]);
@@ -525,7 +535,7 @@ test('a first sighting of a DIFFERENT plaque before freeze is applied unconditio
   assertQuatClose(anchor.group.quaternion, backQuat);
 });
 
-test('a REPEAT sighting of an already-seen plaque before freeze still goes through the full trust gate', () => {
+test('a REPEAT sighting of an already-seen plaque still goes through the full trust gate — only the first sighting per name is exempt', () => {
   const session = new FakeSession();
   const scene = new THREE.Scene();
   const anchor = new ImageTargetAnchorSource(session as never, scene, [FRONT, BACK]);
@@ -535,8 +545,9 @@ test('a REPEAT sighting of an already-seen plaque before freeze still goes throu
     simulateEventFor(FRONT.name, FRONT, new THREE.Vector3(1.2, 0, -3.4), new THREE.Quaternion())
   );
 
-  // First sighting of BACK — exempt, applies unconditionally AND freezes
-  // (it's the first independently-checked sample since bootstrap).
+  // First sighting of BACK — exempt, applies unconditionally AND
+  // stabilizes (it's the first independently-checked sample since
+  // bootstrap).
   const backGoodPos = new THREE.Vector3(2.0, 0, 0.5);
   const backGoodQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), 0.9);
   session.fire('found', simulateEventFor(BACK.name, BACK, backGoodPos, backGoodQuat));
@@ -544,8 +555,10 @@ test('a REPEAT sighting of an already-seen plaque before freeze still goes throu
   assertVectorClose(anchor.group.position, backGoodPos);
 
   // A SECOND sighting of BACK with an implausible scale must be rejected —
-  // both because it's a repeat (not a new-name exemption) AND because the
-  // anchor is now frozen either way.
+  // BACK is no longer new, so it's held to the full trust gate like any
+  // other re-detection (§26: re-detections are evaluated for the FULL
+  // session, not just before stabilization — this rejection is purely the
+  // scale gate doing its job, not a freeze).
   const badSecondBackEvent = withScale(
     simulateEventFor(BACK.name, BACK, new THREE.Vector3(99, 0, 99), new THREE.Quaternion()),
     BACK.physicalTargetWidthMeters * 3
@@ -555,43 +568,18 @@ test('a REPEAT sighting of an already-seen plaque before freeze still goes throu
   assertQuatClose(anchor.group.quaternion, backGoodQuat);
 });
 
-// --- Freeze-after-stabilization (2026-08-31 strategy change) -------------
+// --- Post-stabilization behavior (§26, 2026-09-01 refinement) ------------
 //
-// This is the core contract of the new strategy: once the anchor has
-// stabilized once, NOTHING moves it again for the lifetime of this
-// instance — not a re-detection of the same plaque, not a first-ever
-// sighting of a totally different one, not a per-frame 'updated', however
-// clean the sample. docs/research/8th-wall-troubleshooting.md §25 has the
-// full rationale (weeks of drift/jitter reports under the old
-// continuous-re-snap design); this replaces that design's "reveal happens
-// only once" test with a stronger guarantee: not just the reveal, the
-// TRANSFORM itself never changes again.
+// The first physical retest of the pure "freeze forever" strategy (§25)
+// showed the scene drifting/losing scale over a real walkaround — SLAM
+// drift with nothing left to periodically correct it. The fix keeps §25's
+// win (no more per-frame jitter) but restores periodic correction on
+// DISCRETE re-detections: once stabilized, a continuous 'updated' sample
+// is STILL always a no-op, but a 'found' (the user looking directly at a
+// known plaque again, or a different one for the first time) still runs
+// through the full trust gate and, if it passes, re-grounds the anchor.
 
-test('once frozen, a clean re-detection of the SAME plaque does not move the anchor', async () => {
-  const session = new FakeSession();
-  const scene = new THREE.Scene();
-  const anchor = new ImageTargetAnchorSource(session as never, scene, [FRONT]);
-
-  session.fire('found', simulateEventFor(FRONT.name, FRONT, new THREE.Vector3(1, 0, -1), new THREE.Quaternion()));
-  const stablePos = new THREE.Vector3(1.2, 0, -3.4);
-  const stableQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), 0.2);
-  session.fire('updated', simulateEventFor(FRONT.name, FRONT, stablePos, stableQuat));
-  assert.equal(anchor.group.visible, true);
-
-  // A perfectly good re-detection of the very same plaque, at a
-  // completely different simulated world position — if this were still
-  // the pre-2026-08-31 continuous-re-snap design, this would move the
-  // anchor. It must not.
-  const elsewherePos = new THREE.Vector3(9.9, 0, 4.4);
-  const elsewhereQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -1.8);
-  session.fire('found', simulateEventFor(FRONT.name, FRONT, elsewherePos, elsewhereQuat));
-
-  assert.equal(anchor.group.visible, true);
-  assertVectorClose(anchor.group.position, stablePos);
-  assertQuatClose(anchor.group.quaternion, stableQuat);
-});
-
-test('once frozen, repeated clean "updated" samples never move the anchor (reveal AND freeze happen exactly once)', async () => {
+test('once stabilized, "updated" (continuous per-frame) samples never move the anchor, however many arrive', async () => {
   const session = new FakeSession();
   const scene = new THREE.Scene();
   const anchor = new ImageTargetAnchorSource(session as never, scene, [FRONT]);
@@ -613,7 +601,8 @@ test('once frozen, repeated clean "updated" samples never move the anchor (revea
   // position — a real session keeps sending 'updated' every frame while
   // the target is in view, and even small per-frame drift/noise in a real
   // signal would move a continuously-re-snapping anchor. None of these
-  // should move it at all now.
+  // should move it at all — this is what actually fixed the §22/§24
+  // jitter and stays true under §26.
   for (let i = 0; i < 5; i += 1) {
     session.fire(
       'updated',
@@ -627,30 +616,75 @@ test('once frozen, repeated clean "updated" samples never move the anchor (revea
   assertQuatClose(anchor.group.quaternion, stableQuat);
 });
 
-test('once frozen, the first-ever sighting of a DIFFERENT, never-before-seen plaque still does not move the anchor', () => {
+test('once stabilized, a clean re-detection ("found") of the SAME plaque DOES re-ground the anchor — this is the §26 fix', () => {
   const session = new FakeSession();
   const scene = new THREE.Scene();
-  const anchor = new ImageTargetAnchorSource(session as never, scene, [FRONT, BACK]);
+  const anchor = new ImageTargetAnchorSource(session as never, scene, [FRONT]);
 
-  // Bootstrap + freeze via FRONT only.
   session.fire('found', simulateEventFor(FRONT.name, FRONT, new THREE.Vector3(1, 0, -1), new THREE.Quaternion()));
   const stablePos = new THREE.Vector3(1.2, 0, -3.4);
   const stableQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), 0.2);
   session.fire('updated', simulateEventFor(FRONT.name, FRONT, stablePos, stableQuat));
   assert.equal(anchor.group.visible, true);
 
-  // This is the exact scenario the original §24 bug and its fix were
-  // about — BACK has never been seen before. Under the pre-2026-08-31
-  // design this was a real bug (silently rejected depending on
-  // trackingStatus timing) that §24 fixed by exempting it. Under the
-  // freeze strategy it's not a gate outcome at all: the anchor is frozen,
-  // so BACK's first sighting — clean pose, healthy trackingStatus — is
-  // simply never evaluated against any gate, and the world origin stays
-  // exactly where FRONT put it.
+  // A re-detection carrying a DIFFERENT (but still plausible, still
+  // NORMAL-tracking) pose — simulating accumulated SLAM drift being
+  // corrected the moment the user looks back at the plaque. Under §25's
+  // pure freeze this would have been (wrongly) ignored; §26 restores it.
+  const correctedPos = new THREE.Vector3(1.0, 0, -3.1);
+  const correctedQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), 0.25);
+  session.fire('found', simulateEventFor(FRONT.name, FRONT, correctedPos, correctedQuat));
+
+  assert.equal(anchor.group.visible, true);
+  assertVectorClose(anchor.group.position, correctedPos);
+  assertQuatClose(anchor.group.quaternion, correctedQuat);
+});
+
+test('once stabilized, an implausible re-detection ("found") is still rejected — periodic correction is gated, not blind', () => {
+  const session = new FakeSession();
+  const scene = new THREE.Scene();
+  const anchor = new ImageTargetAnchorSource(session as never, scene, [FRONT]);
+
+  session.fire('found', simulateEventFor(FRONT.name, FRONT, new THREE.Vector3(1, 0, -1), new THREE.Quaternion()));
+  const stablePos = new THREE.Vector3(1.2, 0, -3.4);
+  const stableQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), 0.2);
+  session.fire('updated', simulateEventFor(FRONT.name, FRONT, stablePos, stableQuat));
+  assert.equal(anchor.group.visible, true);
+
+  const badPos = new THREE.Vector3(50, 12, -80);
+  const badQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), 1.1);
+  const badEvent = withScale(
+    simulateEventFor(FRONT.name, FRONT, badPos, badQuat),
+    FRONT.physicalTargetWidthMeters * 3
+  );
+  session.fire('found', badEvent);
+
+  assertVectorClose(anchor.group.position, stablePos);
+  assertQuatClose(anchor.group.quaternion, stableQuat);
+});
+
+test('once stabilized, the first-ever sighting of a DIFFERENT, never-before-seen plaque re-grounds the anchor to it — the exact §24/§26 scenario', () => {
+  const session = new FakeSession();
+  const scene = new THREE.Scene();
+  const anchor = new ImageTargetAnchorSource(session as never, scene, [FRONT, BACK]);
+
+  // Bootstrap + stabilize via FRONT only.
+  session.fire('found', simulateEventFor(FRONT.name, FRONT, new THREE.Vector3(1, 0, -1), new THREE.Quaternion()));
+  const stablePos = new THREE.Vector3(1.2, 0, -3.4);
+  const stableQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), 0.2);
+  session.fire('updated', simulateEventFor(FRONT.name, FRONT, stablePos, stableQuat));
+  assert.equal(anchor.group.visible, true);
+
+  // This is the exact scenario §24 originally fixed and §25's pure freeze
+  // regressed: well into an established session, the user walks up to a
+  // DIFFERENT physical plaque (BACK) neither seen nor evaluated before.
+  // §26 restores the periodic correction — BACK's composed world position
+  // should now be the anchor's position, exactly as if BACK alone had
+  // acquired the anchor from the start.
   const backPos = new THREE.Vector3(2.0, 0, 0.5);
   const backQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), 0.9);
   session.fire('found', simulateEventFor(BACK.name, BACK, backPos, backQuat));
 
-  assertVectorClose(anchor.group.position, stablePos);
-  assertQuatClose(anchor.group.quaternion, stableQuat);
+  assertVectorClose(anchor.group.position, backPos);
+  assertQuatClose(anchor.group.quaternion, backQuat);
 });

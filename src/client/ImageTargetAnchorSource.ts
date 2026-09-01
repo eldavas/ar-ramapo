@@ -92,12 +92,13 @@ function scaleRatio(event: Xr8ImageTrackedEvent, physicalTargetWidthMeters: numb
  * defect — every glitchy reading was being composed correctly and then
  * applied anyway.
  *
- * This gate still exists after the 2026-08-31 strategy change (see the
- * class doc comment) — it now decides which single sample gets to become
- * the ONE frozen pose, rather than deciding whether to accept each of an
- * unbounded stream of re-snaps. A ratio far from 1 means the engine's own
- * absolute-scale estimate for this reading hasn't converged (or is
- * actively bad) — exactly the condition the warning already names.
+ * This gate still exists after the 2026-08-31/§26 strategy change (see the
+ * class doc comment) — it now decides which sample gets to become the
+ * initial pose AND which later discrete re-detections are trusted enough
+ * to re-ground it, rather than deciding whether to accept each of an
+ * unbounded per-frame stream of re-snaps. A ratio far from 1 means the
+ * engine's own absolute-scale estimate for this reading hasn't converged
+ * (or is actively bad) — exactly the condition the warning already names.
  */
 function isScalePlausible(ratio: number): boolean {
   return Math.abs(ratio - 1) <= SCALE_MISMATCH_TOLERANCE;
@@ -161,9 +162,10 @@ function formatPose(event: Xr8ImageTrackedEvent): string {
  * applyPose()'s composition to exactly the pre-multi-target math (see its
  * doc comment) — no behavior change for existing single-target callers.
  *
- * **Strategy change (2026-08-31) — anchor once, then freeze; SLAM owns
- * persistence from there.** Weeks of on-device testing under the previous
- * strategy (continuously re-snapping the anchor's transform to every
+ * **Strategy (2026-08-31, refined 2026-09-01) — anchor once, then only
+ * correct on discrete re-detections; never on continuous per-frame
+ * sampling.** Weeks of on-device testing under the original strategy
+ * (continuously re-snapping the anchor's transform to every
  * plausibility-checked `found`/`updated` sample, most recently with a
  * per-axis/per-quaternion-component One Euro Filter layered on top —
  * docs/research/8th-wall-troubleshooting.md §22/§24) kept surfacing the
@@ -172,77 +174,67 @@ function formatPose(event: Xr8ImageTrackedEvent): string {
  * it (§14), continuous jitter/spin while the camera held still on a target
  * (§22), and an offset plaque amplifying per-frame angular noise into
  * visible positional swim (the `originOffsetMeters` lever-arm effect — the
- * same class of report as 8th Wall's own community forum, see §25). This
- * is not a filter-tuning problem: it is a direct trade-off of the
- * "continuously re-apply" design itself, which was chosen specifically so
- * the anchor could self-correct SLAM drift on every glance back at a
- * plaque — but that same mechanism is also what lets one noisy frame move
- * a supposedly-settled anchor.
+ * same class of report as 8th Wall's own community forum, see §25). The
+ * 2026-08-31 pass (§25) went to the opposite extreme — freeze the
+ * transform permanently after the first stable pose, matching
+ * `TapPlacedAnchorSource` and 8th Wall's own forum-recommended pattern —
+ * which eliminated the jitter but, per the FIRST physical-device retest of
+ * that pass (§26), reintroduced the exact SLAM-drift symptom continuous
+ * re-snapping used to correct: on a real multi-minute walkaround of the
+ * `site` model, the scene visibly follows the user's motion and loses
+ * correct scale, because nothing ever re-grounds the anchor against
+ * reality again after the first lock.
  *
- * The new strategy matches this file's sibling implementation exactly:
- * `TapPlacedAnchorSource` has always placed its anchor ONCE (the user's
- * tap) and let `disableWorldTracking: false` SLAM hold that transform
- * static for the rest of the session — no re-snap logic exists there at
- * all, and it has never been a source of any drift/jitter report in this
- * log. It is also 8th Wall's own documented/community-recommended pattern
- * for this exact symptom (§25): anchor once on image detection, then rely
- * on world tracking for persistence, rather than perpetually re-applying
- * marker pose.
+ * **The refinement (§26): distinguish the EVENT SHAPE, not just gate on
+ * `stable`.** `'updated'` fires every frame the target is in view — a
+ * continuous stream, and per §22/§24 the proven source of jitter when
+ * perpetually re-applied. `'found'` fires only on a DISCRETE transition
+ * (first detection, or a fresh re-detection after `imagelost`) — at most
+ * a few times per minute during normal use, each one the user directly
+ * looking at a known-fixed physical plaque again. Re-grounding the anchor
+ * on that discrete signal is a bounded, occasional correction (exactly
+ * what SLAM drift needs), not a per-frame perturbation (what caused the
+ * jitter). So: once `stable`, `'updated'` samples are PERMANENTLY a pose
+ * no-op (unchanged from §25 — this is what actually fixed the jitter, and
+ * it stays fixed), but `'found'` — a fresh re-detection of ANY configured
+ * plaque, at ANY point in the session — still runs through the same
+ * `isSampleTrustworthy()` gate and, if it passes, re-applies the pose and
+ * fires `onOriginChanged`, exactly as it did before `stable` existed.
  *
  * Mechanically: the pre-existing bootstrap/convergence/reveal machinery
  * (§19 "Cold-start stabilization") is UNCHANGED — the very first `found`
  * of any configured plaque still applies unconditionally (so the anchor
  * is never left un-placed), the anchor stays hidden until a sample
- * independently passes `isSampleTrustworthy()` (scale plausibility AND
- * `trackingStatus === 'NORMAL'`), and that first passing sample is still
- * what reveals the group and resolves `whenStable()`. What changed is what
- * happens AFTER that reveal: previously every later trustworthy sample
- * kept re-writing `group.position`/`group.quaternion` (now smoothed, but
- * still perpetual); now, the instant `stable` flips true, `onImageEvent`
- * stops touching the transform ENTIRELY, forever, for this anchor
- * instance — every later `found` (a fresh detection of any plaque,
- * including one never seen before) and `updated` event still updates
- * `imageVisible`/telemetry (so `isTracking()`, `isImageVisible()`, and the
- * console log stream are unaffected) but is a pose no-op. After `imagelost`
- * the group already simply stopped receiving snaps — SLAM world tracking
- * (`disableWorldTracking: false` in EightWallSession) keeps the frozen
- * world pose valid, so content persists while the user walks around the
- * model; that half of the design is unchanged, it now also covers the
- * plaque coming back INTO view, not just it leaving.
- *
- * Trade-off, stated plainly (not hidden): this anchor no longer
- * self-corrects accumulated SLAM drift over a long session by re-scanning
- * a plaque. For the `site` experience (walking around a ~1.6×1.3m physical
- * model), if SLAM drift over a multi-minute session turns out to be
- * visible in practice, the next lever is NOT reverting to continuous
- * re-snap (already tried, already the source of this rewrite) but a
- * bounded, user-intentional recenter — `EightWallSession.recenter()`
- * already exists and is unused — which is a deliberately separate,
- * future decision, not part of this pass.
+ * independently passes `isSampleTrustworthy()`, and that first passing
+ * sample is still what reveals the group and resolves `whenStable()`.
+ * After `imagelost` the group simply stops receiving snaps until the NEXT
+ * `found` — SLAM world tracking (`disableWorldTracking: false` in
+ * EightWallSession) keeps the frozen-since-last-correction world pose
+ * valid in between, so content persists smoothly while the user walks;
+ * each fresh sighting of a plaque is then a chance to re-ground it, like
+ * a hiker periodically checking a landmark against a map instead of
+ * navigating purely by dead reckoning.
  *
  * The One Euro Filter smoothing apparatus this file carried between
- * 2026-08-26 and 2026-08-31 is removed entirely, not just unused: with no
- * more continuous re-snapping there is nothing left for it to smooth
- * (the group is hidden for the ENTIRE pre-freeze convergence window, so a
- * user never sees any of the handful of samples the filter used to act
- * on), and keeping dead smoothing code around a since-abandoned strategy
- * would misdocument the current design to the next reader.
+ * 2026-08-26 and 2026-08-31 stays removed: `'found'` re-detections are
+ * occasional, discrete ground-truth samples that should snap exactly, not
+ * lag toward — smoothing belongs on a continuous signal, and there isn't
+ * one here anymore.
  *
- * `seenTargetNames` (§24, "Multi-target switching fix") is kept, but its
- * scope is now implicitly narrower: it can only ever matter DURING the
- * brief pre-freeze convergence window (a second plaque sighted for the
- * first time before the first plaque ever produced a trustworthy sample)
- * — once `stable` is true, every `found`/`updated` short-circuits before
- * `seenTargetNames` is even consulted, which is exactly what makes the
- * ORIGINAL §24 bug (a different plaque's first-ever sighting, scanned
- * well after the anchor had long been established, silently rejected)
- * structurally impossible now: after freeze, no plaque's sighting — new
- * or already-seen — is ever "rejected", because none of them are
- * evaluated against the pose gate at all.
+ * `seenTargetNames` (§24, "Multi-target switching fix") now matters for
+ * the FULL session, not just an initial convergence window: a plaque this
+ * anchor has never seen before is applied unconditionally whenever it's
+ * first sighted, `stable` or not — walking up to a DIFFERENT plaque than
+ * the one that originally acquired the anchor, well into an established
+ * session, is exactly the §24 scenario and exactly the periodic
+ * re-grounding this refinement restores.
  *
- * onOriginChanged fires only during that same pre-freeze convergence
- * window (a discontinuity while still converging) — never after freeze,
- * since there are no more pose changes to announce once frozen.
+ * onOriginChanged fires on every accepted `'found'` past the very first
+ * bootstrap sample, for the lifetime of the anchor — not just during an
+ * initial convergence window — since a discrete re-detection is always a
+ * potential pose discontinuity for downstream screen-space filter state
+ * to reset against, whether it happens 2 seconds or 5 minutes into the
+ * session.
  */
 export class ImageTargetAnchorSource implements AnchorSource {
   readonly kind: OriginKind = 'image-target';
@@ -269,30 +261,31 @@ export class ImageTargetAnchorSource implements AnchorSource {
   // and AR_SYSTEM.md §G): whether a pose has ever passed
   // isSampleTrustworthy() SINCE acquisition — distinct from `acquired`,
   // which only means a bootstrap sample was applied. `group.visible` flips
-  // true exactly once, here, never on the bootstrap sample alone.
-  // Since 2026-08-31 this ALSO means "frozen forever" — see the class doc
+  // true exactly once, here, never on the bootstrap sample alone. Since
+  // 2026-08-31/§26 this ALSO permanently gates the CONTINUOUS 'updated'
+  // stream (never a discrete 'found' re-detection) — see the class doc
   // comment's strategy section — not just "revealed."
   private stable = false;
   private readonly stableResolvers: Array<() => void> = [];
   // Multi-target switching fix (2026-08-26, physical-device finding — see
   // onImageEvent's 'found' case doc comment): names that have ever produced
-  // a trustworthy sample. Since 2026-08-31 this only matters BEFORE
-  // `stable` — see the class doc comment's strategy section for why the
-  // original bug this fixed can no longer occur after freeze.
+  // a trustworthy sample. Matters for the FULL session (§26) — every
+  // 'found' still consults this, `stable` or not.
   private readonly seenTargetNames = new Set<string>();
 
   /**
    * Called for every APPLIED pose (bootstrap or checked) — see
-   * onImageEvent's call sites, all of which run only while `!this.stable`
-   * (2026-08-31 — see the class doc comment). isBootstrap = true only for
-   * the very-first, unconditionally-applied acquisition sample; false for
-   * the later sample that independently passed isSampleTrustworthy() (or,
-   * for a never-before-seen plaque during the same convergence window,
-   * the §24 first-sighting exemption). The scene/anchor must never be
-   * revealed on the bootstrap sample alone (that's the whole cold-start
-   * bug this exists to fix) — only the first genuinely-checked sample
-   * flips `stable` and reveals the group, and it does so exactly once,
-   * permanently freezing the transform from that point on.
+   * onImageEvent's call sites: the 'found' case calls this on every
+   * accepted discrete re-detection for the FULL session (§26), while the
+   * 'updated' case only ever reaches this while `!this.stable`. isBootstrap
+   * = true only for the very-first, unconditionally-applied acquisition
+   * sample; false for every later accepted sample. The scene/anchor must
+   * never be revealed on the bootstrap sample alone (that's the whole
+   * cold-start bug this exists to fix) — only the first genuinely-checked
+   * sample flips `stable` and reveals the group, and it does so exactly
+   * once; `stable` thereafter only means "revealed" and "the continuous
+   * 'updated' stream is now permanently ignored" — it does NOT mean this
+   * function stops being called altogether.
    */
   private onPoseApplied(isBootstrap: boolean, ratio: number): void {
     // TEMPORARY diagnostic instrumentation — see DiagnosticTimeline.ts.
@@ -309,7 +302,7 @@ export class ImageTargetAnchorSource implements AnchorSource {
     this.group.visible = true;
     console.log(
       `[${traceT()}] [ImageTargetAnchorSource] first trustworthy pose accepted (ratio=${ratio.toFixed(2)}) ` +
-        '— revealing anchor group and FREEZING its transform (2026-08-31 strategy: anchor once, SLAM persists).'
+        '— revealing anchor group. Continuous per-frame updates are now ignored; a fresh re-detection can still re-ground it (§26).'
     );
     for (const resolve of this.stableResolvers) resolve();
     this.stableResolvers.length = 0;
@@ -475,23 +468,18 @@ export class ImageTargetAnchorSource implements AnchorSource {
           break;
         }
 
-        if (this.stable) {
-          // Anchor is frozen (2026-08-31 strategy — see the class doc
-          // comment): SLAM persists the world pose from here on, so this
-          // sighting — whether a re-detection of the same plaque or the
-          // first-ever sighting of a different one — never touches the
-          // transform. imageVisible/telemetry above still update normally.
-          console.log(
-            `[${traceT()}] [ImageTarget] FOUND "${event.name}" — anchor frozen, pose not re-applied.`
-          );
-          break;
-        }
-
-        // Pre-freeze convergence window: same trust gate as always (scale
-        // plausibility AND trackingStatus === 'NORMAL'), with the §24
-        // exemption — a plaque this anchor has never seen before is new
-        // information, not suspect continuation of an existing one, so its
-        // first sighting is applied unconditionally too.
+        // Every 'found' past bootstrap is a DISCRETE re-detection — the
+        // user directly looking at a known-fixed plaque again — never
+        // frozen out, `stable` or not (§26 refinement to the class doc
+        // comment's strategy section: only the CONTINUOUS 'updated' stream
+        // below is frozen after stabilization; a discrete re-detection is
+        // exactly the periodic re-grounding a real walkaround session
+        // needs against accumulated SLAM drift). Same trust gate as
+        // always (scale plausibility AND trackingStatus === 'NORMAL'),
+        // with the §24 exemption — a plaque this anchor has never seen
+        // before is new information, not suspect continuation of an
+        // existing one, so its first sighting is applied unconditionally
+        // too, regardless of how far into the session it happens.
         const isNewTarget = !this.seenTargetNames.has(event.name);
         const ratio = scaleRatio(event, target.physicalTargetWidthMeters);
         const trustworthy = isNewTarget || this.isSampleTrustworthy(ratio);
@@ -529,10 +517,13 @@ export class ImageTargetAnchorSource implements AnchorSource {
           }
           this.imageVisible = true;
           if (this.stable) {
-            // Frozen — see the class doc comment's strategy section. No
-            // per-frame rejection log here on purpose: 'updated' fires every
-            // frame the target is visible, and "frozen, ignoring" would
-            // flood the console for the entire rest of the session.
+            // Frozen PERMANENTLY against this CONTINUOUS event only — see
+            // the class doc comment's §26 strategy section. 'found' above
+            // (a discrete re-detection) is NOT frozen; only this per-frame
+            // stream is, which is what actually fixed the §22/§24 jitter.
+            // No per-frame rejection log here on purpose: 'updated' fires
+            // every frame the target is visible, and "frozen, ignoring"
+            // would flood the console for the entire rest of the session.
             break;
           }
           const ratio = scaleRatio(event, target.physicalTargetWidthMeters);

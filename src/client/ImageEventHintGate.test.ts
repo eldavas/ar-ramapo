@@ -19,9 +19,9 @@ test('1. scanning/loading before reveal can update the loading hint', () => {
   gate.handle('scanning');
 
   assert.deepEqual(hints, [
-    'Point your camera at the plaque.',
+    "Point your camera at the plaque — get close, it's small.",
     'Loading image target…',
-    'Point your camera at the plaque.',
+    "Point your camera at the plaque — get close, it's small.",
   ]);
 });
 
@@ -45,7 +45,7 @@ test('3. scanning/loading after reveal cannot bring back the initial loading hin
   gate.handle('scanning'); // after reveal: must be a no-op
   gate.handle('loading'); // after reveal: must be a no-op
 
-  assert.deepEqual(hints, ['Point your camera at the plaque.']);
+  assert.deepEqual(hints, ["Point your camera at the plaque — get close, it's small."]);
 });
 
 test('found/updated/lost kinds never drive this hint, before or after reveal (this gate only ever acts on scanning/loading)', () => {

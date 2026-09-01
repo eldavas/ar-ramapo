@@ -10,8 +10,8 @@ import type { ImageEventKind } from './EightWallSession.js';
  * .onImageEvent`'s `'loading'`/`'scanning'` listener is registered once
  * and stays live for the rest of the session. Without this gate, a later
  * `'scanning'` event (e.g. the plaque is briefly lost and the engine
- * resumes searching) would re-show "Point your camera at the plaque."
- * over an ALREADY-REVEALED scene — the hint UI had no memory of "we
+ * resumes searching) would re-show the "point your camera at the plaque"
+ * hint over an ALREADY-REVEALED scene — the hint UI had no memory of "we
  * already got past this once."
  *
  * This class IS that memory. `markRevealed()` is one-way — once called,
@@ -36,6 +36,6 @@ export class ImageEventHintGate {
   handle(kind: ImageEventKind): void {
     if (this.revealed) return;
     if (kind === 'loading') this.showHint('Loading image target…');
-    if (kind === 'scanning') this.showHint('Point your camera at the plaque.');
+    if (kind === 'scanning') this.showHint("Point your camera at the plaque — get close, it's small.");
   }
 }

@@ -34,7 +34,7 @@ test('sustained loss past the threshold shows the hint exactly once', () => {
   hint.tick(false, 1000); // crosses the 2000ms threshold on this tick
   hint.tick(false, 500); // still lost — must not show it again
   hint.tick(false, 500);
-  assert.deepEqual(shown, ['Lost track of the plaque — point your camera back at it to re-lock the model.']);
+  assert.deepEqual(shown, ['Lost track of the plaque — point your camera back at it, up close, to re-lock the model.']);
 });
 
 test('recovering tracking hides the hint and resets the timer for next time', () => {

@@ -43,7 +43,7 @@ interface StepContent {
 const STEPS: Record<OnboardingStep, StepContent> = {
   find: {
     heading: 'Find a target',
-    body: 'Point your camera at one of the 4 image references on the model.',
+    body: 'Point your camera at one of the 4 image references on the model — get close, they are small (about the size of a coin).',
     illustration: 'orbit',
   },
   lock: {
