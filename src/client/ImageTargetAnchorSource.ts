@@ -5,10 +5,9 @@ import type { ResolvedPlaqueTarget } from './ImageTargetLoader.js';
 import type { Xr8ImageTrackedEvent } from './types/xr8.js';
 import { traceT } from './TraceLog.js';
 // TEMPORARY diagnostic instrumentation — see DiagnosticTimeline.ts's own
-// doc comment. Remove this import and every diagMark()/dispatchEvent() call
-// site once the 5-6s startup investigation is closed.
+// doc comment. Remove this import and every diagMark() call site once the
+// 5-6s startup investigation is closed.
 import { diagMark } from './DiagnosticTimeline.js';
-import { OneEuroFilter1D } from './OneEuroFilter.js';
 
 /**
  * §F axis-convention lockdown, image-target edition — the ONLY place the
@@ -61,11 +60,12 @@ const TARGET_FRAME_TO_WORLD_FIX = new THREE.Quaternion().setFromAxisAngle(new TH
  */
 const SCALE_MISMATCH_TOLERANCE = 0.25; // ±25%
 
-// applyPose() runs on every imageupdated (per frame while the target is in
-// view), so an unthrottled mismatch warning floods the 200-line on-screen
-// console during exactly the sessions it exists to diagnose. Once per
-// second preserves the signal (§4 of the troubleshooting doc reads the
-// ratio's trend across a session, not per-frame values).
+// isSampleTrustworthy() only runs during the brief pre-freeze convergence
+// window (see the class doc comment's 2026-08-31 strategy note) — a few
+// samples at most, not an entire session — so the once-per-second warning
+// throttle a continuous-re-snap regime needed is mostly moot now, but it's
+// harmless to keep and avoids flooding the console if convergence ever
+// takes an unusually long run of rejected samples.
 const SCALE_MISMATCH_WARN_INTERVAL_MS = 1000;
 let lastScaleMismatchWarnMs = 0;
 
@@ -79,9 +79,9 @@ function scaleRatio(event: Xr8ImageTrackedEvent, physicalTargetWidthMeters: numb
  * after tracking correctly at first. Root cause, confirmed against this
  * file's pre-existing behavior and telemetry (docs/research/
  * 8th-wall-troubleshooting.md §4/§10) rather than assumed: applyPose() —
- * below — has always applied every single raw tracked pose (both `found`
- * and every `updated`, i.e. every frame the target is visible) directly to
- * the world anchor with zero plausibility check. §10 of that log already
+ * below — used to apply every single raw tracked pose (both `found` and
+ * every `updated`, i.e. every frame the target is visible) directly to the
+ * world anchor with zero plausibility check. §10 of that log already
  * captured this engine-level failure mode in isolation, before it had a
  * user-facing consequence: "one of the sessions... converged its
  * re-detections onto a bad pose (scale=0.106 m, ratio 2.12...) and stayed
@@ -92,19 +92,12 @@ function scaleRatio(event: Xr8ImageTrackedEvent, physicalTargetWidthMeters: numb
  * defect — every glitchy reading was being composed correctly and then
  * applied anyway.
  *
- * This is not "add damping until it looks better": it reuses the ratio the
- * code already computes for the scale-mismatch warning above as a
- * plausibility gate on whether to trust a given tracked sample at all, not
- * a smoothing/lerp of good and bad samples together. A ratio far from 1
- * means the engine's own absolute-scale estimate for this reading hasn't
- * converged (or is actively bad) — exactly the condition the warning
- * already names, previously logged and ignored, now acted on: once a good
- * anchor exists, an implausible reading is rejected outright (the anchor
- * holds its last known-good transform, exactly as it already does across a
- * real `imagelost`) rather than teleporting the whole scene to a bad pose.
- * The very first acquisition always applies regardless — there is no prior
- * good anchor to fall back to, and refusing to ever place the scene would
- * be worse than an imperfect first placement.
+ * This gate still exists after the 2026-08-31 strategy change (see the
+ * class doc comment) — it now decides which single sample gets to become
+ * the ONE frozen pose, rather than deciding whether to accept each of an
+ * unbounded stream of re-snaps. A ratio far from 1 means the engine's own
+ * absolute-scale estimate for this reading hasn't converged (or is
+ * actively bad) — exactly the condition the warning already names.
  */
 function isScalePlausible(ratio: number): boolean {
   return Math.abs(ratio - 1) <= SCALE_MISMATCH_TOLERANCE;
@@ -149,40 +142,6 @@ function yawCorrectionQuaternion(rotationYawDeg: number): THREE.Quaternion {
   );
 }
 
-/**
- * One Euro Filter tuning for the composed world anchor (2026-08-26,
- * AR_SYSTEM.md §G, docs/research/8th-wall-troubleshooting.md §22's
- * proposal, now implemented). applyPose() previously applied every
- * trustworthy sample's raw rotation/position directly, every frame, with
- * zero temporal filtering — confirmed on-device as visible spin/scale
- * jitter while holding the camera roughly on a target.
- *
- * Deliberately HIGH beta / LOW minCF, mirroring
- * ARSessionManager.ts's TRACKING_PROFILE_RIGID_ANCHOR (MindAR's own
- * defaults for this exact scenario — a spatial scene rigidly anchored to
- * a physical model) rather than MarkerLayer.ts's screen-space marker
- * filter (low beta, tuned for a UI element floating over the scene, not
- * for the scene's own anchor). A LOW-beta filter here was already tried
- * and reverted once for MindAR specifically because it "made the whole
- * scene visibly lag behind the physical model" — see OneEuroFilter.ts's
- * own doc comment. High beta keeps this filter almost fully out of the
- * way during real camera motion while still damping at-rest tremor.
- * dCutoff uses the canonical Casiez et al. default (also what
- * MARKER_FILTER_DERIVATIVE_CUTOFF_HZ uses) — nothing in this project's
- * own tuning history singles out a different value for it.
- */
-const RIGID_ANCHOR_FILTER_MIN_CUTOFF_HZ = 0.001;
-const RIGID_ANCHOR_FILTER_BETA = 1000;
-const RIGID_ANCHOR_FILTER_DERIVATIVE_CUTOFF_HZ = 1.0;
-
-function newRigidAnchorFilter(): OneEuroFilter1D {
-  return new OneEuroFilter1D(
-    RIGID_ANCHOR_FILTER_MIN_CUTOFF_HZ,
-    RIGID_ANCHOR_FILTER_BETA,
-    RIGID_ANCHOR_FILTER_DERIVATIVE_CUTOFF_HZ
-  );
-}
-
 /** Compact pose formatter for the telemetry lines below. */
 function formatPose(event: Xr8ImageTrackedEvent): string {
   const p = event.position;
@@ -202,52 +161,88 @@ function formatPose(event: Xr8ImageTrackedEvent): string {
  * applyPose()'s composition to exactly the pre-multi-target math (see its
  * doc comment) — no behavior change for existing single-target callers.
  *
- * acquire() resolves on the FIRST imagefound of ANY configured plaque;
- * every subsequent imagefound/imageupdated (of any plaque still in the
- * `targets` map) re-snaps the mount group to that plaque's own
- * offset/rotation-corrected pose, correcting accumulated SLAM drift
- * whenever the user glances back at whichever plaque is currently in
- * view — PROVIDED the sample passes isSampleTrustworthy() (below), which
- * gates on TWO independent signals, not one: the engine-reported scale
- * (a reading whose scale is implausible is rejected) AND the engine's own
- * trackingStatus (a reading arriving while SLAM is not NORMAL — e.g.
- * RELOCALIZING — is rejected too, closing a real gap an audit found: this
- * class's HotspotProjector-facing isTracking() already gated MARKER
- * VISIBILITY on trackingStatus, but applyPose() gated the ANCHOR'S OWN
- * POSE on scale alone — so a relocalization-churn pose could still
- * silently corrupt the anchor while markers were merely hidden, only to
- * reveal the corrupted position once tracking recovered and hid nothing
- * anymore). Either rejection means a single bad frame can no longer move
- * the anchor (see isSampleTrustworthy's doc comment for the on-device
- * evidence this responds to). After imagelost the group simply stops
- * receiving snaps — SLAM world tracking (disableWorldTracking: false in
- * EightWallSession) keeps the frozen world pose valid, so content
- * persists while the user walks around the model. Scan any one plaque
- * once, walk around.
+ * **Strategy change (2026-08-31) — anchor once, then freeze; SLAM owns
+ * persistence from there.** Weeks of on-device testing under the previous
+ * strategy (continuously re-snapping the anchor's transform to every
+ * plausibility-checked `found`/`updated` sample, most recently with a
+ * per-axis/per-quaternion-component One Euro Filter layered on top —
+ * docs/research/8th-wall-troubleshooting.md §22/§24) kept surfacing the
+ * same failure family in new shapes: drift/scale jumps (§13), a tilted
+ * scene from a wrong glue rotation exposed BECAUSE every frame re-applied
+ * it (§14), continuous jitter/spin while the camera held still on a target
+ * (§22), and an offset plaque amplifying per-frame angular noise into
+ * visible positional swim (the `originOffsetMeters` lever-arm effect — the
+ * same class of report as 8th Wall's own community forum, see §25). This
+ * is not a filter-tuning problem: it is a direct trade-off of the
+ * "continuously re-apply" design itself, which was chosen specifically so
+ * the anchor could self-correct SLAM drift on every glance back at a
+ * plaque — but that same mechanism is also what lets one noisy frame move
+ * a supposedly-settled anchor.
  *
- * onOriginChanged fires only on RE-detection (imagefound after a lost,
- * once already acquired) — a discontinuity where the pose may visibly
- * jump, so downstream screen-space filter state deserves a reset cue.
- * imageupdated re-snaps are continuous sub-centimeter corrections that
- * flow through per-frame projection naturally; firing per update would
- * reset MarkerLayer's One Euro filters every frame and defeat smoothing.
+ * The new strategy matches this file's sibling implementation exactly:
+ * `TapPlacedAnchorSource` has always placed its anchor ONCE (the user's
+ * tap) and let `disableWorldTracking: false` SLAM hold that transform
+ * static for the rest of the session — no re-snap logic exists there at
+ * all, and it has never been a source of any drift/jitter report in this
+ * log. It is also 8th Wall's own documented/community-recommended pattern
+ * for this exact symptom (§25): anchor once on image detection, then rely
+ * on world tracking for persistence, rather than perpetually re-applying
+ * marker pose.
  *
- * Cold-start reveal (2026-08-18, AR_SYSTEM.md §G "Cold-start
- * stabilization"): `group` mounts hidden and stays hidden through the
- * bootstrap acquisition — the first `imagefound` sample is still applied
- * unconditionally to `group`'s transform (isSampleTrustworthy's own doc
- * comment explains why that stays true: refusing to ever place the scene
- * would be worse than an imperfect first placement), but applying a
- * transform and revealing it to the user are now two different decisions.
- * `group.visible` flips true exactly once — the first time a sample
- * independently passes isSampleTrustworthy() — which is also what resolves
- * whenStable(). Before this pass, `group.visible = true` ran at bootstrap
- * acquisition itself, so the user saw the scene at whatever pose the
- * engine's not-yet-converged absolute-scale estimate produced (routinely
- * mis-scaled/mis-oriented for several seconds — see the troubleshooting
- * doc's absolute-scale convergence notes) before a later trustworthy
- * sample silently snapped it to the right place. main.ts now gates the
- * "Loading…" → revealed transition on whenStable(), not on acquire().
+ * Mechanically: the pre-existing bootstrap/convergence/reveal machinery
+ * (§19 "Cold-start stabilization") is UNCHANGED — the very first `found`
+ * of any configured plaque still applies unconditionally (so the anchor
+ * is never left un-placed), the anchor stays hidden until a sample
+ * independently passes `isSampleTrustworthy()` (scale plausibility AND
+ * `trackingStatus === 'NORMAL'`), and that first passing sample is still
+ * what reveals the group and resolves `whenStable()`. What changed is what
+ * happens AFTER that reveal: previously every later trustworthy sample
+ * kept re-writing `group.position`/`group.quaternion` (now smoothed, but
+ * still perpetual); now, the instant `stable` flips true, `onImageEvent`
+ * stops touching the transform ENTIRELY, forever, for this anchor
+ * instance — every later `found` (a fresh detection of any plaque,
+ * including one never seen before) and `updated` event still updates
+ * `imageVisible`/telemetry (so `isTracking()`, `isImageVisible()`, and the
+ * console log stream are unaffected) but is a pose no-op. After `imagelost`
+ * the group already simply stopped receiving snaps — SLAM world tracking
+ * (`disableWorldTracking: false` in EightWallSession) keeps the frozen
+ * world pose valid, so content persists while the user walks around the
+ * model; that half of the design is unchanged, it now also covers the
+ * plaque coming back INTO view, not just it leaving.
+ *
+ * Trade-off, stated plainly (not hidden): this anchor no longer
+ * self-corrects accumulated SLAM drift over a long session by re-scanning
+ * a plaque. For the `site` experience (walking around a ~1.6×1.3m physical
+ * model), if SLAM drift over a multi-minute session turns out to be
+ * visible in practice, the next lever is NOT reverting to continuous
+ * re-snap (already tried, already the source of this rewrite) but a
+ * bounded, user-intentional recenter — `EightWallSession.recenter()`
+ * already exists and is unused — which is a deliberately separate,
+ * future decision, not part of this pass.
+ *
+ * The One Euro Filter smoothing apparatus this file carried between
+ * 2026-08-26 and 2026-08-31 is removed entirely, not just unused: with no
+ * more continuous re-snapping there is nothing left for it to smooth
+ * (the group is hidden for the ENTIRE pre-freeze convergence window, so a
+ * user never sees any of the handful of samples the filter used to act
+ * on), and keeping dead smoothing code around a since-abandoned strategy
+ * would misdocument the current design to the next reader.
+ *
+ * `seenTargetNames` (§24, "Multi-target switching fix") is kept, but its
+ * scope is now implicitly narrower: it can only ever matter DURING the
+ * brief pre-freeze convergence window (a second plaque sighted for the
+ * first time before the first plaque ever produced a trustworthy sample)
+ * — once `stable` is true, every `found`/`updated` short-circuits before
+ * `seenTargetNames` is even consulted, which is exactly what makes the
+ * ORIGINAL §24 bug (a different plaque's first-ever sighting, scanned
+ * well after the anchor had long been established, silently rejected)
+ * structurally impossible now: after freeze, no plaque's sighting — new
+ * or already-seen — is ever "rejected", because none of them are
+ * evaluated against the pose gate at all.
+ *
+ * onOriginChanged fires only during that same pre-freeze convergence
+ * window (a discontinuity while still converging) — never after freeze,
+ * since there are no more pose changes to announce once frozen.
  */
 export class ImageTargetAnchorSource implements AnchorSource {
   readonly kind: OriginKind = 'image-target';
@@ -275,49 +270,29 @@ export class ImageTargetAnchorSource implements AnchorSource {
   // isSampleTrustworthy() SINCE acquisition — distinct from `acquired`,
   // which only means a bootstrap sample was applied. `group.visible` flips
   // true exactly once, here, never on the bootstrap sample alone.
+  // Since 2026-08-31 this ALSO means "frozen forever" — see the class doc
+  // comment's strategy section — not just "revealed."
   private stable = false;
   private readonly stableResolvers: Array<() => void> = [];
   // Multi-target switching fix (2026-08-26, physical-device finding — see
-  // onImageEvent's 'found' case doc comment): names that have ever passed
-  // isSampleTrustworthy() at least once. Distinct from `acquired`, which is
-  // global across the whole anchor — this is per physical plaque, so the
-  // FIRST sighting of a plaque this anchor has never seen before (even
-  // after a DIFFERENT plaque already acquired the anchor) gets the same
-  // "bootstrap, apply unconditionally" treatment the very first-ever
-  // sighting already got, instead of being held to the strict re-detection
-  // gate meant for noise around an EXISTING good anchor.
+  // onImageEvent's 'found' case doc comment): names that have ever produced
+  // a trustworthy sample. Since 2026-08-31 this only matters BEFORE
+  // `stable` — see the class doc comment's strategy section for why the
+  // original bug this fixed can no longer occur after freeze.
   private readonly seenTargetNames = new Set<string>();
-  // Composed-world-anchor smoothing (2026-08-26, docs/research/
-  // 8th-wall-troubleshooting.md §22 — implemented). One filter per
-  // position axis and per quaternion component; reset together whenever a
-  // 'found' event represents a pose discontinuity (see resetPoseFilters's
-  // call sites) so the filter never smooths ACROSS a legitimate jump.
-  private readonly filterPosX = newRigidAnchorFilter();
-  private readonly filterPosY = newRigidAnchorFilter();
-  private readonly filterPosZ = newRigidAnchorFilter();
-  private readonly filterRotX = newRigidAnchorFilter();
-  private readonly filterRotY = newRigidAnchorFilter();
-  private readonly filterRotZ = newRigidAnchorFilter();
-  private readonly filterRotW = newRigidAnchorFilter();
-  // Quaternions double-cover rotation space (q and -q are the same
-  // rotation) — component-wise filtering only works if consecutive raw
-  // samples stay on the same hemisphere as the last FILTERED output, so
-  // this tracks that output for the sign-flip check in filterPose(). Reset
-  // has no separate hook: it's naturally consistent again the instant the
-  // per-component filters take their next (post-reset, unconditionally
-  // accepted) sample.
-  private readonly prevFilteredQuat = new THREE.Quaternion();
-  private lastFilterTimeMs: number | null = null;
 
   /**
    * Called for every APPLIED pose (bootstrap or checked) — see
-   * onImageEvent's two call sites. isBootstrap = true only for the
-   * very-first, unconditionally-applied acquisition sample; false for
-   * every later sample that independently passed isSampleTrustworthy().
-   * The scene/anchor must never be revealed on the bootstrap sample alone
-   * (that's the whole cold-start bug this exists to fix) — only the first
-   * genuinely-checked sample flips `stable` and reveals the group, and it
-   * does so exactly once.
+   * onImageEvent's call sites, all of which run only while `!this.stable`
+   * (2026-08-31 — see the class doc comment). isBootstrap = true only for
+   * the very-first, unconditionally-applied acquisition sample; false for
+   * the later sample that independently passed isSampleTrustworthy() (or,
+   * for a never-before-seen plaque during the same convergence window,
+   * the §24 first-sighting exemption). The scene/anchor must never be
+   * revealed on the bootstrap sample alone (that's the whole cold-start
+   * bug this exists to fix) — only the first genuinely-checked sample
+   * flips `stable` and reveals the group, and it does so exactly once,
+   * permanently freezing the transform from that point on.
    */
   private onPoseApplied(isBootstrap: boolean, ratio: number): void {
     // TEMPORARY diagnostic instrumentation — see DiagnosticTimeline.ts.
@@ -334,7 +309,7 @@ export class ImageTargetAnchorSource implements AnchorSource {
     this.group.visible = true;
     console.log(
       `[${traceT()}] [ImageTargetAnchorSource] first trustworthy pose accepted (ratio=${ratio.toFixed(2)}) ` +
-        '— revealing anchor group.'
+        '— revealing anchor group and FREEZING its transform (2026-08-31 strategy: anchor once, SLAM persists).'
     );
     for (const resolve of this.stableResolvers) resolve();
     this.stableResolvers.length = 0;
@@ -349,16 +324,7 @@ export class ImageTargetAnchorSource implements AnchorSource {
     private readonly session: EightWallSession,
     private readonly scene: THREE.Scene,
     /** One entry per plaque this experience should recognize (§E). */
-    targets: readonly ResolvedPlaqueTarget[],
-    /**
-     * Clock for the pose filters' elapsed-time (see nextFilterDtSeconds) —
-     * real `performance.now` in production, an injectable fake in tests
-     * (ImageTargetAnchorSource.test.ts fires synthetic events back to
-     * back, which under a real clock would measure near-zero elapsed
-     * time and over-smooth every test sample; a controllable clock lets
-     * tests assert on realistic frame-to-frame timing instead).
-     */
-    private readonly now: () => number = () => performance.now()
+    targets: readonly ResolvedPlaqueTarget[]
   ) {
     this.targetsByName = new Map(targets.map((target) => [target.name, target]));
     this.group.name = 'image-target-anchor';
@@ -372,8 +338,8 @@ export class ImageTargetAnchorSource implements AnchorSource {
     console.log(
       `[${traceT()}] [ImageTargetAnchorSource] acquire() — waiting for first imagefound of any of "${names}"...`
     );
-    // Re-acquire is a no-op by design: re-alignment is automatic on every
-    // sighting of the plaque, so there is nothing to re-run.
+    // Re-acquire is a no-op by design: the anchor is placed exactly once
+    // (2026-08-31 strategy) — there is nothing to re-run.
     if (this.acquired) return Promise.resolve();
     return new Promise<void>((resolve) => {
       this.acquireResolve = resolve;
@@ -386,9 +352,9 @@ export class ImageTargetAnchorSource implements AnchorSource {
    * (so the anchor is never left un-placed — same reasoning as
    * isSampleTrustworthy's doc comment); whenStable() resolves only once a
    * pose has independently passed isSampleTrustworthy(), which is also the
-   * exact instant `group.visible` flips true (onPoseApplied above) — the
-   * two are the same event by construction, not two signals that could
-   * drift out of sync.
+   * exact instant `group.visible` flips true AND the transform freezes
+   * (onPoseApplied above) — the two are the same event by construction,
+   * not two signals that could drift out of sync.
    */
   whenStable(): Promise<void> {
     if (this.stable) return Promise.resolve();
@@ -400,7 +366,9 @@ export class ImageTargetAnchorSource implements AnchorSource {
   /**
    * NORMAL SLAM after first detection — visible-or-SLAM-extended. The
    * plaque leaving the camera view must NOT read as tracking loss; that
-   * persistence is the whole point of the hybrid design.
+   * persistence is the whole point of the hybrid design. Unaffected by the
+   * 2026-08-31 freeze change — this gates MARKER visibility, not the
+   * anchor's own transform.
    */
   isTracking(): boolean {
     const status = this.session.trackingStatus;
@@ -444,6 +412,9 @@ export class ImageTargetAnchorSource implements AnchorSource {
    *   OTHER gate — hiding the symptom, not preventing the corruption. The
    *   anchor would then reveal wherever it drifted to the moment tracking
    *   recovered and isTracking() stopped hiding markers.
+   *
+   * Since 2026-08-31 this gate is only ever consulted before `stable` —
+   * see the class doc comment's strategy section.
    */
   private isSampleTrustworthy(ratio: number): boolean {
     return isScalePlausible(ratio) && this.session.trackingStatus === 'NORMAL';
@@ -480,83 +451,69 @@ export class ImageTargetAnchorSource implements AnchorSource {
     switch (kind) {
       case 'found': {
         if (event === null || target === undefined) return;
-        const wasAcquired = this.acquired;
-        // Multi-target switching fix (2026-08-26, physical-device finding:
-        // on the real four-plaque 'site' entry, once one plaque acquired
-        // the anchor, scanning any of the OTHER three plaques for the
-        // first time silently failed unless a sample happened to land
-        // exactly when trackingStatus was NORMAL — every other sighting
-        // was rejected as if it were noisy re-detection of the SAME
-        // plaque already anchoring the scene, which is a different
-        // situation with a different appropriate trust level). A plaque
-        // this anchor has never seen before is new information, not
-        // suspect continuation of an existing one — its first sighting
-        // gets the same "apply unconditionally, there's no prior good
-        // reading to protect" treatment isSampleTrustworthy's own doc
-        // comment already grants the anchor's very first-ever sample.
-        // Every LATER sighting of that same name (another re-detection,
-        // or a per-frame 'updated') still goes through the full gate
-        // below — this only widens the bootstrap exception from "the
-        // whole anchor's first sample" to "this specific plaque's first
-        // sample."
+        this.imageVisible = true;
+
+        if (!this.acquired) {
+          // Bootstrap: the very first sighting of ANY configured plaque,
+          // applied unconditionally (isSampleTrustworthy's own reasoning:
+          // refusing to ever place the scene would be worse than an
+          // imperfect first placement) — anchor stays hidden until a LATER
+          // sample independently passes the trust gate below.
+          const ratio = scaleRatio(event, target.physicalTargetWidthMeters);
+          console.log(
+            `[${traceT()}] [ImageTarget] FOUND "${event.name}"\n` +
+              `  scale=${event.scale.toFixed(3)}m ${formatPose(event)}\n` +
+              `  trackingStatus=${this.session.trackingStatus}\n` +
+              '  acquired: false -> true (bootstrap — pose applied, anchor stays hidden until a trustworthy sample lands)'
+          );
+          this.seenTargetNames.add(event.name);
+          this.applyPose(event, target);
+          this.onPoseApplied(true, ratio);
+          this.acquired = true;
+          this.acquireResolve?.();
+          this.acquireResolve = null;
+          break;
+        }
+
+        if (this.stable) {
+          // Anchor is frozen (2026-08-31 strategy — see the class doc
+          // comment): SLAM persists the world pose from here on, so this
+          // sighting — whether a re-detection of the same plaque or the
+          // first-ever sighting of a different one — never touches the
+          // transform. imageVisible/telemetry above still update normally.
+          console.log(
+            `[${traceT()}] [ImageTarget] FOUND "${event.name}" — anchor frozen, pose not re-applied.`
+          );
+          break;
+        }
+
+        // Pre-freeze convergence window: same trust gate as always (scale
+        // plausibility AND trackingStatus === 'NORMAL'), with the §24
+        // exemption — a plaque this anchor has never seen before is new
+        // information, not suspect continuation of an existing one, so its
+        // first sighting is applied unconditionally too.
         const isNewTarget = !this.seenTargetNames.has(event.name);
         const ratio = scaleRatio(event, target.physicalTargetWidthMeters);
-        const trustworthy = !wasAcquired || isNewTarget || this.isSampleTrustworthy(ratio);
+        const trustworthy = isNewTarget || this.isSampleTrustworthy(ratio);
         console.log(
           `[${traceT()}] [ImageTarget] FOUND "${event.name}"\n` +
             `  scale=${event.scale.toFixed(3)}m ${formatPose(event)}\n` +
             `  trackingStatus=${this.session.trackingStatus}\n` +
-            `  acquired: ${wasAcquired} -> true` +
-            (!wasAcquired
-              ? ' (first acquire — pose applied, anchor stays hidden until a trustworthy sample lands)'
-              : isNewTarget
-                ? ' (first sighting of a NEW plaque — applied unconditionally, firing onOriginChanged)'
-                : trustworthy
-                  ? ' (re-detection — firing onOriginChanged, pose discontinuity)'
-                  : ' (re-detection REJECTED — see warning below — keeping previous anchor)')
+            (isNewTarget
+              ? '  first sighting of a NEW plaque — applied unconditionally, firing onOriginChanged'
+              : trustworthy
+                ? '  re-detection — firing onOriginChanged, pose discontinuity'
+                : '  re-detection REJECTED — see warning below — keeping previous anchor')
         );
-        this.imageVisible = true;
         if (trustworthy) {
           this.seenTargetNames.add(event.name);
-          if (wasAcquired) {
-            // Any 'found' past the very first-ever bootstrap is a pose
-            // discontinuity — either this same plaque re-detected after a
-            // loss, or (the fix above) a genuinely different plaque's
-            // first sighting — so the last filtered sample is no longer a
-            // meaningful "previous value" to smooth continuity against.
-            this.resetPoseFilters();
-          }
           this.applyPose(event, target);
-          this.onPoseApplied(!wasAcquired, ratio);
-        } else {
-          this.logSampleRejected(event, target, ratio);
-          if (wasAcquired) {
-            // TEMPORARY diagnostic instrumentation (physical-device
-            // follow-up, 2026-08-19) — evidence-gathering for the "anchor
-            // sometimes doesn't recover when the plaque comes back into
-            // view" report: names WHICH gate rejected the re-detection, so
-            // an on-device capture can confirm or refute the leading
-            // hypothesis that trackingStatus hasn't caught up to NORMAL
-            // yet at the exact moment of a fresh, direct sighting (vs. a
-            // genuinely bad scale reading). Not acted on yet — see
-            // DiagnosticTimeline.ts.
-            diagMark(
-              're-detection-rejected',
-              `scalePlausible=${isScalePlausible(ratio)} trackingStatus=${this.session.trackingStatus}`
-            );
-          }
-        }
-        if (!this.acquired) {
-          this.acquired = true;
-          this.acquireResolve?.();
-          this.acquireResolve = null;
-        } else if (trustworthy) {
-          // Re-detection after a lost, OR the first sighting of a
-          // different plaque = pose discontinuity (only when the anchor
-          // actually moved — a rejected sample changed nothing).
+          this.onPoseApplied(false, ratio);
           for (const handler of this.originChangedHandlers) {
             handler();
           }
+        } else {
+          this.logSampleRejected(event, target, ratio);
         }
         break;
       }
@@ -570,6 +527,14 @@ export class ImageTargetAnchorSource implements AnchorSource {
                 `scale=${event.scale.toFixed(3)}m ${formatPose(event)}`
             );
           }
+          this.imageVisible = true;
+          if (this.stable) {
+            // Frozen — see the class doc comment's strategy section. No
+            // per-frame rejection log here on purpose: 'updated' fires every
+            // frame the target is visible, and "frozen, ignoring" would
+            // flood the console for the entire rest of the session.
+            break;
+          }
           const ratio = scaleRatio(event, target.physicalTargetWidthMeters);
           if (this.isSampleTrustworthy(ratio)) {
             this.applyPose(event, target);
@@ -577,7 +542,6 @@ export class ImageTargetAnchorSource implements AnchorSource {
           } else {
             this.logSampleRejected(event, target, ratio);
           }
-          this.imageVisible = true;
         }
         break;
       case 'lost':
@@ -615,33 +579,14 @@ export class ImageTargetAnchorSource implements AnchorSource {
    * the tracked position itself (which is where the pre-multi-target code
    * put it — correct only when offsetMeters is exactly {0,0}).
    *
-   * The RAW tracked position/rotation are filtered (2026-08-26, see
-   * RIGID_ANCHOR_FILTER_* doc comment) before any of the composition
-   * above runs — not the other way around (filter, then compose, never
-   * compose then filter the result) — so the offset is always rotated by
-   * a quaternion that's internally consistent with the filtered position,
-   * the same invariant the unfiltered code always had.
+   * Applies the RAW tracked position/rotation directly — no temporal
+   * filtering (removed 2026-08-31; see the class doc comment's strategy
+   * section for why: this only ever runs during the pre-freeze
+   * convergence window, while `group` is still hidden, so there is
+   * nothing visible for a filter to smooth).
    */
   private applyPose(event: Xr8ImageTrackedEvent, target: ResolvedPlaqueTarget): void {
-    const dtSeconds = this.nextFilterDtSeconds();
     this.scratchQuat.set(event.rotation.x, event.rotation.y, event.rotation.z, event.rotation.w);
-    // Quaternions double-cover rotation space (q and -q are the same
-    // rotation) — component-wise filtering only works if consecutive raw
-    // samples stay on the same hemisphere as the last FILTERED output, so
-    // flip the incoming sign when it's nearer to that output's negation.
-    if (this.scratchQuat.dot(this.prevFilteredQuat) < 0) {
-      this.scratchQuat.set(-this.scratchQuat.x, -this.scratchQuat.y, -this.scratchQuat.z, -this.scratchQuat.w);
-    }
-    this.scratchQuat
-      .set(
-        this.filterRotX.filter(this.scratchQuat.x, dtSeconds),
-        this.filterRotY.filter(this.scratchQuat.y, dtSeconds),
-        this.filterRotZ.filter(this.scratchQuat.z, dtSeconds),
-        this.filterRotW.filter(this.scratchQuat.w, dtSeconds)
-      )
-      .normalize();
-    this.prevFilteredQuat.copy(this.scratchQuat);
-
     this.group.quaternion
       .copy(this.scratchQuat)
       .multiply(TARGET_FRAME_TO_WORLD_FIX)
@@ -651,50 +596,9 @@ export class ImageTargetAnchorSource implements AnchorSource {
       .set(target.originOffsetMeters.x, 0, target.originOffsetMeters.z)
       .applyQuaternion(this.group.quaternion);
     this.group.position
-      .set(
-        this.filterPosX.filter(event.position.x, dtSeconds),
-        this.filterPosY.filter(event.position.y, dtSeconds),
-        this.filterPosZ.filter(event.position.z, dtSeconds)
-      )
+      .set(event.position.x, event.position.y, event.position.z)
       .sub(this.scratchOffset);
 
     this.group.scale.setScalar(anchorScaleForEvent());
-  }
-
-  /**
-   * Elapsed time since the last filtered sample, for the One Euro
-   * filters' speed-adaptive cutoff. `null` on the very first call (each
-   * filter's own `prevValue === null` branch ignores dt entirely on ITS
-   * first call, so any placeholder value here is inert) and immediately
-   * after resetPoseFilters() — a discontinuity's first post-reset sample
-   * must not be smoothed against whatever dt elapsed since the LAST
-   * (now-irrelevant) sample, which OneEuroFilter1D.filter() already
-   * guarantees as long as this returns a value at all.
-   */
-  private nextFilterDtSeconds(): number {
-    const now = this.now();
-    const dtSeconds = this.lastFilterTimeMs === null ? 1 / 60 : (now - this.lastFilterTimeMs) / 1000;
-    this.lastFilterTimeMs = now;
-    return dtSeconds > 0 ? dtSeconds : 1 / 60;
-  }
-
-  /**
-   * Called on every 'found' past the very first-ever bootstrap sample
-   * (see onImageEvent) — a pose discontinuity, whether this is the same
-   * plaque re-detected after a loss or a different plaque's first
-   * sighting. Forgetting all filter history here is what stops the
-   * filters from smoothing a slow "swim" across a jump they should
-   * instead snap through immediately, exactly like the unfiltered code
-   * already did at every discontinuity before this pass.
-   */
-  private resetPoseFilters(): void {
-    this.filterPosX.reset();
-    this.filterPosY.reset();
-    this.filterPosZ.reset();
-    this.filterRotX.reset();
-    this.filterRotY.reset();
-    this.filterRotZ.reset();
-    this.filterRotW.reset();
-    this.lastFilterTimeMs = null;
   }
 }

@@ -2979,3 +2979,64 @@ schema above.
   **Requires physical device testing, not verifiable in software:**
   whether the corrected, slower motion now reads as the intended subtle
   gesture in real hand use.
+
+  **Progress (2026-08-31): `ImageTargetAnchorSource`'s tracking strategy
+  reversed — anchor once and freeze, instead of continuously re-snapping —
+  after weeks of on-device testing under the continuous-re-snap design kept
+  surfacing new shapes of the same drift/jitter symptom family (§13, §14,
+  §22, §24) even with the plausibility gate and pose-smoothing filter both
+  in place.**
+
+  **Decision, not a guess:** `docs/research/8th-wall-troubleshooting.md`
+  §25 has the full write-up, including two independent 8th Wall community
+  forum threads found this session — one where 8th Wall staff (Ian)
+  explicitly recommend anchoring on `xrimagefound` and relying on SLAM
+  world tracking for persistence rather than continuously re-applying
+  marker pose (the exact symptom this project hit), and one describing the
+  same offset-amplifies-drift geometry this project's `originOffsetMeters`
+  composition has. The replacement strategy is not new engineering: it is
+  the same shape `TapPlacedAnchorSource` has used since Phase 6 began
+  (place once on the user's tap, let `disableWorldTracking: false` SLAM
+  hold it) — never once the subject of a drift/jitter entry in this file.
+
+  **What changed in `ImageTargetAnchorSource.ts`:** the pre-existing
+  bootstrap/convergence/reveal machinery (§19 "Cold-start stabilization")
+  is untouched — first `found` still applies unconditionally, the group
+  stays hidden until a sample independently passes `isSampleTrustworthy()`
+  (scale plausibility AND `trackingStatus === 'NORMAL'`), and that sample
+  still reveals the group and resolves `whenStable()`. The instant that
+  happens, the transform now FREEZES permanently for the anchor's
+  lifetime: every later `found`/`updated` (same plaque re-detected, or a
+  different plaque's first-ever sighting) still updates
+  `imageVisible`/telemetry but never touches `group.position`/
+  `group.quaternion` again. The One Euro Filter smoothing apparatus §22
+  added (2026-08-26) is removed outright, not left dormant — with no more
+  continuous re-snapping there is nothing left for it to smooth (the group
+  is hidden for the entire pre-freeze window anyway, so no user ever saw
+  the samples it used to act on); leaving it in place would misdocument
+  the shipped design. The `seenTargetNames` multi-target exemption from
+  §24 is kept for the (now much shorter) pre-freeze window, but the
+  original §24 bug it fixed is now structurally impossible post-freeze:
+  nothing is evaluated against any gate once frozen, so nothing can be
+  "rejected."
+
+  **Trade-off, stated plainly:** the anchor no longer self-corrects
+  accumulated SLAM drift by re-scanning a plaque mid-session. If that
+  proves to matter on the physical exhibit (a multi-minute walkaround of
+  the ~1.6×1.3m `site` model), the next lever is a bounded,
+  user-intentional recenter (`EightWallSession.recenter()` already exists,
+  unused) — not a reversion to continuous re-snap. Not built this pass;
+  deferred to on-device evidence.
+
+  **Verified in software:** `npm run typecheck`/`build`/`test` clean,
+  52/52. `ImageTargetAnchorSource.test.ts` rewritten: every pre-freeze
+  gate test kept (tightened to exact-match epsilons now that there's no
+  filter lag to account for), the filter-reset-specific test removed
+  (nothing left to test), three new tests assert the transform is
+  unchanged post-freeze by a same-plaque re-detection, by a run of
+  ordinary per-frame `updated` samples, and by a different plaque's
+  first-ever sighting. **Requires the physical exhibit, not verifiable in
+  software:** whether the §22/§24 jitter/drift reports are actually gone
+  on real hardware, and whether losing continuous drift self-correction is
+  noticeable over a real walkaround session — the whole reason this is
+  shipping to a physical test before any further iteration.

@@ -11,6 +11,18 @@
  * the fixed single-target glue (TARGET_FRAME_TO_WORLD_FIX) it composes
  * with remains "best inference, validate on device" as already documented
  * in ImageTargetAnchorSource.ts.
+ *
+ * 2026-08-31: rewritten for the "anchor once, then freeze" strategy (see
+ * ImageTargetAnchorSource.ts's own class doc comment). The pre-freeze
+ * bootstrap/plausibility/multi-target-exemption gates are unchanged and
+ * still fully covered below; what's new is a dedicated block of tests
+ * confirming that once the anchor stabilizes, NOTHING moves it again —
+ * not a re-detection of the same plaque, not a first-ever sighting of a
+ * different one, not an implausible sample. The One Euro Filter tests
+ * that used to live here (2026-08-26–2026-08-31) are gone along with the
+ * filter itself — with no more continuous re-snapping there is nothing
+ * left for a filter to smooth, so "filter lag" epsilons are gone too:
+ * every applied sample now lands exactly.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -84,26 +96,6 @@ function simulateEventFor(
   };
 }
 
-/**
- * Fake clock for ImageTargetAnchorSource's injectable `now` param
- * (2026-08-26, pose-filter tests): the class's One Euro filters need
- * realistic elapsed time between samples to behave as designed (the
- * whole point of a high-beta filter is that it gets out of the way once
- * it sees genuine motion; back-to-back test calls under the real
- * `performance.now` clock measure near-zero elapsed time between them,
- * which is indistinguishable from "the anchor didn't actually move" and
- * over-smooths every sample this file's assertions expect to land
- * exactly). Every filtered test below constructs its own instance so
- * tests never share clock state.
- */
-function fakeClock(stepSeconds = 1 / 60): () => number {
-  let t = 0;
-  return () => {
-    t += stepSeconds * 1000;
-    return t;
-  };
-}
-
 function assertVectorClose(actual: THREE.Vector3, expected: THREE.Vector3, epsilon = 1e-6): void {
   assert.ok(
     actual.distanceTo(expected) < epsilon,
@@ -149,7 +141,7 @@ test('all 4 targets recover the same assumed world placement from their own simu
   for (const target of [FRONT, BACK, LEFT, RIGHT]) {
     const session = new FakeSession();
     const scene = new THREE.Scene();
-    const anchor = new ImageTargetAnchorSource(session as never, scene, [target], fakeClock());
+    const anchor = new ImageTargetAnchorSource(session as never, scene, [target]);
     const event = simulateEventFor(target.name, target, modelPos, modelQuat);
     session.fire('found', event);
     assertVectorClose(anchor.group.position, modelPos);
@@ -166,7 +158,7 @@ test('a single-target experience (identity offset/rotation) reduces to pre-multi
   };
   const session = new FakeSession();
   const scene = new THREE.Scene();
-  const anchor = new ImageTargetAnchorSource(session as never, scene, [identityTarget], fakeClock());
+  const anchor = new ImageTargetAnchorSource(session as never, scene, [identityTarget]);
 
   const trackedPosition = { x: 0.5, y: 0.1, z: -0.2 };
   const trackedRotation = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), 0.1);
@@ -188,7 +180,7 @@ test('a single-target experience (identity offset/rotation) reduces to pre-multi
 test('an event for an unconfigured target name is ignored (group stays unacquired)', () => {
   const session = new FakeSession();
   const scene = new THREE.Scene();
-  const anchor = new ImageTargetAnchorSource(session as never, scene, [FRONT], fakeClock());
+  const anchor = new ImageTargetAnchorSource(session as never, scene, [FRONT]);
   session.fire('found', {
     name: 'not-one-of-the-configured-targets',
     type: 'FLAT',
@@ -199,7 +191,8 @@ test('an event for an unconfigured target name is ignored (group stays unacquire
   assert.equal(anchor.isTracking(), false);
 });
 
-// --- Pose-plausibility gating (2026-08-14 physical-device fix) -----------
+// --- Pose-plausibility gating (2026-08-14 physical-device fix), still in
+// effect during the pre-freeze convergence window (2026-08-31) -----------
 //
 // First real hardware test showed the world anchor drifting/jumping and
 // briefly appearing at a drastically wrong scale — traced to applyPose()
@@ -212,13 +205,15 @@ test('an event for an unconfigured target name is ignored (group stays unacquire
 // outside SCALE_MISMATCH_TOLERANCE of physicalTargetWidthMeters) and
 // verify the anchor's transform is unaffected by it once a good anchor
 // already exists — the anchor holds its last known-good pose instead of
-// jumping to the bad one.
+// jumping to the bad one. This gate is what decides which single sample
+// gets to become the ONE frozen pose (2026-08-31) — it still matters, just
+// over a much shorter window than before.
 
 function withScale(event: Xr8ImageTrackedEvent, scale: number): Xr8ImageTrackedEvent {
   return { ...event, scale };
 }
 
-test('an implausible-scale updated sample is rejected — anchor holds its last known-good pose', () => {
+test('an implausible-scale sample is rejected before freeze — anchor holds its last known-good pose, then a good sample freezes it', () => {
   const goodPos = new THREE.Vector3(1.2, 0, -3.4);
   const goodQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), 0.37);
   const badPos = new THREE.Vector3(50, 12, -80); // physically implausible jump
@@ -226,16 +221,17 @@ test('an implausible-scale updated sample is rejected — anchor holds its last 
 
   const session = new FakeSession();
   const scene = new THREE.Scene();
-  const anchor = new ImageTargetAnchorSource(session as never, scene, [FRONT], fakeClock());
+  const anchor = new ImageTargetAnchorSource(session as never, scene, [FRONT]);
 
-  // Establish a good anchor first.
+  // Bootstrap (unconditional, hidden).
   session.fire('found', simulateEventFor(FRONT.name, FRONT, goodPos, goodQuat));
   assertVectorClose(anchor.group.position, goodPos);
   assertQuatClose(anchor.group.quaternion, goodQuat);
+  assert.equal(anchor.group.visible, false);
 
   // A bad-scale 'updated' sample (ratio = 3x tolerance) must not move it,
   // even though its position/rotation would otherwise place the anchor
-  // somewhere completely different.
+  // somewhere completely different, and must not reveal/freeze it either.
   const badEvent = withScale(
     simulateEventFor(FRONT.name, FRONT, badPos, badQuat),
     FRONT.physicalTargetWidthMeters * 3
@@ -243,32 +239,29 @@ test('an implausible-scale updated sample is rejected — anchor holds its last 
   session.fire('updated', badEvent);
   assertVectorClose(anchor.group.position, goodPos);
   assertQuatClose(anchor.group.quaternion, goodQuat);
+  assert.equal(anchor.group.visible, false);
 
   // A bad-scale re-detection ('found' after being already acquired) must
   // be rejected the same way — not just 'updated'.
   session.fire('found', badEvent);
   assertVectorClose(anchor.group.position, goodPos);
   assertQuatClose(anchor.group.quaternion, goodQuat);
+  assert.equal(anchor.group.visible, false);
 
-  // A subsequent GOOD sample still applies normally — rejection is
-  // per-sample, not a permanent lockout. This is the second-ever
-  // trustworthy sample, so (2026-08-26, pose-filter tests) the One Euro
-  // filters are now genuinely smoothing it against the first — a wider
-  // epsilon than this file's default (still well under 1cm) accounts for
-  // that expected filter lag without losing the ability to catch a real
-  // composition-math regression, which would be off by orders of
-  // magnitude more than filter lag ever is.
+  // The first GOOD sample after bootstrap reveals AND freezes the anchor —
+  // exact, no filter lag (2026-08-31: the filter is gone).
   const recoveredPos = new THREE.Vector3(2.0, 0, -1.0);
   const recoveredQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -0.5);
   session.fire('updated', simulateEventFor(FRONT.name, FRONT, recoveredPos, recoveredQuat));
-  assertVectorClose(anchor.group.position, recoveredPos, 0.01);
-  assertQuatClose(anchor.group.quaternion, recoveredQuat, 0.01);
+  assert.equal(anchor.group.visible, true);
+  assertVectorClose(anchor.group.position, recoveredPos);
+  assertQuatClose(anchor.group.quaternion, recoveredQuat);
 });
 
 test('the very first acquisition applies even with an implausible scale — bootstrap must not hang forever', () => {
   const session = new FakeSession();
   const scene = new THREE.Scene();
-  const anchor = new ImageTargetAnchorSource(session as never, scene, [FRONT], fakeClock());
+  const anchor = new ImageTargetAnchorSource(session as never, scene, [FRONT]);
 
   const pos = new THREE.Vector3(1.2, 0, -3.4);
   const quat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), 0.37);
@@ -293,14 +286,13 @@ test('the very first acquisition applies even with an implausible scale — boot
 //
 // The bootstrap pose above is intentionally still applied — the anchor
 // must never be left un-placed — but it must not be REVEALED. These tests
-// cover the new whenStable()/group.visible contract layered on top of the
-// existing plausibility gates, which stay unmodified (verified by every
-// test above still passing unchanged).
+// cover the whenStable()/group.visible contract layered on top of the
+// existing plausibility gates, which stay unmodified.
 
 test('a bootstrap-only pose does not reveal the scene (group stays hidden, whenStable() unresolved)', async () => {
   const session = new FakeSession();
   const scene = new THREE.Scene();
-  const anchor = new ImageTargetAnchorSource(session as never, scene, [FRONT], fakeClock());
+  const anchor = new ImageTargetAnchorSource(session as never, scene, [FRONT]);
 
   let resolved = false;
   anchor.whenStable().then(() => {
@@ -316,10 +308,10 @@ test('a bootstrap-only pose does not reveal the scene (group stays hidden, whenS
   assert.equal(resolved, false);
 });
 
-test('the first trustworthy sample after bootstrap reveals the scene and resolves whenStable()', async () => {
+test('the first trustworthy sample after bootstrap reveals the scene, resolves whenStable(), and freezes the transform exactly', async () => {
   const session = new FakeSession();
   const scene = new THREE.Scene();
-  const anchor = new ImageTargetAnchorSource(session as never, scene, [FRONT], fakeClock());
+  const anchor = new ImageTargetAnchorSource(session as never, scene, [FRONT]);
 
   let resolved = false;
   anchor.whenStable().then(() => {
@@ -332,17 +324,14 @@ test('the first trustworthy sample after bootstrap reveals the scene and resolve
 
   // First independently-checked sample (an 'updated' — the common case,
   // since 'found' only re-fires on re-detection): scale-plausible,
-  // trackingStatus NORMAL (FakeSession's default) — must reveal. It's
-  // also the second-ever trustworthy sample, so (2026-08-26) a wider
-  // epsilon accounts for expected One Euro filter lag — see the
-  // scale-mismatch test's own comment on this.
+  // trackingStatus NORMAL (FakeSession's default) — must reveal and freeze.
   const stablePos = new THREE.Vector3(1.2, 0, -3.4);
   const stableQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), 0.2);
   session.fire('updated', simulateEventFor(FRONT.name, FRONT, stablePos, stableQuat));
 
   assert.equal(anchor.group.visible, true);
-  assertVectorClose(anchor.group.position, stablePos, 0.01);
-  assertQuatClose(anchor.group.quaternion, stableQuat, 0.01);
+  assertVectorClose(anchor.group.position, stablePos);
+  assertQuatClose(anchor.group.quaternion, stableQuat);
   await Promise.resolve();
   assert.equal(resolved, true, 'whenStable() must resolve once the group is revealed');
 
@@ -356,41 +345,10 @@ test('the first trustworthy sample after bootstrap reveals the scene and resolve
   assert.equal(resolvedAgain, true);
 });
 
-test('reveal happens only once — further trustworthy samples after the first do not re-trigger it', async () => {
-  const session = new FakeSession();
-  const scene = new THREE.Scene();
-  const anchor = new ImageTargetAnchorSource(session as never, scene, [FRONT], fakeClock());
-
-  let resolveCount = 0;
-  anchor.whenStable().then(() => {
-    resolveCount += 1;
-  });
-
-  session.fire('found', simulateEventFor(FRONT.name, FRONT, new THREE.Vector3(1, 0, -1), new THREE.Quaternion()));
-  session.fire('updated', simulateEventFor(FRONT.name, FRONT, new THREE.Vector3(1.2, 0, -3.4), new THREE.Quaternion()));
-  await Promise.resolve();
-  assert.equal(anchor.group.visible, true);
-  assert.equal(resolveCount, 1, 'whenStable() handler must fire exactly once');
-
-  // Several more good samples in a row — a real session keeps sending
-  // 'updated' every frame while the target is in view. None of them should
-  // re-resolve whenStable() a second time, and group.visible must simply
-  // stay true (not re-toggle).
-  for (let i = 0; i < 5; i += 1) {
-    session.fire(
-      'updated',
-      simulateEventFor(FRONT.name, FRONT, new THREE.Vector3(1.2 + i * 0.01, 0, -3.4), new THREE.Quaternion())
-    );
-  }
-  await Promise.resolve();
-  assert.equal(anchor.group.visible, true);
-  assert.equal(resolveCount, 1, 'whenStable() handler must still have fired exactly once after more good samples');
-});
-
 test('4. an already-stabilized anchor is unaffected by later scanning/loading/lost lifecycle events', () => {
   const session = new FakeSession();
   const scene = new THREE.Scene();
-  const anchor = new ImageTargetAnchorSource(session as never, scene, [FRONT], fakeClock());
+  const anchor = new ImageTargetAnchorSource(session as never, scene, [FRONT]);
 
   session.fire('found', simulateEventFor(FRONT.name, FRONT, new THREE.Vector3(1, 0, -1), new THREE.Quaternion()));
   const stablePos = new THREE.Vector3(1.2, 0, -3.4);
@@ -408,17 +366,14 @@ test('4. an already-stabilized anchor is unaffected by later scanning/loading/lo
   session.fireLifecycle('lost');
 
   assert.equal(anchor.group.visible, true, 'an already-stabilized scene must remain visible');
-  // stablePos/stableQuat were the second-ever trustworthy sample — see the
-  // scale-mismatch test's comment on why this needs a wider (2026-08-26)
-  // epsilon for expected One Euro filter lag.
-  assertVectorClose(anchor.group.position, stablePos, 0.01);
-  assertQuatClose(anchor.group.quaternion, stableQuat, 0.01);
+  assertVectorClose(anchor.group.position, stablePos);
+  assertQuatClose(anchor.group.quaternion, stableQuat);
 });
 
 test('an implausible sample arriving before any trustworthy one is rejected without reveal or corruption', () => {
   const session = new FakeSession();
   const scene = new THREE.Scene();
-  const anchor = new ImageTargetAnchorSource(session as never, scene, [FRONT], fakeClock());
+  const anchor = new ImageTargetAnchorSource(session as never, scene, [FRONT]);
 
   const bootstrapPos = new THREE.Vector3(1, 0, -1);
   session.fire('found', simulateEventFor(FRONT.name, FRONT, bootstrapPos, new THREE.Quaternion()));
@@ -447,19 +402,21 @@ test('an implausible sample arriving before any trustworthy one is rejected with
 // status) could still move the anchor, with only the SEPARATE marker-
 // visibility gate hiding the result, not preventing it. These tests cover
 // the fix: isSampleTrustworthy() now requires trackingStatus === 'NORMAL'
-// in addition to a plausible scale.
+// in addition to a plausible scale. Still enforced during the pre-freeze
+// window (2026-08-31).
 
-test('a scale-plausible sample arriving while trackingStatus is not NORMAL is rejected', () => {
+test('a scale-plausible sample arriving while trackingStatus is not NORMAL is rejected before freeze', () => {
   const goodPos = new THREE.Vector3(1.2, 0, -3.4);
   const goodQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), 0.37);
 
   const session = new FakeSession();
   const scene = new THREE.Scene();
-  const anchor = new ImageTargetAnchorSource(session as never, scene, [FRONT], fakeClock());
+  const anchor = new ImageTargetAnchorSource(session as never, scene, [FRONT]);
 
-  // Establish a good anchor while tracking is healthy.
+  // Bootstrap (unconditional, hidden).
   session.fire('found', simulateEventFor(FRONT.name, FRONT, goodPos, goodQuat));
   assertVectorClose(anchor.group.position, goodPos);
+  assert.equal(anchor.group.visible, false);
 
   // SLAM enters a relocalization window — scale is still perfectly
   // plausible (ratio 1), but the sample must still be rejected.
@@ -470,27 +427,25 @@ test('a scale-plausible sample arriving while trackingStatus is not NORMAL is re
   session.fire('updated', simulateEventFor(FRONT.name, FRONT, duringRelocPos, duringRelocQuat));
   assertVectorClose(anchor.group.position, goodPos);
   assertQuatClose(anchor.group.quaternion, goodQuat);
+  assert.equal(anchor.group.visible, false);
 
-  // Tracking recovers to NORMAL — the next good sample applies again
-  // (rejection is per-sample, not a permanent lockout, same as the scale
-  // gate above).
+  // Tracking recovers to NORMAL — the next good sample applies, revealing
+  // and freezing the anchor.
   session.trackingStatus = 'NORMAL';
   session.trackingReason = 'UNSPECIFIED';
   const recoveredPos = new THREE.Vector3(0.5, 0, -0.5);
   const recoveredQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -1.0);
   session.fire('updated', simulateEventFor(FRONT.name, FRONT, recoveredPos, recoveredQuat));
-  // Second-ever trustworthy sample — see the scale-mismatch test's comment
-  // on why this needs a wider (2026-08-26) epsilon for expected One Euro
-  // filter lag.
-  assertVectorClose(anchor.group.position, recoveredPos, 0.01);
-  assertQuatClose(anchor.group.quaternion, recoveredQuat, 0.01);
+  assert.equal(anchor.group.visible, true);
+  assertVectorClose(anchor.group.position, recoveredPos);
+  assertQuatClose(anchor.group.quaternion, recoveredQuat);
 });
 
 test('the very first acquisition applies even while trackingStatus is not NORMAL yet', () => {
   const session = new FakeSession();
   session.trackingStatus = 'UNSPECIFIED'; // engine hasn't reported a real status yet
   const scene = new THREE.Scene();
-  const anchor = new ImageTargetAnchorSource(session as never, scene, [FRONT], fakeClock());
+  const anchor = new ImageTargetAnchorSource(session as never, scene, [FRONT]);
 
   const pos = new THREE.Vector3(1.2, 0, -3.4);
   const quat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), 0.37);
@@ -505,34 +460,39 @@ test('the very first acquisition applies even while trackingStatus is not NORMAL
   assertQuatClose(anchor.group.quaternion, quat);
 });
 
-// --- Multi-target switching fix (2026-08-26, physical-device finding) ---
+// --- Multi-target switching fix (2026-08-26, physical-device finding),
+// scope narrowed by the 2026-08-31 freeze strategy ---
 //
 // On the real four-plaque 'site' entry, once one plaque acquired the
-// anchor, scanning any of the OTHER three plaques for the first time
-// silently failed unless a sample happened to land exactly when
-// trackingStatus was NORMAL — every other sighting was rejected by
-// isSampleTrustworthy() as if it were noisy re-detection of the SAME
-// plaque already anchoring the scene. These tests cover the fix: the
-// FIRST sighting of a target name this anchor has never seen before is
-// applied unconditionally, the same as the anchor's very first-ever
-// sample — only a REPEAT sighting of an already-seen name goes through
-// the full scale/trackingStatus gate.
+// anchor, scanning any of the OTHER three plaques for the first time used
+// to silently fail unless a sample happened to land exactly when
+// trackingStatus was NORMAL. The fix: the FIRST sighting of a target name
+// this anchor has never seen before is applied unconditionally, the same
+// as the anchor's very first-ever sample — only a REPEAT sighting of an
+// already-seen name goes through the full scale/trackingStatus gate. These
+// tests cover that this exemption still works DURING the pre-freeze
+// window; the block after them covers why the ORIGINAL bug (a switch
+// happening well after the anchor had long stabilized) can no longer occur
+// at all post-freeze.
 
-test('a first sighting of a DIFFERENT plaque is applied unconditionally even with an implausible scale', () => {
+test('a first sighting of a DIFFERENT plaque before freeze is applied unconditionally even with an implausible scale', () => {
   const session = new FakeSession();
   const scene = new THREE.Scene();
-  const anchor = new ImageTargetAnchorSource(session as never, scene, [FRONT, BACK], fakeClock());
+  const anchor = new ImageTargetAnchorSource(session as never, scene, [FRONT, BACK]);
 
-  // Bootstrap via FRONT, healthy sample.
+  // Bootstrap via FRONT (hidden — bootstrap never freezes).
   const frontPos = new THREE.Vector3(1.2, 0, -3.4);
   const frontQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), 0.37);
   session.fire('found', simulateEventFor(FRONT.name, FRONT, frontPos, frontQuat));
   assertVectorClose(anchor.group.position, frontPos);
+  assert.equal(anchor.group.visible, false);
 
   // First-ever sighting of BACK, with a wildly implausible scale — the
   // kind of reading isSampleTrustworthy() would reject for a REPEAT
-  // sighting of FRONT. It must still apply: BACK has never been seen
-  // before, so there is no existing BACK-derived anchor to protect.
+  // sighting of FRONT. It must still apply (and, being the first
+  // independently-checked sample since bootstrap, also reveals/freezes):
+  // BACK has never been seen before, so there is no existing BACK-derived
+  // anchor to protect.
   const backPos = new THREE.Vector3(-5.0, 0, 12.0);
   const backQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -1.4);
   const badFirstBackEvent = withScale(
@@ -540,14 +500,15 @@ test('a first sighting of a DIFFERENT plaque is applied unconditionally even wit
     BACK.physicalTargetWidthMeters * 3
   );
   session.fire('found', badFirstBackEvent);
+  assert.equal(anchor.group.visible, true);
   assertVectorClose(anchor.group.position, backPos);
   assertQuatClose(anchor.group.quaternion, backQuat);
 });
 
-test('a first sighting of a DIFFERENT plaque is applied unconditionally even while trackingStatus is not NORMAL', () => {
+test('a first sighting of a DIFFERENT plaque before freeze is applied unconditionally even while trackingStatus is not NORMAL', () => {
   const session = new FakeSession();
   const scene = new THREE.Scene();
-  const anchor = new ImageTargetAnchorSource(session as never, scene, [FRONT, BACK], fakeClock());
+  const anchor = new ImageTargetAnchorSource(session as never, scene, [FRONT, BACK]);
 
   session.fire(
     'found',
@@ -559,28 +520,32 @@ test('a first sighting of a DIFFERENT plaque is applied unconditionally even whi
   const backPos = new THREE.Vector3(2.0, 0, 0.5);
   const backQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), 0.9);
   session.fire('found', simulateEventFor(BACK.name, BACK, backPos, backQuat));
+  assert.equal(anchor.group.visible, true);
   assertVectorClose(anchor.group.position, backPos);
   assertQuatClose(anchor.group.quaternion, backQuat);
 });
 
-test('a REPEAT sighting of an already-seen plaque still goes through the full trust gate — only the first sighting per name is exempt', () => {
+test('a REPEAT sighting of an already-seen plaque before freeze still goes through the full trust gate', () => {
   const session = new FakeSession();
   const scene = new THREE.Scene();
-  const anchor = new ImageTargetAnchorSource(session as never, scene, [FRONT, BACK], fakeClock());
+  const anchor = new ImageTargetAnchorSource(session as never, scene, [FRONT, BACK]);
 
   session.fire(
     'found',
     simulateEventFor(FRONT.name, FRONT, new THREE.Vector3(1.2, 0, -3.4), new THREE.Quaternion())
   );
 
-  // First sighting of BACK — exempt, applies unconditionally (previous test).
+  // First sighting of BACK — exempt, applies unconditionally AND freezes
+  // (it's the first independently-checked sample since bootstrap).
   const backGoodPos = new THREE.Vector3(2.0, 0, 0.5);
   const backGoodQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), 0.9);
   session.fire('found', simulateEventFor(BACK.name, BACK, backGoodPos, backGoodQuat));
+  assert.equal(anchor.group.visible, true);
   assertVectorClose(anchor.group.position, backGoodPos);
 
-  // A SECOND sighting of BACK with an implausible scale must be rejected
-  // like any other re-detection — BACK is no longer new.
+  // A SECOND sighting of BACK with an implausible scale must be rejected —
+  // both because it's a repeat (not a new-name exemption) AND because the
+  // anchor is now frozen either way.
   const badSecondBackEvent = withScale(
     simulateEventFor(BACK.name, BACK, new THREE.Vector3(99, 0, 99), new THREE.Quaternion()),
     BACK.physicalTargetWidthMeters * 3
@@ -590,42 +555,102 @@ test('a REPEAT sighting of an already-seen plaque still goes through the full tr
   assertQuatClose(anchor.group.quaternion, backGoodQuat);
 });
 
-// --- Pose-filter reset on discontinuity (2026-08-26) ---
+// --- Freeze-after-stabilization (2026-08-31 strategy change) -------------
 //
-// applyPose() now runs every trustworthy sample through a One Euro filter
-// per position axis and quaternion component (docs/research/
-// 8th-wall-troubleshooting.md §22), which by design lags slightly behind
-// a fast but genuine change between two samples of the SAME target (see
-// the widened epsilons on the pre-existing "recovered" assertions above).
-// A target SWITCH is not that case — it's a deliberate discontinuity, not
-// jitter to smooth through — so resetPoseFilters() must make the anchor
-// snap to the new plaque's pose exactly, not lag toward it.
+// This is the core contract of the new strategy: once the anchor has
+// stabilized once, NOTHING moves it again for the lifetime of this
+// instance — not a re-detection of the same plaque, not a first-ever
+// sighting of a totally different one, not a per-frame 'updated', however
+// clean the sample. docs/research/8th-wall-troubleshooting.md §25 has the
+// full rationale (weeks of drift/jitter reports under the old
+// continuous-re-snap design); this replaces that design's "reveal happens
+// only once" test with a stronger guarantee: not just the reveal, the
+// TRANSFORM itself never changes again.
 
-test('switching to a different plaque snaps the filtered pose exactly, rather than smoothing toward it', () => {
+test('once frozen, a clean re-detection of the SAME plaque does not move the anchor', async () => {
   const session = new FakeSession();
   const scene = new THREE.Scene();
-  const anchor = new ImageTargetAnchorSource(session as never, scene, [FRONT, BACK], fakeClock());
+  const anchor = new ImageTargetAnchorSource(session as never, scene, [FRONT]);
 
-  session.fire(
-    'found',
-    simulateEventFor(FRONT.name, FRONT, new THREE.Vector3(1.2, 0, -3.4), new THREE.Quaternion())
-  );
-  // A couple of ordinary 'updated' samples on FRONT, so its filters have
-  // real (non-null) history — the exact scenario that would show lag on
-  // a same-target follow-up sample (see the "recovered" tests above),
-  // and so the eventual switch below is a genuine reset, not a no-op on
-  // filters that were already empty.
-  session.fire(
-    'updated',
-    simulateEventFor(FRONT.name, FRONT, new THREE.Vector3(1.21, 0, -3.41), new THREE.Quaternion())
-  );
+  session.fire('found', simulateEventFor(FRONT.name, FRONT, new THREE.Vector3(1, 0, -1), new THREE.Quaternion()));
+  const stablePos = new THREE.Vector3(1.2, 0, -3.4);
+  const stableQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), 0.2);
+  session.fire('updated', simulateEventFor(FRONT.name, FRONT, stablePos, stableQuat));
+  assert.equal(anchor.group.visible, true);
 
+  // A perfectly good re-detection of the very same plaque, at a
+  // completely different simulated world position — if this were still
+  // the pre-2026-08-31 continuous-re-snap design, this would move the
+  // anchor. It must not.
+  const elsewherePos = new THREE.Vector3(9.9, 0, 4.4);
+  const elsewhereQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -1.8);
+  session.fire('found', simulateEventFor(FRONT.name, FRONT, elsewherePos, elsewhereQuat));
+
+  assert.equal(anchor.group.visible, true);
+  assertVectorClose(anchor.group.position, stablePos);
+  assertQuatClose(anchor.group.quaternion, stableQuat);
+});
+
+test('once frozen, repeated clean "updated" samples never move the anchor (reveal AND freeze happen exactly once)', async () => {
+  const session = new FakeSession();
+  const scene = new THREE.Scene();
+  const anchor = new ImageTargetAnchorSource(session as never, scene, [FRONT]);
+
+  let resolveCount = 0;
+  anchor.whenStable().then(() => {
+    resolveCount += 1;
+  });
+
+  session.fire('found', simulateEventFor(FRONT.name, FRONT, new THREE.Vector3(1, 0, -1), new THREE.Quaternion()));
+  const stablePos = new THREE.Vector3(1.2, 0, -3.4);
+  const stableQuat = new THREE.Quaternion();
+  session.fire('updated', simulateEventFor(FRONT.name, FRONT, stablePos, stableQuat));
+  await Promise.resolve();
+  assert.equal(anchor.group.visible, true);
+  assert.equal(resolveCount, 1, 'whenStable() handler must fire exactly once');
+
+  // Several more good samples in a row, each at a DIFFERENT simulated
+  // position — a real session keeps sending 'updated' every frame while
+  // the target is in view, and even small per-frame drift/noise in a real
+  // signal would move a continuously-re-snapping anchor. None of these
+  // should move it at all now.
+  for (let i = 0; i < 5; i += 1) {
+    session.fire(
+      'updated',
+      simulateEventFor(FRONT.name, FRONT, new THREE.Vector3(1.2 + i * 0.5, 0, -3.4 - i * 0.3), new THREE.Quaternion())
+    );
+  }
+  await Promise.resolve();
+  assert.equal(anchor.group.visible, true);
+  assert.equal(resolveCount, 1, 'whenStable() handler must still have fired exactly once after more samples');
+  assertVectorClose(anchor.group.position, stablePos);
+  assertQuatClose(anchor.group.quaternion, stableQuat);
+});
+
+test('once frozen, the first-ever sighting of a DIFFERENT, never-before-seen plaque still does not move the anchor', () => {
+  const session = new FakeSession();
+  const scene = new THREE.Scene();
+  const anchor = new ImageTargetAnchorSource(session as never, scene, [FRONT, BACK]);
+
+  // Bootstrap + freeze via FRONT only.
+  session.fire('found', simulateEventFor(FRONT.name, FRONT, new THREE.Vector3(1, 0, -1), new THREE.Quaternion()));
+  const stablePos = new THREE.Vector3(1.2, 0, -3.4);
+  const stableQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), 0.2);
+  session.fire('updated', simulateEventFor(FRONT.name, FRONT, stablePos, stableQuat));
+  assert.equal(anchor.group.visible, true);
+
+  // This is the exact scenario the original §24 bug and its fix were
+  // about — BACK has never been seen before. Under the pre-2026-08-31
+  // design this was a real bug (silently rejected depending on
+  // trackingStatus timing) that §24 fixed by exempting it. Under the
+  // freeze strategy it's not a gate outcome at all: the anchor is frozen,
+  // so BACK's first sighting — clean pose, healthy trackingStatus — is
+  // simply never evaluated against any gate, and the world origin stays
+  // exactly where FRONT put it.
   const backPos = new THREE.Vector3(2.0, 0, 0.5);
   const backQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), 0.9);
   session.fire('found', simulateEventFor(BACK.name, BACK, backPos, backQuat));
-  // Tight epsilon (this file's default) — a reset filter's first sample
-  // returns the raw value unchanged, same as the anchor's very first-ever
-  // bootstrap sample, not the widened epsilon the "recovered" tests need.
-  assertVectorClose(anchor.group.position, backPos);
-  assertQuatClose(anchor.group.quaternion, backQuat);
+
+  assertVectorClose(anchor.group.position, stablePos);
+  assertQuatClose(anchor.group.quaternion, stableQuat);
 });
