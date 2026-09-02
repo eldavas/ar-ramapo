@@ -3355,3 +3355,30 @@ schema above.
   step:** re-run the same walkaround and confirm the model holds a
   consistent, correct real-world scale through a `back`/`left`
   first-sighting instead of jumping to a corrupted size.
+
+  **Progress (2026-09-02, ninth capture): §33 confirmed working on real
+  hardware; the rotation question hit a real logging gap, fixed
+  diagnostically.** Full reasoning: `docs/research/
+  8th-wall-troubleshooting.md` §34 / `docs/log-6.txt`. Every implausible
+  "new plaque" reading this session (ratios 2.11 to 105.34, including six
+  rejected attempts on `left` alone) was correctly rejected instead of
+  corrupting the anchor — the fix works. Reported: scale looked correct
+  this time; a perceived diagonal tilt and the underlying scale
+  volatility both persisted. The volatility is the same already-
+  characterized SLAM calibration instability (§27/§30/§32/§33) — the
+  gate now protects against it correctly, it cannot make the engine's
+  own calibration stop drifting.
+
+  **The rotation question couldn't be answered from this capture — not
+  because of more drift, but because the one accepted sample's actual
+  rotation was never printed anywhere.** The throttled `updated` log
+  line and the actual accepted sample landed on two different events
+  half a second apart with very different scales; the applied
+  transform's rotation was invisible by construction. Fixed
+  diagnostically: `cameraDiagnosticLine()` (already runs once per
+  applied pose, never throttled) now also prints the anchor's resulting
+  quaternion and its Euler yaw/pitch/roll in degrees. `npm run
+  typecheck`/`build`/`test` clean, 53/53. **Next physical step:** repeat
+  the walkaround — this time the rotation will actually be visible,
+  finally answering whether the tilt is systematic (mount angle /
+  `TARGET_FRAME_TO_WORLD_FIX`) or per-sample noise.

@@ -439,10 +439,29 @@ export class ImageTargetAnchorSource implements AnchorSource {
    * line is the cheapest way to tell those apart from ONE clean capture,
    * instead of guessing which one it is and shipping another unverified
    * fix. Never read for any tracking decision — logging only.
+   *
+   * Rotation added (2026-09-02, troubleshooting doc §32/§34): a reported
+   * "diagonal tilt" needed the anchor's actual applied WORLD rotation to
+   * investigate, and the existing `[ImageTarget] updated (throttled 1/s)`
+   * line only shows the RAW incoming event's rotation, sampled at most
+   * once/second — a real capture showed the raw sample displayed by that
+   * throttle and the sample that actually got accepted moments later were
+   * two different events with very different scales, so the accepted
+   * transform's rotation was never printed anywhere. This line runs
+   * exactly once per applied pose (every accept, not throttled), so it
+   * always reflects the transform actually in effect. Euler degrees
+   * alongside the raw quaternion purely for human eyeballing ("does this
+   * look tilted") — never used for any computation.
    */
   private cameraDiagnosticLine(): string {
     const cam = this.session.getCameraPosition();
-    if (!cam) return '  camera=unavailable (session not started?)';
+    const q = this.group.quaternion;
+    const euler = new THREE.Euler().setFromQuaternion(q, 'YXZ');
+    const rotStr =
+      `rot=(${q.x.toFixed(2)}, ${q.y.toFixed(2)}, ${q.z.toFixed(2)}, ${q.w.toFixed(2)}) ` +
+      `euler(YXZ, deg)=(yaw=${THREE.MathUtils.radToDeg(euler.y).toFixed(1)}, ` +
+      `pitch=${THREE.MathUtils.radToDeg(euler.x).toFixed(1)}, roll=${THREE.MathUtils.radToDeg(euler.z).toFixed(1)})`;
+    if (!cam) return `  camera=unavailable (session not started?) anchor-${rotStr}`;
     const dx = cam.x - this.group.position.x;
     const dy = cam.y - this.group.position.y;
     const dz = cam.z - this.group.position.z;
@@ -450,7 +469,7 @@ export class ImageTargetAnchorSource implements AnchorSource {
     return (
       `  camera=(${cam.x.toFixed(2)}, ${cam.y.toFixed(2)}, ${cam.z.toFixed(2)}) ` +
       `anchor=(${this.group.position.x.toFixed(2)}, ${this.group.position.y.toFixed(2)}, ${this.group.position.z.toFixed(2)}) ` +
-      `dist=${distance.toFixed(2)}m`
+      `dist=${distance.toFixed(2)}m anchor-${rotStr}`
     );
   }
 
