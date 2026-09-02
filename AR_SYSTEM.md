@@ -3281,3 +3281,41 @@ schema above.
   threshold — now well-evidenced (the correction path is confirmed to
   work, and a nudge would also mitigate the back/left detection gap by
   encouraging a deliberate, close, square-on look) but not yet built.
+
+  **Progress (2026-09-02, sixth/seventh captures): a rotation question
+  raised, then superseded by a stronger finding — SLAM's own scale
+  calibration drifts too, and it can block recovery outright.** Full
+  reasoning: `docs/research/8th-wall-troubleshooting.md` §32 /
+  `docs/log-3.txt` / `docs/log-4.txt`. A reported "diagonal tilt since
+  first scan, never corrected" traced to exactly ONE trustworthy pose
+  accepted in a 93-second session — too little data to tell whether
+  `TARGET_FRAME_TO_WORLD_FIX`/mount angle is systematically wrong or one
+  noisy rotation slipped through a gate that never validates rotation.
+  The proposed discriminating test (re-scan `front` repeatedly) surfaced
+  something bigger first: in the next capture, `front` fired `FOUND`
+  60+ times over 62 seconds — detection itself works fine — and EVERY
+  one was rejected, because the engine's own scale reading for the same
+  physical target drifted in a smooth, consistent trend from ~1.0 down
+  toward 0.27 over ~40 seconds, not random noise. Only after 71 seconds
+  did a sample happen to land back in tolerance.
+
+  **Reframe:** "hard to scan" / "could never re-scan it" was not a
+  print/lighting/detection problem this pass — the plaque was seen
+  dozens of times. It was `isSampleTrustworthy()` correctly doing its
+  job against a coordinate system whose own notion of "one meter" had
+  drifted, with no way to tell "this sample is noise" from "everything
+  will read wrong by a similar amount until the drift resolves." This is
+  a third facet of the same root SLAM/VIO instability already measured
+  in camera position (§27/§30) — now confirmed to also affect the
+  engine's internal scale calibration, not just its position estimate.
+
+  **Deliberately not chosen between yet:** (1) an environmental
+  comparison test (asked directly whether the test room is visually
+  plain/repetitive; answer was inconclusive — a controlled test in a
+  more richly textured space would settle it empirically), or (2) teach
+  the trust gate to recognize a *consistent* run of out-of-tolerance
+  readings as a genuine-but-drifted measurement worth re-baselining
+  around, instead of only ever trusting the original ±25% band — named
+  trade-off: faster recovery, but also faster lock-on to a truly
+  bad-but-stable state. The original rotation question remains open,
+  unresolved by either capture.
