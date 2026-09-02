@@ -1726,3 +1726,31 @@ The camera's own SLAM-reported height climbed roughly **1.5 meters over ~45 seco
 2. **Code, a real trade-off, not yet built:** teach the trust gate to recognize a *consistent* run of out-of-tolerance samples (low variance across several consecutive readings of the same target) as evidence of a genuine-but-drifted measurement worth re-baselining around, rather than only ever trusting readings near the original ±25% band — directly targeting the "stuck rejecting for 60+ seconds" failure mode observed here. The risk, named up front: this would also make the gate lock onto a truly bad-but-stable drifted state faster, trading "waits a long time to recover" for "recovers fast, including sometimes to the wrong place." Not implemented without deciding whether that trade-off is acceptable.
 
 **The rotation question from earlier in this entry is still open and unresolved** — `log-4.txt`'s single accepted sample doesn't by itself distinguish hypothesis (a) from (b) either, and no further captures have targeted it since. Revisit once (1) or (2) above make repeated clean re-detections practical enough to actually run that comparison.
+
+---
+
+## 33. Environmental hypothesis confirmed AND a real, precise code bug found (2026-09-02, eighth capture) — the §24 "new target" exemption was skipping scale plausibility, not just trackingStatus
+
+**Environmental fix worked.** A photo of the physical test table showed a glossy/reflective wood finish with a repetitive parquet pattern — both textbook-bad conditions for monocular visual tracking, and both directly under where the camera spends the most time (scanning the plaques up close). The person testing covered the table with a plain matte cloth and re-ran the walk: initial detection time for `front` dropped considerably, and — for the first time across every capture in this file — `back` and `left` were ALSO detected during a normal walkaround (`docs/log-5.txt`). The surface was a real, meaningful contributor, exactly as hypothesized in §32. It did not eliminate SLAM instability outright (trackingStatus still flickered LIMITED/NORMAL later in the session, and the underlying position/scale drift this file has tracked since §27/§30 is still present) — but it measurably improved detection reliability across all 4 plaques, not just `front`.
+
+**The remaining "anchor/scale bug" the person testing reported had an exact, findable cause — not more environmental noise.** Reported: the rendered model doesn't appear to measure the documented 1606.55mm × 1343.03mm footprint. The capture shows precisely why:
+
+```
+[+94.9s] FOUND "site-tracking-back"
+  scale=0.448m  (declared 0.03m → ratio 14.9)
+  trackingStatus=LIMITED
+  first sighting of a NEW plaque — applied unconditionally
+
+[+103.6s] FOUND "site-tracking-left"
+  scale=0.068m  (declared 0.03m → ratio 2.27)
+  trackingStatus=LIMITED
+  first sighting of a NEW plaque — applied unconditionally
+```
+
+Both readings arrived during a period where the camera's own periodic-position log had just jumped from ~1.3m to over 6m — an obvious, severe tracking glitch — and BOTH were applied to the anchor with zero plausibility check of any kind, back-to-back, each overwriting the previous (good) `front`-derived placement (ratio 1.06, captured earlier in the same session) with a progressively more corrupted one.
+
+**Root cause, confirmed by reading the code, not inferred:** the §24/§26 "first sighting of a new target" exemption was written as `trustworthy = isNewTarget || isSampleTrustworthy(ratio)` — a single boolean OR that waives **both halves** of the gate (scale plausibility AND `trackingStatus === 'NORMAL'`) the instant a name is new, not just the trackingStatus half §24 was actually about. §24's own problem (documented in this file and in AR_SYSTEM.md) was specifically that walking up to a different plaque tends to coincide with `trackingStatus` deviating from `NORMAL` — nothing about that problem ever required also skipping the scale check. This capture is the first time a first-sighting happened to land during a severe enough SLAM glitch to expose it.
+
+**Fix (`ImageTargetAnchorSource.ts`):** split the two halves of the gate the exemption was conflating. New logic: `trustworthy = isScalePlausible(ratio) && (isNewTarget || trackingStatus === 'NORMAL')`. A new target's first sighting still doesn't need `trackingStatus === 'NORMAL'` (§24's actual fix, preserved), but now unconditionally needs a plausible scale, exactly like every other sample. Re-run against this session's own numbers: `back`'s ratio 14.9 and `left`'s ratio 2.27 would BOTH now be rejected, leaving the anchor on the earlier, accurate `front` reading (ratio 1.06) instead of being overwritten twice by corrupted data — directly addressing the reported size mismatch.
+
+**Verified in software:** `npm run typecheck`/`build`/`test` clean, 53/53. The test that encoded the old (buggy) behavior — "a first sighting of a DIFFERENT plaque... is applied unconditionally even with an implausible scale" — was inverted to assert the corrected behavior (rejected, anchor stays on the last known-good transform); the sibling trackingStatus-only exemption test is unchanged and still passes, confirming §24's actual fix is intact. **Not verifiable in software, next physical step:** re-run the same walkaround (matte surface, same 4 plaques) and confirm the model now holds a consistent, correct real-world scale — including through a `back`/`left` first-sighting — instead of jumping to a corrupted size when one lands during a rough tracking moment.

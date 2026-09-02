@@ -474,22 +474,23 @@ test('the very first acquisition applies even while trackingStatus is not NORMAL
 });
 
 // --- Multi-target switching fix (2026-08-26, physical-device finding),
-// now in effect for the FULL session (§26, 2026-09-01) ---
+// now in effect for the FULL session (§26, 2026-09-01), scale plausibility
+// re-required for new targets too (§33, 2026-09-02) ---
 //
 // On the real four-plaque 'site' entry, once one plaque acquired the
 // anchor, scanning any of the OTHER three plaques for the first time used
 // to silently fail unless a sample happened to land exactly when
 // trackingStatus was NORMAL. The fix: the FIRST sighting of a target name
-// this anchor has never seen before is applied unconditionally, the same
-// as the anchor's very first-ever sample — only a REPEAT sighting of an
-// already-seen name goes through the full scale/trackingStatus gate. These
-// tests cover the exemption in the early convergence window; the
-// post-stabilization block further below covers the exact scenario §24
-// was originally about — a switch happening well after the anchor had
-// long stabilized — which §26 restored (§25's freeze had made it
-// structurally impossible, which is what caused the regression §26 fixes).
+// this anchor has never seen before waives the trackingStatus === 'NORMAL'
+// requirement — only a REPEAT sighting of an already-seen name still needs
+// it. §33 correction: a real capture showed this exemption ALSO waiving
+// scale plausibility, letting a first sighting apply a 14.9x-implausible
+// reading unconditionally. Scale plausibility is now required for every
+// accepted sample, new target or not — these tests cover the exemption's
+// corrected scope in the early convergence window; the post-stabilization
+// block further below covers the exact scenario §24 was originally about.
 
-test('a first sighting of a DIFFERENT plaque before stabilization is applied unconditionally even with an implausible scale', () => {
+test('a first sighting of a DIFFERENT plaque before stabilization is REJECTED when its scale is implausible — the §33 fix', () => {
   const session = new FakeSession();
   const scene = new THREE.Scene();
   const anchor = new ImageTargetAnchorSource(session as never, scene, [FRONT, BACK]);
@@ -501,12 +502,14 @@ test('a first sighting of a DIFFERENT plaque before stabilization is applied unc
   assertVectorClose(anchor.group.position, frontPos);
   assert.equal(anchor.group.visible, false);
 
-  // First-ever sighting of BACK, with a wildly implausible scale — the
-  // kind of reading isSampleTrustworthy() would reject for a REPEAT
-  // sighting of FRONT. It must still apply (and, being the first
-  // independently-checked sample since bootstrap, also reveals/freezes):
-  // BACK has never been seen before, so there is no existing BACK-derived
-  // anchor to protect.
+  // First-ever sighting of BACK, with a wildly implausible scale — a real
+  // on-device capture (docs/research/8th-wall-troubleshooting.md §33)
+  // showed exactly this shape of reading (engine scale ~15x the declared
+  // physical width) being applied blindly before this fix, corrupting the
+  // model's real-world size. It must now be REJECTED: BACK being new
+  // means there's no existing BACK-derived anchor to "protect," but an
+  // implausible reading is still implausible regardless of which name it
+  // arrived under.
   const backPos = new THREE.Vector3(-5.0, 0, 12.0);
   const backQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -1.4);
   const badFirstBackEvent = withScale(
@@ -514,12 +517,13 @@ test('a first sighting of a DIFFERENT plaque before stabilization is applied unc
     BACK.physicalTargetWidthMeters * 3
   );
   session.fire('found', badFirstBackEvent);
-  assert.equal(anchor.group.visible, true);
-  assertVectorClose(anchor.group.position, backPos);
-  assertQuatClose(anchor.group.quaternion, backQuat);
+  assert.equal(anchor.group.visible, false, 'an implausible new-target sample must not reveal the group either');
+  // The anchor must stay at the last known-good (FRONT) transform.
+  assertVectorClose(anchor.group.position, frontPos);
+  assertQuatClose(anchor.group.quaternion, frontQuat);
 });
 
-test('a first sighting of a DIFFERENT plaque before stabilization is applied unconditionally even while trackingStatus is not NORMAL', () => {
+test('a first sighting of a DIFFERENT plaque before stabilization is applied even while trackingStatus is not NORMAL, PROVIDED its scale is plausible', () => {
   const session = new FakeSession();
   const scene = new THREE.Scene();
   const anchor = new ImageTargetAnchorSource(session as never, scene, [FRONT, BACK]);

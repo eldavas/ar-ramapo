@@ -3319,3 +3319,39 @@ schema above.
   trade-off: faster recovery, but also faster lock-on to a truly
   bad-but-stable state. The original rotation question remains open,
   unresolved by either capture.
+
+  **Progress (2026-09-02, eighth capture): environmental hypothesis
+  confirmed, AND a precise, fixed code bug — the §24 "new target"
+  exemption was waiving scale plausibility, not just trackingStatus.**
+  Full reasoning: `docs/research/8th-wall-troubleshooting.md` §33 /
+  `docs/log-5.txt`. A photo of the test table showed a glossy,
+  repetitive-pattern wood finish — known-bad for monocular tracking,
+  right where the camera spends the most time. Covering it with a matte
+  cloth measurably improved detection: `back` and `left` were detected
+  during a normal walkaround for the first time in any capture in this
+  file. Confirms §32's environmental hypothesis.
+
+  **Separately, the reported "model doesn't measure the documented
+  1606.55mm × 1343.03mm footprint" traced to an exact bug, not more
+  drift noise:** `site-tracking-back`'s first-ever sighting applied a
+  scale ratio of 14.9 (declared 0.03m, engine read 0.448m) while the
+  camera's own position had just jumped several meters — an obvious
+  glitch — and it was accepted with ZERO plausibility check, because
+  `ImageTargetAnchorSource`'s §24/§26 "new target" exemption was written
+  as `isNewTarget || isSampleTrustworthy(ratio)`, waiving BOTH scale
+  plausibility and trackingStatus the instant a name was new, not just
+  the trackingStatus half §24 was actually solving (a plaque switch
+  coinciding with trackingStatus deviating from NORMAL). `site-tracking-
+  left`'s first sighting (ratio 2.27) then compounded it, overwriting a
+  good earlier `front` reading (ratio 1.06) twice with corrupted data.
+
+  **Fix:** `trustworthy = isScalePlausible(ratio) && (isNewTarget ||
+  trackingStatus === 'NORMAL')` — a new target still skips the
+  trackingStatus requirement (§24's real fix, preserved) but now
+  unconditionally needs a plausible scale, same as every other sample.
+  `npm run typecheck`/`build`/`test` clean, 53/53 — the test asserting
+  the old buggy behavior was inverted to assert the fix; the sibling
+  trackingStatus-only-exemption test needed no change. **Next physical
+  step:** re-run the same walkaround and confirm the model holds a
+  consistent, correct real-world scale through a `back`/`left`
+  first-sighting instead of jumping to a corrupted size.

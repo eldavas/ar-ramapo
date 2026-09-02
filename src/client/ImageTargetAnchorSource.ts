@@ -230,11 +230,15 @@ function formatPose(event: Xr8ImageTrackedEvent): string {
  *
  * `seenTargetNames` (§24, "Multi-target switching fix") now matters for
  * the FULL session, not just an initial convergence window: a plaque this
- * anchor has never seen before is applied unconditionally whenever it's
- * first sighted, `stable` or not — walking up to a DIFFERENT plaque than
- * the one that originally acquired the anchor, well into an established
- * session, is exactly the §24 scenario and exactly the periodic
- * re-grounding this refinement restores.
+ * anchor has never seen before gets its `trackingStatus === 'NORMAL'`
+ * requirement waived on first sighting, `stable` or not — walking up to a
+ * DIFFERENT plaque than the one that originally acquired the anchor, well
+ * into an established session, is exactly the §24 scenario and exactly
+ * the periodic re-grounding this refinement restores. It does NOT waive
+ * scale plausibility (§33 correction, 2026-09-02) — a real capture showed
+ * a new plaque's first sighting applying a 14.9x-implausible scale reading
+ * purely because no scale check ran on it at all; every accepted sample,
+ * new target or not, must still pass `isScalePlausible()`.
  *
  * onOriginChanged fires on every accepted `'found'` past the very first
  * bootstrap sample, for the lifetime of the anchor — not just during an
@@ -531,20 +535,41 @@ export class ImageTargetAnchorSource implements AnchorSource {
         // always (scale plausibility AND trackingStatus === 'NORMAL'),
         // with the §24 exemption — a plaque this anchor has never seen
         // before is new information, not suspect continuation of an
-        // existing one, so its first sighting is applied unconditionally
-        // too, regardless of how far into the session it happens.
+        // existing one.
+        //
+        // §33 correction (2026-09-02, physical-device capture): the §24
+        // exemption used to bypass BOTH halves of the gate for a new
+        // target (`isNewTarget || isSampleTrustworthy(ratio)`) — not just
+        // the trackingStatus half it was built for. A real capture caught
+        // this directly: `site-tracking-back`'s first-ever sighting
+        // applied a scale ratio of 14.9 (declared 0.03m, engine read
+        // 0.448m) while the camera's own position had just jumped by
+        // several meters — an obviously corrupt sample — purely because
+        // no scale check ever ran on it. `site-tracking-left`'s first
+        // sighting (ratio 2.27) then overwrote that with a second,
+        // still-implausible reading. §24's actual problem was a plaque
+        // switch getting rejected by the trackingStatus half specifically
+        // (walking to a different plaque is exactly when trackingStatus
+        // commonly deviates from NORMAL) — nothing about that problem
+        // required also skipping the scale check. Fixed by exempting only
+        // the trackingStatus requirement for a new target's first
+        // sighting; scale plausibility is now required unconditionally,
+        // for every accepted sample, new target or not.
         const isNewTarget = !this.seenTargetNames.has(event.name);
         const ratio = scaleRatio(event, target.physicalTargetWidthMeters);
-        const trustworthy = isNewTarget || this.isSampleTrustworthy(ratio);
+        const scalePlausible = isScalePlausible(ratio);
+        const trustworthy = scalePlausible && (isNewTarget || this.session.trackingStatus === 'NORMAL');
         console.log(
           `[${traceT()}] [ImageTarget] FOUND "${event.name}"\n` +
             `  scale=${event.scale.toFixed(3)}m ${formatPose(event)}\n` +
             `  trackingStatus=${this.session.trackingStatus}\n` +
-            (isNewTarget
-              ? '  first sighting of a NEW plaque — applied unconditionally, firing onOriginChanged'
-              : trustworthy
-                ? '  re-detection — firing onOriginChanged, pose discontinuity'
-                : '  re-detection REJECTED — see warning below — keeping previous anchor')
+            (!scalePlausible
+              ? `  ${isNewTarget ? 'first sighting of a NEW plaque, but scale implausible' : 're-detection'} REJECTED — see warning below — keeping previous anchor`
+              : isNewTarget
+                ? '  first sighting of a NEW plaque — applied (trackingStatus exemption), firing onOriginChanged'
+                : trustworthy
+                  ? '  re-detection — firing onOriginChanged, pose discontinuity'
+                  : '  re-detection REJECTED — see warning below — keeping previous anchor')
         );
         if (trustworthy) {
           this.seenTargetNames.add(event.name);
