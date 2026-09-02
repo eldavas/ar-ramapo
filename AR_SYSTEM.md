@@ -3446,3 +3446,44 @@ schema above.
   for the engine's own general SLAM feature tracking, separate from its
   benefit to image-target recognition) to test on the next physical
   pass. `npm run typecheck`/`build`/`test` clean, 53/53.
+
+  **Progress (2026-09-02, twelfth/thirteenth captures): found the real
+  remaining defect — a single sample's ROTATION can be badly wrong even
+  with a perfect scale reading, and nothing ever checked that.** Full
+  reasoning: `docs/research/8th-wall-troubleshooting.md` §37 /
+  `docs/log-9.txt` (two tests, same file, textured objects placed near
+  the plaques to test §36's hypothesis). Capture 1: the reveal-triggering
+  sample (yaw 134.2 degrees) was followed 0.23 seconds later by a second
+  accepted re-detection landing at yaw -155.8 degrees — both individually
+  scale-plausible and NORMAL-tracked, for the literal same unmoving
+  plaque. Reported: model rendered completely off-anchor and
+  off-orientation. Capture 2: the sole reveal sample had a near-perfect
+  scale ratio (1.03), six seconds into stable NORMAL tracking, yet a yaw
+  of -114.3 degrees. Reported: closer to correct position/rotation than
+  capture 1, but visibly outside the model's real footprint — exactly
+  what a correctly-scaled but ~100-plus-degree-misrotated model looks
+  like.
+
+  Root cause: `isSampleTrustworthy()` has only ever checked scale
+  plausibility and trackingStatus — neither says anything about whether
+  a sample's ROTATION converged. Unlike scale (checked against
+  `physicalTargetWidthMeters`), there's no ground truth to validate one
+  sample's yaw against. Fixed in `ImageTargetAnchorSource.ts`: a sample
+  that passes the existing gate is now held as a pending candidate and
+  only actually applied once a SECOND trustworthy sample for the same
+  target, within 1 second, agrees in yaw within 20 degrees — the
+  confirming sample is what applies, not the first one. Applies to the
+  pre-freeze 'updated' stream and every 'found' re-detection; the
+  unconditional bootstrap sample is untouched (must never hang waiting
+  for confirmation). Costs at most one extra tracked frame in the normal
+  case (typically under 100ms), and only meaningfully delays anything in
+  the exact isolated-bad-frame case this exists to catch. Every existing
+  test that fired one event and expected immediate application now fires
+  an agreeing pair first (mechanical consequence of the new gate, not a
+  behavior change); 3 new tests cover the consensus gate directly,
+  including a deterministic reproduction of capture 1's exact flip-flop.
+  `npm run typecheck`/`build`/`test` clean, 56/56 (53 previous + 3 new).
+  **Next physical step:** repeat the scan and confirm no reveal or
+  re-detection ever again lands 70-150 degrees from where it should —
+  some "rotation not yet corroborated" log lines during noisy stretches
+  are expected and fine.

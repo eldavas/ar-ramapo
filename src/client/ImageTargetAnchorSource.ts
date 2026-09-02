@@ -150,6 +150,31 @@ function yawCorrectionQuaternion(rotationYawDeg: number): THREE.Quaternion {
   );
 }
 
+const candidateYawScratchQuat = new THREE.Quaternion();
+const candidateYawScratchEuler = new THREE.Euler();
+
+/**
+ * Yaw component (degrees, YXZ order — matches cameraDiagnosticLine's own
+ * euler extraction) of the pose applyPose() WOULD compose for this sample,
+ * without mutating the anchor group. Used only by the rotation-consensus
+ * gate (§37) to compare a candidate sample's orientation against a
+ * still-pending one before either is applied.
+ */
+function computeCandidateYawDeg(event: Xr8ImageTrackedEvent, target: ResolvedPlaqueTarget): number {
+  candidateYawScratchQuat
+    .set(event.rotation.x, event.rotation.y, event.rotation.z, event.rotation.w)
+    .multiply(TARGET_FRAME_TO_WORLD_FIX)
+    .multiply(yawCorrectionQuaternion(target.rotationYawDeg));
+  candidateYawScratchEuler.setFromQuaternion(candidateYawScratchQuat, 'YXZ');
+  return THREE.MathUtils.radToDeg(candidateYawScratchEuler.y);
+}
+
+/** Circular difference between two degree angles, always in [0, 180]. */
+function angleDiffDeg(a: number, b: number): number {
+  const diff = Math.abs(a - b) % 360;
+  return diff > 180 ? 360 - diff : diff;
+}
+
 /** Compact pose formatter for the telemetry lines below. */
 function formatPose(event: Xr8ImageTrackedEvent): string {
   const p = event.position;
@@ -246,6 +271,33 @@ function formatPose(event: Xr8ImageTrackedEvent): string {
  * potential pose discontinuity for downstream screen-space filter state
  * to reset against, whether it happens 2 seconds or 5 minutes into the
  * session.
+ *
+ * **Rotation-consensus gate (2026-09-02, §37 — docs/log-9.txt).** Two
+ * independent physical captures proved a sample can pass
+ * `isSampleTrustworthy()` (scale plausible AND trackingStatus NORMAL) with
+ * a badly wrong ROTATION. Capture one: the reveal-triggering sample (yaw
+ * 134.2°) was immediately followed 0.23s later by a second accepted
+ * re-detection landing 70+ degrees away (yaw -155.8°) — both individually
+ * scale-plausible and NORMAL, for the same physically-unmoving plaque.
+ * Capture two: the sole reveal-triggering sample carried a -114.3° yaw
+ * despite a near-perfect scale ratio (1.03), six seconds into stable
+ * NORMAL tracking. Scale plausibility says nothing about rotation
+ * quality — 8th Wall's single-frame image-target orientation estimate can
+ * be noisy independent of how good the translation/scale reading is.
+ * There is no absolute ground truth for yaw to check one sample against
+ * (unlike scale, which has `physicalTargetWidthMeters`), so this gate
+ * requires TEMPORAL AGREEMENT instead: a candidate sample that would
+ * otherwise apply is held pending until a SECOND trustworthy sample for
+ * the same target, arriving within `YAW_CONFIRM_WINDOW_MS`, agrees with
+ * it in yaw within `YAW_CONFIRM_TOLERANCE_DEG` — at which point the
+ * CONFIRMING sample is what actually applies. This filters exactly the
+ * single-frame outliers both captures showed without assuming which of
+ * two divergent readings is correct. While a target stays in view this
+ * costs at most one extra tracked frame (the 'updated' case runs the
+ * check every frame, not just once per second like its console.log) — it
+ * only meaningfully delays anything in the pathological case this exists
+ * to catch: an isolated bad frame with no immediate corroborating
+ * follow-up.
  */
 export class ImageTargetAnchorSource implements AnchorSource {
   readonly kind: OriginKind = 'image-target';
@@ -283,6 +335,13 @@ export class ImageTargetAnchorSource implements AnchorSource {
   // a trustworthy sample. Matters for the FULL session (§26) — every
   // 'found' still consults this, `stable` or not.
   private readonly seenTargetNames = new Set<string>();
+  // Rotation-consensus gate (2026-09-02, §37 — see class doc comment): a
+  // candidate sample that passed isSampleTrustworthy() but hasn't yet been
+  // corroborated by a second, agreeing sample for the SAME target within
+  // YAW_CONFIRM_WINDOW_MS.
+  private pendingCandidate: { name: string; yawDeg: number; atMs: number } | null = null;
+  private static readonly YAW_CONFIRM_WINDOW_MS = 1000;
+  private static readonly YAW_CONFIRM_TOLERANCE_DEG = 20;
 
   /**
    * Called for every APPLIED pose (bootstrap or checked) — see
@@ -425,6 +484,35 @@ export class ImageTargetAnchorSource implements AnchorSource {
   }
 
   /**
+   * Rotation-consensus gate — see the class doc comment's §37 section for
+   * the two physical captures that motivated this. Returns true if this
+   * call resulted in `applyPose()` actually running (the caller still does
+   * its own onPoseApplied/reveal/origin-changed bookkeeping); false if the
+   * sample is being held pending confirmation.
+   */
+  private tryApplyWithRotationConsensus(event: Xr8ImageTrackedEvent, target: ResolvedPlaqueTarget): boolean {
+    const yawDeg = computeCandidateYawDeg(event, target);
+    const now = performance.now();
+    const pending = this.pendingCandidate;
+    if (
+      pending &&
+      pending.name === event.name &&
+      now - pending.atMs <= ImageTargetAnchorSource.YAW_CONFIRM_WINDOW_MS &&
+      angleDiffDeg(yawDeg, pending.yawDeg) <= ImageTargetAnchorSource.YAW_CONFIRM_TOLERANCE_DEG
+    ) {
+      this.pendingCandidate = null;
+      this.applyPose(event, target);
+      return true;
+    }
+    console.log(
+      `[${traceT()}] [ImageTargetAnchorSource] rotation not yet corroborated for "${event.name}" ` +
+        `(yaw=${yawDeg.toFixed(1)}°) — awaiting a confirming sample before applying (§37)`
+    );
+    this.pendingCandidate = { name: event.name, yawDeg, atMs: now };
+    return false;
+  }
+
+  /**
    * Diagnostic-only (2026-09-01, troubleshooting doc §27): "anchor is lost
    * easily, scale goes miniature" has (at least) two structurally
    * different possible causes that look identical from the visual symptom
@@ -508,6 +596,7 @@ export class ImageTargetAnchorSource implements AnchorSource {
     this.scene.remove(this.group);
     this.originChangedHandlers.length = 0;
     this.acquired = false;
+    this.pendingCandidate = null;
   }
 
   private onImageEvent(kind: ImageEventKind, event: Xr8ImageTrackedEvent | null): void {
@@ -591,12 +680,13 @@ export class ImageTargetAnchorSource implements AnchorSource {
                   : '  re-detection REJECTED — see warning below — keeping previous anchor')
         );
         if (trustworthy) {
-          this.seenTargetNames.add(event.name);
-          this.applyPose(event, target);
-          console.log(`[${traceT()}] [ImageTargetAnchorSource]${this.cameraDiagnosticLine()}`);
-          this.onPoseApplied(false, ratio);
-          for (const handler of this.originChangedHandlers) {
-            handler();
+          if (this.tryApplyWithRotationConsensus(event, target)) {
+            this.seenTargetNames.add(event.name);
+            console.log(`[${traceT()}] [ImageTargetAnchorSource]${this.cameraDiagnosticLine()}`);
+            this.onPoseApplied(false, ratio);
+            for (const handler of this.originChangedHandlers) {
+              handler();
+            }
           }
         } else {
           this.logSampleRejected(event, target, ratio);
@@ -626,9 +716,10 @@ export class ImageTargetAnchorSource implements AnchorSource {
           }
           const ratio = scaleRatio(event, target.physicalTargetWidthMeters);
           if (this.isSampleTrustworthy(ratio)) {
-            this.applyPose(event, target);
-            console.log(`[${traceT()}] [ImageTargetAnchorSource]${this.cameraDiagnosticLine()}`);
-            this.onPoseApplied(false, ratio);
+            if (this.tryApplyWithRotationConsensus(event, target)) {
+              console.log(`[${traceT()}] [ImageTargetAnchorSource]${this.cameraDiagnosticLine()}`);
+              this.onPoseApplied(false, ratio);
+            }
           } else {
             this.logSampleRejected(event, target, ratio);
           }

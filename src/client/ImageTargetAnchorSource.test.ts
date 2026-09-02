@@ -261,10 +261,15 @@ test('an implausible-scale sample is rejected before freeze — anchor holds its
   assertQuatClose(anchor.group.quaternion, goodQuat);
   assert.equal(anchor.group.visible, false);
 
-  // The first GOOD sample after bootstrap reveals AND freezes the anchor —
-  // exact, no filter lag (2026-08-31: the filter is gone).
+  // The first GOOD sample after bootstrap does NOT reveal/freeze by itself
+  // — the §37 rotation-consensus gate holds it pending a corroborating
+  // second sample (see that section below for the full rationale). A
+  // second, agreeing sample confirms and applies exactly, no filter lag
+  // (2026-08-31: the filter is gone).
   const recoveredPos = new THREE.Vector3(2.0, 0, -1.0);
   const recoveredQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -0.5);
+  session.fire('updated', simulateEventFor(FRONT.name, FRONT, recoveredPos, recoveredQuat));
+  assert.equal(anchor.group.visible, false, '§37: a lone candidate must not apply until corroborated');
   session.fire('updated', simulateEventFor(FRONT.name, FRONT, recoveredPos, recoveredQuat));
   assert.equal(anchor.group.visible, true);
   assertVectorClose(anchor.group.position, recoveredPos);
@@ -337,11 +342,17 @@ test('the first trustworthy sample after bootstrap reveals the scene, resolves w
 
   // First independently-checked sample (an 'updated' — the common case,
   // since 'found' only re-fires on re-detection): scale-plausible,
-  // trackingStatus NORMAL (FakeSession's default) — must reveal and freeze.
+  // trackingStatus NORMAL (FakeSession's default) — but the §37
+  // rotation-consensus gate holds it pending a corroborating second
+  // sample before it reveals/freezes anything.
   const stablePos = new THREE.Vector3(1.2, 0, -3.4);
   const stableQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), 0.2);
   session.fire('updated', simulateEventFor(FRONT.name, FRONT, stablePos, stableQuat));
+  assert.equal(anchor.group.visible, false, '§37: a lone candidate must not reveal until corroborated');
 
+  // A second, agreeing sample confirms it — this is what actually reveals
+  // and freezes.
+  session.fire('updated', simulateEventFor(FRONT.name, FRONT, stablePos, stableQuat));
   assert.equal(anchor.group.visible, true);
   assertVectorClose(anchor.group.position, stablePos);
   assertQuatClose(anchor.group.quaternion, stableQuat);
@@ -366,6 +377,8 @@ test('4. an already-stabilized anchor is unaffected by later scanning/loading/lo
   session.fire('found', simulateEventFor(FRONT.name, FRONT, new THREE.Vector3(1, 0, -1), new THREE.Quaternion()));
   const stablePos = new THREE.Vector3(1.2, 0, -3.4);
   const stableQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), 0.2);
+  // §37: two agreeing samples to actually reveal/freeze.
+  session.fire('updated', simulateEventFor(FRONT.name, FRONT, stablePos, stableQuat));
   session.fire('updated', simulateEventFor(FRONT.name, FRONT, stablePos, stableQuat));
   assert.equal(anchor.group.visible, true);
 
@@ -442,12 +455,15 @@ test('a scale-plausible sample arriving while trackingStatus is not NORMAL is re
   assertQuatClose(anchor.group.quaternion, goodQuat);
   assert.equal(anchor.group.visible, false);
 
-  // Tracking recovers to NORMAL — the next good sample applies, revealing
-  // and freezing the anchor.
+  // Tracking recovers to NORMAL — the next good sample passes the scale/
+  // tracking gate, but §37's rotation-consensus still needs a second,
+  // agreeing sample before it applies, reveals, and freezes the anchor.
   session.trackingStatus = 'NORMAL';
   session.trackingReason = 'UNSPECIFIED';
   const recoveredPos = new THREE.Vector3(0.5, 0, -0.5);
   const recoveredQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -1.0);
+  session.fire('updated', simulateEventFor(FRONT.name, FRONT, recoveredPos, recoveredQuat));
+  assert.equal(anchor.group.visible, false, '§37: a lone candidate must not apply until corroborated');
   session.fire('updated', simulateEventFor(FRONT.name, FRONT, recoveredPos, recoveredQuat));
   assert.equal(anchor.group.visible, true);
   assertVectorClose(anchor.group.position, recoveredPos);
@@ -537,6 +553,9 @@ test('a first sighting of a DIFFERENT plaque before stabilization is applied eve
   session.trackingReason = 'RELOCALIZING';
   const backPos = new THREE.Vector3(2.0, 0, 0.5);
   const backQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), 0.9);
+  // §37: two agreeing 'found' events for BACK to actually apply/reveal.
+  session.fire('found', simulateEventFor(BACK.name, BACK, backPos, backQuat));
+  assert.equal(anchor.group.visible, false, '§37: a lone candidate must not apply until corroborated');
   session.fire('found', simulateEventFor(BACK.name, BACK, backPos, backQuat));
   assert.equal(anchor.group.visible, true);
   assertVectorClose(anchor.group.position, backPos);
@@ -553,11 +572,14 @@ test('a REPEAT sighting of an already-seen plaque still goes through the full tr
     simulateEventFor(FRONT.name, FRONT, new THREE.Vector3(1.2, 0, -3.4), new THREE.Quaternion())
   );
 
-  // First sighting of BACK — exempt, applies unconditionally AND
+  // First sighting of BACK — exempt from the trackingStatus check AND
   // stabilizes (it's the first independently-checked sample since
-  // bootstrap).
+  // bootstrap), but §37's rotation-consensus still needs a second,
+  // agreeing sighting before it actually applies.
   const backGoodPos = new THREE.Vector3(2.0, 0, 0.5);
   const backGoodQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), 0.9);
+  session.fire('found', simulateEventFor(BACK.name, BACK, backGoodPos, backGoodQuat));
+  assert.equal(anchor.group.visible, false, '§37: a lone candidate must not apply until corroborated');
   session.fire('found', simulateEventFor(BACK.name, BACK, backGoodPos, backGoodQuat));
   assert.equal(anchor.group.visible, true);
   assertVectorClose(anchor.group.position, backGoodPos);
@@ -600,6 +622,8 @@ test('once stabilized, "updated" (continuous per-frame) samples never move the a
   session.fire('found', simulateEventFor(FRONT.name, FRONT, new THREE.Vector3(1, 0, -1), new THREE.Quaternion()));
   const stablePos = new THREE.Vector3(1.2, 0, -3.4);
   const stableQuat = new THREE.Quaternion();
+  // §37: two agreeing samples to actually reveal/freeze.
+  session.fire('updated', simulateEventFor(FRONT.name, FRONT, stablePos, stableQuat));
   session.fire('updated', simulateEventFor(FRONT.name, FRONT, stablePos, stableQuat));
   await Promise.resolve();
   assert.equal(anchor.group.visible, true);
@@ -632,6 +656,8 @@ test('once stabilized, a clean re-detection ("found") of the SAME plaque DOES re
   session.fire('found', simulateEventFor(FRONT.name, FRONT, new THREE.Vector3(1, 0, -1), new THREE.Quaternion()));
   const stablePos = new THREE.Vector3(1.2, 0, -3.4);
   const stableQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), 0.2);
+  // §37: two agreeing samples to actually reveal/freeze.
+  session.fire('updated', simulateEventFor(FRONT.name, FRONT, stablePos, stableQuat));
   session.fire('updated', simulateEventFor(FRONT.name, FRONT, stablePos, stableQuat));
   assert.equal(anchor.group.visible, true);
 
@@ -639,8 +665,13 @@ test('once stabilized, a clean re-detection ("found") of the SAME plaque DOES re
   // NORMAL-tracking) pose — simulating accumulated SLAM drift being
   // corrected the moment the user looks back at the plaque. Under §25's
   // pure freeze this would have been (wrongly) ignored; §26 restores it.
+  // §37's rotation-consensus gate applies here too — a lone re-detection
+  // doesn't re-ground until a second, agreeing one confirms it.
   const correctedPos = new THREE.Vector3(1.0, 0, -3.1);
   const correctedQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), 0.25);
+  session.fire('found', simulateEventFor(FRONT.name, FRONT, correctedPos, correctedQuat));
+  // §37: a lone re-detection must not re-ground yet — anchor stays at stablePos.
+  assertVectorClose(anchor.group.position, stablePos);
   session.fire('found', simulateEventFor(FRONT.name, FRONT, correctedPos, correctedQuat));
 
   assert.equal(anchor.group.visible, true);
@@ -656,6 +687,8 @@ test('once stabilized, an implausible re-detection ("found") is still rejected �
   session.fire('found', simulateEventFor(FRONT.name, FRONT, new THREE.Vector3(1, 0, -1), new THREE.Quaternion()));
   const stablePos = new THREE.Vector3(1.2, 0, -3.4);
   const stableQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), 0.2);
+  // §37: two agreeing samples to actually reveal/freeze.
+  session.fire('updated', simulateEventFor(FRONT.name, FRONT, stablePos, stableQuat));
   session.fire('updated', simulateEventFor(FRONT.name, FRONT, stablePos, stableQuat));
   assert.equal(anchor.group.visible, true);
 
@@ -676,10 +709,12 @@ test('once stabilized, the first-ever sighting of a DIFFERENT, never-before-seen
   const scene = new THREE.Scene();
   const anchor = new ImageTargetAnchorSource(session as never, scene, [FRONT, BACK]);
 
-  // Bootstrap + stabilize via FRONT only.
+  // Bootstrap + stabilize via FRONT only. §37: two agreeing samples to
+  // actually reveal/freeze.
   session.fire('found', simulateEventFor(FRONT.name, FRONT, new THREE.Vector3(1, 0, -1), new THREE.Quaternion()));
   const stablePos = new THREE.Vector3(1.2, 0, -3.4);
   const stableQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), 0.2);
+  session.fire('updated', simulateEventFor(FRONT.name, FRONT, stablePos, stableQuat));
   session.fire('updated', simulateEventFor(FRONT.name, FRONT, stablePos, stableQuat));
   assert.equal(anchor.group.visible, true);
 
@@ -688,11 +723,103 @@ test('once stabilized, the first-ever sighting of a DIFFERENT, never-before-seen
   // DIFFERENT physical plaque (BACK) neither seen nor evaluated before.
   // §26 restores the periodic correction — BACK's composed world position
   // should now be the anchor's position, exactly as if BACK alone had
-  // acquired the anchor from the start.
+  // acquired the anchor from the start. §37's rotation-consensus gate
+  // applies here too — a lone sighting doesn't re-ground until a second,
+  // agreeing one confirms it.
   const backPos = new THREE.Vector3(2.0, 0, 0.5);
   const backQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), 0.9);
+  session.fire('found', simulateEventFor(BACK.name, BACK, backPos, backQuat));
   session.fire('found', simulateEventFor(BACK.name, BACK, backPos, backQuat));
 
   assertVectorClose(anchor.group.position, backPos);
   assertQuatClose(anchor.group.quaternion, backQuat);
+});
+
+// --- Rotation-consensus gate (2026-09-02, §37 — docs/log-9.txt) ---
+//
+// Two independent physical captures showed a single sample's ROTATION can
+// be badly wrong even though its scale is perfect and trackingStatus is
+// NORMAL. Unlike scale (checked against physicalTargetWidthMeters), there
+// is no absolute ground truth to validate one sample's yaw against, so
+// this gate requires a second, agreeing sample for the same target within
+// a short window before either one is actually applied.
+
+test('a single trustworthy sample alone never applies — it waits for a corroborating second sample', () => {
+  const session = new FakeSession();
+  const scene = new THREE.Scene();
+  const anchor = new ImageTargetAnchorSource(session as never, scene, [FRONT]);
+
+  const bootstrapPos = new THREE.Vector3(1, 0, -1);
+  session.fire('found', simulateEventFor(FRONT.name, FRONT, bootstrapPos, new THREE.Quaternion()));
+
+  const pos = new THREE.Vector3(1.2, 0, -3.4);
+  const quat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), 0.2);
+  session.fire('updated', simulateEventFor(FRONT.name, FRONT, pos, quat));
+
+  assert.equal(anchor.group.visible, false);
+  // Anchor is still at the unchecked bootstrap transform, untouched by the
+  // lone unconfirmed candidate.
+  assertVectorClose(anchor.group.position, bootstrapPos);
+});
+
+test('two DISAGREEING trustworthy samples never apply either — only a THIRD sample agreeing with the second confirms it', () => {
+  const session = new FakeSession();
+  const scene = new THREE.Scene();
+  const anchor = new ImageTargetAnchorSource(session as never, scene, [FRONT]);
+
+  session.fire('found', simulateEventFor(FRONT.name, FRONT, new THREE.Vector3(1, 0, -1), new THREE.Quaternion()));
+
+  // Mirrors the exact log-9.txt capture: a candidate sample (yaw 0°)
+  // immediately followed by a second, equally scale-plausible/NORMAL
+  // sample landing 90° away — both individually "trustworthy," neither
+  // should ever reach the anchor.
+  const posA = new THREE.Vector3(1.2, 0, -3.4);
+  const quatA = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), 0);
+  session.fire('updated', simulateEventFor(FRONT.name, FRONT, posA, quatA));
+  assert.equal(anchor.group.visible, false);
+
+  const posB = new THREE.Vector3(1.3, 0, -3.3);
+  const quatB = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2); // 90°, far outside tolerance
+  session.fire('updated', simulateEventFor(FRONT.name, FRONT, posB, quatB));
+  assert.equal(anchor.group.visible, false, 'a second sample disagreeing with the first must not apply either');
+
+  // A third sample agreeing with B (not A) confirms B, not A.
+  session.fire('updated', simulateEventFor(FRONT.name, FRONT, posB, quatB));
+  assert.equal(anchor.group.visible, true);
+  assertVectorClose(anchor.group.position, posB);
+  assertQuatClose(anchor.group.quaternion, quatB);
+});
+
+test('a pending candidate for one target is not confirmed by an agreeing sample for a DIFFERENT target', () => {
+  const session = new FakeSession();
+  const scene = new THREE.Scene();
+  const anchor = new ImageTargetAnchorSource(session as never, scene, [FRONT, BACK]);
+
+  session.fire('found', simulateEventFor(FRONT.name, FRONT, new THREE.Vector3(1, 0, -1), new THREE.Quaternion()));
+
+  const frontPos = new THREE.Vector3(1.2, 0, -3.4);
+  const frontQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), 0.2);
+  session.fire('updated', simulateEventFor(FRONT.name, FRONT, frontPos, frontQuat));
+  assert.equal(anchor.group.visible, false);
+
+  // BACK's first sighting, with the SAME yaw as the pending FRONT
+  // candidate — must not confirm it (different target name). There is a
+  // single pending-candidate slot, so this REPLACES the FRONT candidate
+  // with BACK's own, still unconfirmed.
+  const backPos = new THREE.Vector3(2.0, 0, 0.5);
+  const backQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), 0.2);
+  session.fire('found', simulateEventFor(BACK.name, BACK, backPos, backQuat));
+  assert.equal(anchor.group.visible, false, 'an agreeing sample for a different target must not cross-confirm');
+
+  // The next FRONT sample becomes the new pending candidate (replacing
+  // BACK's, for the same single-slot reason) — still not applied.
+  session.fire('updated', simulateEventFor(FRONT.name, FRONT, frontPos, frontQuat));
+  assert.equal(anchor.group.visible, false, 'replacing the pending slot again must not itself apply anything');
+
+  // Only a FOURTH sample, agreeing with the now-pending FRONT candidate,
+  // actually confirms and applies it.
+  session.fire('updated', simulateEventFor(FRONT.name, FRONT, frontPos, frontQuat));
+  assert.equal(anchor.group.visible, true);
+  assertVectorClose(anchor.group.position, frontPos);
+  assertQuatClose(anchor.group.quaternion, frontQuat);
 });
