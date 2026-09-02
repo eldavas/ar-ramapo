@@ -3525,3 +3525,42 @@ schema above.
   first sighting with implausible roll still being rejected despite the
   trackingStatus exemption. `npm run typecheck`/`build`/`test` clean,
   58/58.
+
+  **Progress (2026-09-02, fifteenth capture, diagnosis only, no code
+  changed): §37/§38 confirmed working on real hardware — tilt now
+  excellent — and the new dominant symptom is the long-flagged
+  global-rescale limitation, not a gate bug.** Full reasoning:
+  `docs/research/8th-wall-troubleshooting.md` §39 / `docs/log-11.txt`.
+  Reported: lock slow again, tilt looks more accurate but heading still
+  doesn't, and scale collapsed rapidly post-reveal ("como cayendo en el
+  vacío"). Confirmed: several pre-reveal samples were rejected with the
+  new §38 warning (pitch/roll around -16 to -20 degrees), and the pose
+  that ultimately froze has pitch=-1.0, roll=3.8 degrees - both
+  excellent, an order of magnitude better than log-10's frozen 35.5
+  degrees. Yaw (-28.9 degrees) is still uncorrected, which is expected,
+  not a regression - no ground truth exists for it, same limitation
+  documented since §35.
+
+  The dominant remaining symptom: after reveal, 4 more re-detections
+  arrived and every single one was correctly REJECTED for scale
+  mismatch (ratios 0.60, 3.18, 4.17 - inconsistent with each other, so
+  the engine's own scale estimate is still actively wandering, not
+  settled on a new value). The anchor's own transform never changed
+  again for the rest of the session - since scale:'absolute' means the
+  anchor never self-scales, a visibly shrinking model with an untouched
+  anchor can only be the engine's own internal "one meter" definition
+  drifting underneath it, exactly §27's long-standing hypothesis (b),
+  now caught directly via the camera-position log (height climbing from
+  ~0.5m to ~5m over about 15 seconds). This is not a gate bug - the gate
+  is correctly protecting against a reading that doesn't match the
+  original calibration; there is no way to tell "one bad sample" apart
+  from "the world genuinely rescaled" from a single ratio check, and
+  periodic re-detection (§26) remains the correct recovery mechanism,
+  contingent on the engine's own estimate re-settling, which app code
+  cannot force.
+
+  Raised as an open product question, not yet built: inviting the user
+  to re-scan a plaque partway through a session (today's coaching only
+  ever runs pre-reveal) could give periodic re-detection more chances to
+  fire when the estimate happens to cooperate - a UX/product decision,
+  not a bug fix, pending discussion. No code changed this pass.
