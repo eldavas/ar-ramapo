@@ -3414,3 +3414,35 @@ schema above.
   the first scan and check whether the escalated hint actually appears
   during a stall and whether motion (and lock) resumes sooner than the
   43-second baseline.
+
+  **Progress (2026-09-02, eleventh capture): the stillness message never
+  fired — because `trackingStatus` itself stayed LIMITED for 115
+  seconds, and the worst yaw error recorded yet.** Full reasoning:
+  `docs/research/8th-wall-troubleshooting.md` §36 / `docs/log-8.txt`.
+  Every prior capture reached `trackingStatus=NORMAL` within ~17-18s;
+  this one took 115s, with the periodic camera-position log swinging by
+  whole meters between consecutive 1-second samples the entire time —
+  SLAM/VIO noise from an unconverged tracker, not real hand motion. The
+  §35 stillness check reads position deltas as "movement," so it
+  correctly never fired, but nothing else flagged this very different
+  failure mode (world tracking itself not initializing, not the phone
+  being held still), leaving a static hint up for almost two minutes.
+  The eventual accepted anchor (accepted at +151.1s, after 151 seconds
+  of largely unconstrained drift) carried a yaw of -135.0 degrees —
+  pitch/roll stayed small as always (mount angle still fine), but this
+  is the largest yaw error on record, mechanically confirming §35's
+  prediction that a slower lock produces a worse final orientation.
+
+  Fixed in `main.ts`: a second, independent escalation on the same
+  interval, firing on wall-clock time alone (20s, well past the ~17-18s
+  normal baseline) whenever `trackingStatus !== 'NORMAL'`, naming the
+  actual problem (tracking not initializing) instead of the
+  closer/farther text already on screen. The §35 stillness check is now
+  explicitly gated on `trackingStatus === 'NORMAL'`, documenting that
+  position telemetry isn't a valid signal before then (it accidentally
+  worked out that way in every prior capture). Does not explain WHY
+  this capture took 115s to begin with — logged as an open hypothesis
+  (the matte tablecloth added in §32 for glare may be too low-texture
+  for the engine's own general SLAM feature tracking, separate from its
+  benefit to image-target recognition) to test on the next physical
+  pass. `npm run typecheck`/`build`/`test` clean, 53/53.

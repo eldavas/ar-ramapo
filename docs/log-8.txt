@@ -1,0 +1,897 @@
+20:34:43.919  [ar-debug-console] active before module script — 2026-09-02T20:34:43.919Z
+20:34:44.405  8th Wall XR Version: 0.0.0.0s
+20:34:44.944  [DIAG T+1412ms] main-start
+20:34:44.944  [DIAG T+1413ms] manifest-resolved — site
+20:34:44.945  [DIAG T+1413ms] glb-load-start
+20:34:44.945  [DIAG T+1413ms] rive-file-load-start
+20:34:44.951  [DIAG T+1419ms] image-target-json-fetch-start
+20:34:45.002  [DIAG T+1471ms] card-attach-end
+20:34:45.438  [DIAG T+1906ms] image-target-json-fetch-end
+20:34:45.438  [DIAG T+1906ms] start-ar-button-shown
+20:34:50.878  [DIAG T+7347ms] glb-load-end — 12 hotspots, 29 occluders
+20:34:50.879  [DIAG T+7347ms] rive-file-load-end
+20:34:50.879  [runEightWallExperience] SceneGraphLoader found 12 hotspot_* node(s) and 29 occluder mesh(es) in /assets/site-scene.glb.
+20:34:50.879  [DIAG T+7348ms] markers-attach-start
+20:34:50.903  [DIAG T+7372ms] markers-attach-end
+20:34:50.904  [runEightWallExperience] MarkerLayer and CardPanel attached — content pipeline is live.
+20:34:50.904  [DIAG T+7373ms] scene-content-ready
+20:34:53.186  [DIAG T+9654ms] start-ar-tapped
+20:34:53.191  [DIAG T+9659ms] xr8-engine-module-import-start
+20:34:53.497  [DIAG T+9965ms] xr8-engine-module-ready
+20:34:53.509  [DIAG T+9977ms] xr8-run-invoked
+20:34:54.963  [DIAG T+11431ms] xr8-pipeline-onstart
+20:34:54.964  [EightWallSession] canvas diagnostics @ onStart, BEFORE installFullWindowResize:
+  canvas.getBoundingClientRect() = 300.0 x 150.0 (left=0.0, top=0.0)
+  canvas.width/height (drawing buffer) = 300 x 150
+  window.innerWidth/innerHeight = 393 x 695
+  visualViewport = 393.0 x 695.0 scale=1.000
+  window.devicePixelRatio = 3
+  renderer.getSize() = 300.0 x 150.0, renderer.getPixelRatio() = 1
+  camera.aspect = 2.000
+  renderer.domElement === #camerafeed -> true
+  canvas.id="camerafeed" canvas.isConnected=true
+  canvas.style.cssText (inline) = "position: fixed; inset: 0px; width: 300px; height: 150px; display: block; touch-action: none;"
+  getComputedStyle: position=fixed display=block width=300px height=150px inset=0px
+20:34:54.965  [EightWallSession] canvas diagnostics @ onStart, AFTER installFullWindowResize:
+  canvas.getBoundingClientRect() = 393.0 x 695.0 (left=0.0, top=0.0)
+  canvas.width/height (drawing buffer) = 1179 x 2085
+  window.innerWidth/innerHeight = 393 x 695
+  visualViewport = 393.0 x 695.0 scale=1.000
+  window.devicePixelRatio = 3
+  renderer.getSize() = 393.0 x 695.0, renderer.getPixelRatio() = 3
+  camera.aspect = 0.565
+  renderer.domElement === #camerafeed -> true
+  canvas.id="camerafeed" canvas.isConnected=true
+  canvas.style.cssText (inline) = "position: fixed; inset: 0px; width: 393px; height: 695px; display: block; touch-action: none;"
+  getComputedStyle: position=fixed display=block width=393px height=695px inset=0px
+20:34:55.005  [DIAG T+11474ms] xr8-onstart-fired
+20:34:55.006  [+10.1s] [ImageTargetAnchorSource] acquire() — waiting for first imagefound of any of "site-tracking-front", "site-tracking-back", "site-tracking-left", "site-tracking-right"...
+20:34:55.013  [EightWallSession] canvas diagnostics @ first requestAnimationFrame after onStart:
+  canvas.getBoundingClientRect() = 393.0 x 695.0 (left=0.0, top=0.0)
+  canvas.width/height (drawing buffer) = 1179 x 2085
+  window.innerWidth/innerHeight = 393 x 695
+  visualViewport = 393.0 x 695.0 scale=1.000
+  window.devicePixelRatio = 3
+  renderer.getSize() = 393.0 x 695.0, renderer.getPixelRatio() = 3
+  camera.aspect = 0.565
+  renderer.domElement === #camerafeed -> true
+  canvas.id="camerafeed" canvas.isConnected=true
+  canvas.style.cssText (inline) = "position: fixed; inset: 0px; width: 393px; height: 695px; display: block; touch-action: none;"
+  getComputedStyle: position=fixed display=block width=393px height=695px inset=0px
+20:34:55.048  [+10.1s] [EightWallSession] camera (periodic, throttled 1/s) = (0.00, 1.00, 0.00) trackingStatus=UNSPECIFIED reason=UNSPECIFIED
+20:34:55.070  [+10.1s] [TrackingStatus] LIMITED reason=INITIALIZING — was UNSPECIFIED (UNSPECIFIED)
+20:34:55.593  [+10.7s] [ImageTarget] scanning for target...
+20:34:55.974  [EightWallSession] canvas diagnostics @ +1000ms after onStart:
+  canvas.getBoundingClientRect() = 393.0 x 695.0 (left=0.0, top=0.0)
+  canvas.width/height (drawing buffer) = 1179 x 2085
+  window.innerWidth/innerHeight = 393 x 695
+  visualViewport = 393.0 x 695.0 scale=1.000
+  window.devicePixelRatio = 3
+  renderer.getSize() = 393.0 x 695.0, renderer.getPixelRatio() = 3
+  camera.aspect = 0.565
+  renderer.domElement === #camerafeed -> true
+  canvas.id="camerafeed" canvas.isConnected=true
+  canvas.style.cssText (inline) = "position: fixed; inset: 0px; width: 393px; height: 695px; display: block; touch-action: none;"
+  getComputedStyle: position=fixed display=block width=393px height=695px inset=0px
+20:34:56.049  [+11.1s] [EightWallSession] camera (periodic, throttled 1/s) = (0.01, 1.04, -0.03) trackingStatus=LIMITED reason=INITIALIZING
+20:34:57.058  [+12.1s] [EightWallSession] camera (periodic, throttled 1/s) = (0.00, 0.98, -0.23) trackingStatus=LIMITED reason=INITIALIZING
+20:34:58.067  [+13.1s] [EightWallSession] camera (periodic, throttled 1/s) = (0.04, 0.83, -0.36) trackingStatus=LIMITED reason=INITIALIZING
+20:34:58.349  [+13.4s] [ImageTarget] FOUND "site-tracking-front"
+  scale=0.065m pos=(0.02, 0.39, -0.35) rot=(0.69, -0.17, -0.10, -0.70)
+  trackingStatus=LIMITED
+  acquired: false -> true (bootstrap — pose applied, anchor stays hidden until a trustworthy sample lands)
+20:34:58.350  [+13.4s] [ImageTargetAnchorSource]  camera=(0.02, 0.80, -0.36) anchor=(-0.75, 0.48, -0.03) dist=0.90m anchor-rot=(-0.00, -0.19, 0.05, -0.98) euler(YXZ, deg)=(yaw=21.7, pitch=1.5, roll=-5.7)
+20:34:58.350  [DIAG T+14818ms] first-pose-applied (bootstrap, unchecked) — ratio=2.18
+20:34:58.356  [DIAG T+14824ms] first-image-found-acquired (bootstrap, not yet revealed)
+20:34:58.368  [+13.4s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.065m pos=(0.02, 0.39, -0.35) rot=(0.69, -0.17, -0.10, -0.69)
+20:34:58.368  [+13.4s] [ImageTarget] scale mismatch: engine sees 0.065 m, manifest declares 0.03 m (ratio 2.18). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:34:58.368  [+13.4s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:34:59.070  [+14.1s] [EightWallSession] camera (periodic, throttled 1/s) = (0.02, 0.75, -0.34) trackingStatus=LIMITED reason=INITIALIZING
+20:34:59.382  [+14.4s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.077m pos=(0.02, 0.34, -0.35) rot=(0.70, -0.03, 0.02, -0.71)
+20:34:59.383  [+14.4s] [ImageTarget] scale mismatch: engine sees 0.077 m, manifest declares 0.03 m (ratio 2.58). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:34:59.383  [+14.4s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:35:00.072  [+15.1s] [EightWallSession] camera (periodic, throttled 1/s) = (0.02, 0.72, -0.33) trackingStatus=LIMITED reason=INITIALIZING
+20:35:00.393  [+15.5s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.082m pos=(0.01, 0.33, -0.34) rot=(0.68, 0.09, 0.13, -0.71)
+20:35:00.394  [+15.5s] [ImageTarget] scale mismatch: engine sees 0.082 m, manifest declares 0.03 m (ratio 2.72). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:35:00.394  [+15.5s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:35:01.090  [+16.1s] [EightWallSession] camera (periodic, throttled 1/s) = (0.01, 0.69, -0.36) trackingStatus=LIMITED reason=INITIALIZING
+20:35:01.396  [+16.5s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.085m pos=(0.01, 0.31, -0.35) rot=(0.67, 0.17, 0.19, -0.70)
+20:35:01.397  [+16.5s] [ImageTarget] scale mismatch: engine sees 0.085 m, manifest declares 0.03 m (ratio 2.83). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:35:01.397  [+16.5s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:35:02.095  [+17.2s] [EightWallSession] camera (periodic, throttled 1/s) = (0.01, 0.69, -0.35) trackingStatus=LIMITED reason=INITIALIZING
+20:35:02.398  [+17.5s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.091m pos=(-0.01, 0.27, -0.36) rot=(0.57, 0.38, 0.40, -0.61)
+20:35:02.398  [+17.5s] [ImageTarget] scale mismatch: engine sees 0.091 m, manifest declares 0.03 m (ratio 3.04). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:35:02.398  [+17.5s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:35:03.097  [+18.2s] [EightWallSession] camera (periodic, throttled 1/s) = (0.06, 1.02, -0.41) trackingStatus=LIMITED reason=INITIALIZING
+20:35:03.411  [+18.5s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=6.403m pos=(0.20, -35.20, -1.25) rot=(0.20, 0.68, 0.66, -0.24)
+20:35:03.412  [+18.5s] [ImageTarget] scale mismatch: engine sees 6.403 m, manifest declares 0.03 m (ratio 213.43). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:35:03.412  [+18.5s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:35:04.111  [+19.2s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.02, 1.32, -0.14) trackingStatus=LIMITED reason=INITIALIZING
+20:35:04.427  [+19.5s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=2.910m pos=(-0.58, -19.01, -0.23) rot=(0.51, 0.46, 0.46, -0.57)
+20:35:04.428  [+19.5s] [ImageTarget] scale mismatch: engine sees 2.910 m, manifest declares 0.03 m (ratio 97.00). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:35:04.428  [+19.5s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:35:05.119  [+20.2s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.18, 1.41, 0.10) trackingStatus=LIMITED reason=INITIALIZING
+20:35:05.445  [+20.5s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=2.524m pos=(-0.10, -18.05, -0.32) rot=(0.50, 0.46, 0.46, -0.57)
+20:35:05.445  [+20.5s] [ImageTarget] scale mismatch: engine sees 2.524 m, manifest declares 0.03 m (ratio 84.15). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:35:05.445  [+20.5s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:35:06.129  [+21.2s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.13, 1.33, 0.11) trackingStatus=LIMITED reason=INITIALIZING
+20:35:06.454  [+21.5s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.166m pos=(-0.18, 0.31, 0.11) rot=(0.50, 0.48, 0.48, -0.55)
+20:35:06.454  [+21.5s] [ImageTarget] scale mismatch: engine sees 0.166 m, manifest declares 0.03 m (ratio 5.54). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:35:06.455  [+21.5s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:35:07.137  [+22.2s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.24, 1.25, 0.13) trackingStatus=LIMITED reason=INITIALIZING
+20:35:07.464  [+22.5s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.189m pos=(-0.29, 0.48, 0.12) rot=(0.68, 0.14, 0.18, -0.69)
+20:35:07.464  [+22.5s] [ImageTarget] scale mismatch: engine sees 0.189 m, manifest declares 0.03 m (ratio 6.30). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:35:07.464  [+22.5s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:35:08.155  [+23.2s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.24, 1.24, 0.09) trackingStatus=LIMITED reason=INITIALIZING
+20:35:08.276  [+23.3s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+20:35:08.348  [+23.4s] [ImageTarget] FOUND "site-tracking-front"
+  scale=1.104m pos=(-0.54, -2.86, 0.25) rot=(0.68, 0.17, 0.24, -0.67)
+  trackingStatus=LIMITED
+  re-detection REJECTED — see warning below — keeping previous anchor
+20:35:08.471  [+23.5s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=1.448m pos=(-0.56, -4.15, 0.03) rot=(0.54, 0.40, 0.48, -0.56)
+20:35:08.471  [+23.5s] [ImageTarget] scale mismatch: engine sees 1.448 m, manifest declares 0.03 m (ratio 48.26). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:35:08.471  [+23.5s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:35:08.687  [+23.7s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+20:35:08.752  [+23.8s] [ImageTarget] FOUND "site-tracking-front"
+  scale=3.055m pos=(-0.44, -9.17, -0.09) rot=(0.50, 0.45, 0.52, -0.52)
+  trackingStatus=LIMITED
+  re-detection REJECTED — see warning below — keeping previous anchor
+20:35:08.837  [+23.9s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+20:35:09.170  [+24.2s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.38, 1.31, 0.05) trackingStatus=LIMITED reason=INITIALIZING
+20:35:10.186  [+25.2s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.66, 1.43, 0.49) trackingStatus=LIMITED reason=INITIALIZING
+20:35:11.186  [+26.2s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.79, 1.64, 0.44) trackingStatus=LIMITED reason=INITIALIZING
+20:35:12.205  [+27.3s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.83, 2.21, 0.32) trackingStatus=LIMITED reason=INITIALIZING
+20:35:12.389  [+27.4s] [ImageTarget] FOUND "site-tracking-front"
+  scale=0.451m pos=(-0.83, 0.18, 0.38) rot=(0.65, -0.21, -0.21, -0.70)
+  trackingStatus=LIMITED
+  re-detection REJECTED — see warning below — keeping previous anchor
+20:35:12.390  [+27.4s] [ImageTarget] scale mismatch: engine sees 0.451 m, manifest declares 0.03 m (ratio 15.04). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:35:12.390  [+27.4s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:35:12.408  [+27.5s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.451m pos=(-0.82, 0.18, 0.38) rot=(0.65, -0.21, -0.22, -0.70)
+20:35:13.221  [+28.3s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.83, 2.18, 0.34) trackingStatus=LIMITED reason=INITIALIZING
+20:35:13.402  [+28.5s] [ImageTarget] scale mismatch: engine sees 0.315 m, manifest declares 0.03 m (ratio 10.50). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:35:13.402  [+28.5s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:35:13.423  [+28.5s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.314m pos=(-0.81, 0.79, 0.36) rot=(0.58, -0.37, -0.37, -0.62)
+20:35:14.231  [+29.3s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.80, 2.11, 0.39) trackingStatus=LIMITED reason=INITIALIZING
+20:35:14.404  [+29.5s] [ImageTarget] scale mismatch: engine sees 0.256 m, manifest declares 0.03 m (ratio 8.52). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:35:14.405  [+29.5s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:35:14.440  [+29.5s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.255m pos=(-0.83, 0.89, 0.39) rot=(0.59, -0.36, -0.34, -0.64)
+20:35:15.231  [+30.3s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.74, 2.18, 0.40) trackingStatus=LIMITED reason=INITIALIZING
+20:35:15.419  [+30.5s] [ImageTarget] scale mismatch: engine sees 0.217 m, manifest declares 0.03 m (ratio 7.23). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:35:15.420  [+30.5s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:35:15.440  [+30.5s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+20:35:15.513  [+30.6s] [ImageTarget] FOUND "site-tracking-front"
+  scale=0.217m pos=(-0.83, 1.04, 0.39) rot=(0.58, -0.37, -0.34, -0.64)
+  trackingStatus=LIMITED
+  re-detection REJECTED — see warning below — keeping previous anchor
+20:35:15.533  [+30.6s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.217m pos=(-0.82, 1.04, 0.39) rot=(0.59, -0.36, -0.34, -0.64)
+20:35:16.233  [+31.3s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.73, 2.18, 0.40) trackingStatus=LIMITED reason=INITIALIZING
+20:35:16.423  [+31.5s] [ImageTarget] scale mismatch: engine sees 0.209 m, manifest declares 0.03 m (ratio 6.96). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:35:16.423  [+31.5s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:35:16.535  [+31.6s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.209m pos=(-0.83, 1.06, 0.38) rot=(0.58, -0.37, -0.33, -0.64)
+20:35:17.235  [+32.3s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.72, 2.19, 0.40) trackingStatus=LIMITED reason=INITIALIZING
+20:35:17.431  [+32.5s] [ImageTarget] scale mismatch: engine sees 0.209 m, manifest declares 0.03 m (ratio 6.98). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:35:17.432  [+32.5s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:35:17.537  [+32.6s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.205m pos=(-0.82, 1.06, 0.38) rot=(0.59, -0.37, -0.33, -0.64)
+20:35:18.244  [+33.3s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.72, 2.24, 0.38) trackingStatus=LIMITED reason=INITIALIZING
+20:35:18.438  [+33.5s] [ImageTarget] scale mismatch: engine sees 0.206 m, manifest declares 0.03 m (ratio 6.87). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:35:18.439  [+33.5s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:35:18.539  [+33.6s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.205m pos=(-0.82, 1.09, 0.38) rot=(0.59, -0.37, -0.33, -0.64)
+20:35:19.256  [+34.3s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.71, 2.26, 0.41) trackingStatus=LIMITED reason=INITIALIZING
+20:35:19.440  [+34.5s] [ImageTarget] scale mismatch: engine sees 0.188 m, manifest declares 0.03 m (ratio 6.26). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:35:19.440  [+34.5s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:35:19.548  [+34.6s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.187m pos=(-0.82, 1.17, 0.38) rot=(0.59, -0.37, -0.34, -0.64)
+20:35:20.270  [+35.3s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.72, 2.29, 0.41) trackingStatus=LIMITED reason=INITIALIZING
+20:35:20.449  [+35.5s] [ImageTarget] scale mismatch: engine sees 0.186 m, manifest declares 0.03 m (ratio 6.18). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:35:20.450  [+35.5s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:35:20.554  [+35.6s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.183m pos=(-0.82, 1.26, 0.38) rot=(0.64, -0.28, -0.28, -0.66)
+20:35:21.288  [+36.3s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.71, 2.75, 0.45) trackingStatus=LIMITED reason=INITIALIZING
+20:35:21.456  [+36.5s] [ImageTarget] scale mismatch: engine sees 0.167 m, manifest declares 0.03 m (ratio 5.57). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:35:21.456  [+36.5s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:35:21.566  [+36.6s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.165m pos=(-0.82, 1.25, 0.37) rot=(0.63, -0.24, -0.31, -0.67)
+20:35:21.671  [+36.7s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+20:35:22.292  [+37.3s] [EightWallSession] camera (periodic, throttled 1/s) = (-1.29, 3.17, 0.50) trackingStatus=LIMITED reason=INITIALIZING
+20:35:23.301  [+38.4s] [EightWallSession] camera (periodic, throttled 1/s) = (-1.28, 3.26, 0.54) trackingStatus=LIMITED reason=INITIALIZING
+20:35:24.302  [+39.4s] [EightWallSession] camera (periodic, throttled 1/s) = (-1.31, 2.75, 0.40) trackingStatus=LIMITED reason=INITIALIZING
+20:35:24.450  [+39.5s] [ImageTarget] FOUND "site-tracking-front"
+  scale=0.328m pos=(-1.38, 0.33, 0.22) rot=(0.60, 0.26, 0.25, -0.71)
+  trackingStatus=LIMITED
+  re-detection REJECTED — see warning below — keeping previous anchor
+20:35:24.450  [+39.5s] [ImageTarget] scale mismatch: engine sees 0.328 m, manifest declares 0.03 m (ratio 10.93). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:35:24.450  [+39.5s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:35:24.468  [+39.5s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.335m pos=(-1.42, 0.33, 0.21) rot=(0.58, 0.32, 0.31, -0.69)
+20:35:24.503  [+39.6s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+20:35:24.809  [+39.9s] [ImageTarget] FOUND "site-tracking-front"
+  scale=0.470m pos=(-1.50, -0.07, 0.27) rot=(-0.48, -0.53, -0.55, 0.43)
+  trackingStatus=LIMITED
+  re-detection REJECTED — see warning below — keeping previous anchor
+20:35:25.318  [+40.4s] [EightWallSession] camera (periodic, throttled 1/s) = (-1.71, 2.55, 0.27) trackingStatus=LIMITED reason=INITIALIZING
+20:35:25.457  [+40.5s] [ImageTarget] scale mismatch: engine sees 1.073 m, manifest declares 0.03 m (ratio 35.78). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:35:25.457  [+40.5s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:35:25.474  [+40.5s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=3.152m pos=(-0.86, -11.03, -0.02) rot=(0.49, 0.54, 0.52, -0.45)
+20:35:26.157  [+41.2s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+20:35:26.323  [+41.4s] [EightWallSession] camera (periodic, throttled 1/s) = (-1.80, 2.32, -0.07) trackingStatus=LIMITED reason=INITIALIZING
+20:35:27.340  [+42.4s] [EightWallSession] camera (periodic, throttled 1/s) = (-1.03, 2.05, 0.18) trackingStatus=LIMITED reason=INITIALIZING
+20:35:28.352  [+43.4s] [EightWallSession] camera (periodic, throttled 1/s) = (-1.66, 2.01, 0.44) trackingStatus=LIMITED reason=INITIALIZING
+20:35:29.352  [+44.4s] [EightWallSession] camera (periodic, throttled 1/s) = (-1.70, 1.82, 0.22) trackingStatus=LIMITED reason=INITIALIZING
+20:35:30.368  [+45.4s] [EightWallSession] camera (periodic, throttled 1/s) = (-1.59, 2.49, 0.16) trackingStatus=LIMITED reason=INITIALIZING
+20:35:31.382  [+46.4s] [EightWallSession] camera (periodic, throttled 1/s) = (-1.37, 3.65, -0.47) trackingStatus=LIMITED reason=INITIALIZING
+20:35:32.386  [+47.4s] [EightWallSession] camera (periodic, throttled 1/s) = (-1.96, 4.90, -0.48) trackingStatus=LIMITED reason=INITIALIZING
+20:35:33.399  [+48.5s] [EightWallSession] camera (periodic, throttled 1/s) = (-2.01, 4.96, -0.59) trackingStatus=LIMITED reason=INITIALIZING
+20:35:34.406  [+49.5s] [EightWallSession] camera (periodic, throttled 1/s) = (-1.83, 9.45, 0.41) trackingStatus=LIMITED reason=INITIALIZING
+20:35:34.920  [+50.0s] [ImageTarget] FOUND "site-tracking-front"
+  scale=0.652m pos=(-1.95, 7.19, 0.49) rot=(0.34, -0.59, -0.63, -0.37)
+  trackingStatus=LIMITED
+  re-detection REJECTED — see warning below — keeping previous anchor
+20:35:34.920  [+50.0s] [ImageTarget] scale mismatch: engine sees 0.652 m, manifest declares 0.03 m (ratio 21.73). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:35:34.920  [+50.0s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:35:34.941  [+50.0s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.658m pos=(-1.94, 7.14, 0.49) rot=(0.34, -0.59, -0.63, -0.37)
+20:35:35.417  [+50.5s] [EightWallSession] camera (periodic, throttled 1/s) = (-1.85, 11.35, 0.20) trackingStatus=LIMITED reason=INITIALIZING
+20:35:35.927  [+51.0s] [ImageTarget] scale mismatch: engine sees 0.526 m, manifest declares 0.03 m (ratio 17.53). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:35:35.927  [+51.0s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:35:35.945  [+51.0s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.597m pos=(-1.98, 7.23, 0.50) rot=(0.22, -0.66, -0.67, -0.26)
+20:35:36.430  [+51.5s] [EightWallSession] camera (periodic, throttled 1/s) = (-1.81, 11.90, 0.20) trackingStatus=LIMITED reason=INITIALIZING
+20:35:36.939  [+52.0s] [ImageTarget] scale mismatch: engine sees 0.344 m, manifest declares 0.03 m (ratio 11.46). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:35:36.940  [+52.0s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:35:36.957  [+52.0s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.344m pos=(-1.97, 8.95, 0.44) rot=(-0.22, 0.67, 0.65, 0.28)
+20:35:37.430  [+52.5s] [EightWallSession] camera (periodic, throttled 1/s) = (-1.67, 12.27, 0.07) trackingStatus=LIMITED reason=INITIALIZING
+20:35:37.627  [+52.7s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+20:35:37.776  [+52.8s] [ImageTarget] FOUND "site-tracking-front"
+  scale=0.274m pos=(-1.86, 9.67, 0.32) rot=(-0.30, 0.64, 0.62, 0.35)
+  trackingStatus=LIMITED
+  re-detection REJECTED — see warning below — keeping previous anchor
+20:35:37.942  [+53.0s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+20:35:38.458  [+53.5s] [EightWallSession] camera (periodic, throttled 1/s) = (-1.47, 14.28, -0.40) trackingStatus=LIMITED reason=INITIALIZING
+20:35:39.462  [+54.5s] [EightWallSession] camera (periodic, throttled 1/s) = (-1.55, 14.32, -0.44) trackingStatus=LIMITED reason=INITIALIZING
+20:35:40.475  [+55.5s] [EightWallSession] camera (periodic, throttled 1/s) = (-1.57, 17.68, -0.89) trackingStatus=LIMITED reason=INITIALIZING
+20:35:41.483  [+56.5s] [EightWallSession] camera (periodic, throttled 1/s) = (-2.95, 14.78, 0.52) trackingStatus=LIMITED reason=INITIALIZING
+20:35:42.049  [+57.1s] [ImageTarget] FOUND "site-tracking-front"
+  scale=0.552m pos=(-2.89, 8.22, 2.08) rot=(0.03, -0.70, -0.71, -0.08)
+  trackingStatus=LIMITED
+  re-detection REJECTED — see warning below — keeping previous anchor
+20:35:42.049  [+57.1s] [ImageTarget] scale mismatch: engine sees 0.552 m, manifest declares 0.03 m (ratio 18.40). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:35:42.049  [+57.1s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:35:42.068  [+57.1s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.570m pos=(-2.89, 8.10, 2.14) rot=(0.03, -0.70, -0.71, -0.09)
+20:35:42.168  [+57.2s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+20:35:42.450  [+57.5s] [ImageTarget] FOUND "site-tracking-front"
+  scale=1.425m pos=(-3.20, 1.99, 4.08) rot=(-0.16, 0.68, 0.68, 0.21)
+  trackingStatus=LIMITED
+  re-detection REJECTED — see warning below — keeping previous anchor
+20:35:42.500  [+57.6s] [EightWallSession] camera (periodic, throttled 1/s) = (-1.95, 12.25, 1.16) trackingStatus=LIMITED reason=INITIALIZING
+20:35:43.062  [+58.1s] [ImageTarget] scale mismatch: engine sees 0.964 m, manifest declares 0.03 m (ratio 32.12). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:35:43.062  [+58.1s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:35:43.082  [+58.1s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.963m pos=(-2.75, 5.94, 3.00) rot=(0.21, -0.67, -0.67, -0.25)
+20:35:43.516  [+58.6s] [EightWallSession] camera (periodic, throttled 1/s) = (-1.57, 11.09, 2.00) trackingStatus=LIMITED reason=INITIALIZING
+20:35:44.065  [+59.1s] [ImageTarget] scale mismatch: engine sees 0.948 m, manifest declares 0.03 m (ratio 31.60). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:35:44.066  [+59.1s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:35:44.084  [+59.1s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.951m pos=(-2.56, 6.80, 2.89) rot=(0.37, -0.58, -0.59, -0.43)
+20:35:44.262  [+59.3s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+20:35:44.403  [+59.5s] [ImageTarget] FOUND "site-tracking-front"
+  scale=0.419m pos=(-1.82, 9.26, 2.52) rot=(0.37, -0.58, -0.58, -0.43)
+  trackingStatus=LIMITED
+  re-detection REJECTED — see warning below — keeping previous anchor
+20:35:44.531  [+59.6s] [EightWallSession] camera (periodic, throttled 1/s) = (-1.48, 11.07, 2.35) trackingStatus=LIMITED reason=INITIALIZING
+20:35:45.075  [+60.1s] [ImageTarget] scale mismatch: engine sees 0.395 m, manifest declares 0.03 m (ratio 13.18). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:35:45.075  [+60.1s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:35:45.094  [+60.2s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.390m pos=(-1.76, 9.42, 2.54) rot=(0.55, -0.42, -0.47, -0.55)
+20:35:45.110  [+60.2s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+20:35:45.231  [+60.3s] [ImageTarget] FOUND "site-tracking-front"
+  scale=0.401m pos=(-1.75, 9.42, 2.54) rot=(0.55, -0.42, -0.46, -0.55)
+  trackingStatus=LIMITED
+  re-detection REJECTED — see warning below — keeping previous anchor
+20:35:45.544  [+60.6s] [EightWallSession] camera (periodic, throttled 1/s) = (-1.48, 10.85, 2.56) trackingStatus=LIMITED reason=INITIALIZING
+20:35:46.086  [+61.1s] [ImageTarget] scale mismatch: engine sees 0.373 m, manifest declares 0.03 m (ratio 12.42). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:35:46.086  [+61.1s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:35:46.104  [+61.2s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.373m pos=(-1.91, 9.30, 2.58) rot=(-0.00, 0.72, 0.69, 0.06)
+20:35:46.549  [+61.6s] [EightWallSession] camera (periodic, throttled 1/s) = (-1.94, 11.09, 2.28) trackingStatus=LIMITED reason=INITIALIZING
+20:35:47.100  [+62.2s] [ImageTarget] scale mismatch: engine sees 0.364 m, manifest declares 0.03 m (ratio 12.12). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:35:47.100  [+62.2s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:35:47.121  [+62.2s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.346m pos=(-1.94, 9.44, 2.64) rot=(0.24, 0.69, 0.66, -0.19)
+20:35:47.212  [+62.3s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+20:35:47.550  [+62.6s] [EightWallSession] camera (periodic, throttled 1/s) = (-2.66, 11.69, 2.38) trackingStatus=LIMITED reason=INITIALIZING
+20:35:48.558  [+63.6s] [EightWallSession] camera (periodic, throttled 1/s) = (-1.26, 13.42, 3.31) trackingStatus=LIMITED reason=INITIALIZING
+20:35:49.566  [+64.6s] [EightWallSession] camera (periodic, throttled 1/s) = (-1.19, 13.90, 3.40) trackingStatus=LIMITED reason=INITIALIZING
+20:35:50.575  [+65.6s] [EightWallSession] camera (periodic, throttled 1/s) = (-1.27, 13.43, 3.28) trackingStatus=LIMITED reason=INITIALIZING
+20:35:51.584  [+66.6s] [EightWallSession] camera (periodic, throttled 1/s) = (-1.48, 12.53, 2.78) trackingStatus=LIMITED reason=INITIALIZING
+20:35:52.599  [+67.7s] [EightWallSession] camera (periodic, throttled 1/s) = (-1.61, 12.36, 2.74) trackingStatus=LIMITED reason=INITIALIZING
+20:35:53.616  [+68.7s] [EightWallSession] camera (periodic, throttled 1/s) = (-1.81, 12.59, 2.82) trackingStatus=LIMITED reason=INITIALIZING
+20:35:54.616  [+69.7s] [EightWallSession] camera (periodic, throttled 1/s) = (-1.89, 12.84, 2.78) trackingStatus=LIMITED reason=INITIALIZING
+20:35:55.626  [+70.7s] [EightWallSession] camera (periodic, throttled 1/s) = (-1.87, 14.19, 2.51) trackingStatus=LIMITED reason=INITIALIZING
+20:35:56.634  [+71.7s] [EightWallSession] camera (periodic, throttled 1/s) = (3.29, 16.79, 1.76) trackingStatus=LIMITED reason=INITIALIZING
+20:35:56.868  [+71.9s] [ImageTarget] FOUND "site-tracking-front"
+  scale=2.239m pos=(1.06, 5.49, 2.77) rot=(-0.37, 0.71, 0.39, 0.47)
+  trackingStatus=LIMITED
+  re-detection REJECTED — see warning below — keeping previous anchor
+20:35:56.869  [+71.9s] [ImageTarget] scale mismatch: engine sees 2.239 m, manifest declares 0.03 m (ratio 74.64). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:35:56.869  [+71.9s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:35:56.884  [+71.9s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=2.237m pos=(1.06, 5.49, 2.77) rot=(-0.37, 0.71, 0.39, 0.47)
+20:35:57.646  [+72.7s] [EightWallSession] camera (periodic, throttled 1/s) = (3.19, 17.63, 1.84) trackingStatus=LIMITED reason=INITIALIZING
+20:35:57.877  [+72.9s] [ImageTarget] scale mismatch: engine sees 2.637 m, manifest declares 0.03 m (ratio 87.89). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:35:57.878  [+72.9s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:35:57.895  [+73.0s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=2.636m pos=(0.50, 2.86, 3.03) rot=(-0.38, 0.66, 0.44, 0.47)
+20:35:58.665  [+73.7s] [EightWallSession] camera (periodic, throttled 1/s) = (3.28, 17.53, 1.72) trackingStatus=LIMITED reason=INITIALIZING
+20:35:58.894  [+74.0s] [ImageTarget] scale mismatch: engine sees 2.009 m, manifest declares 0.03 m (ratio 66.98). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:35:58.895  [+74.0s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:35:58.911  [+74.0s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=2.014m pos=(0.87, 5.83, 2.85) rot=(-0.37, 0.67, 0.43, 0.47)
+20:35:58.970  [+74.0s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+20:35:59.169  [+74.2s] [ImageTarget] FOUND "site-tracking-front"
+  scale=1.772m pos=(0.90, 6.35, 2.87) rot=(-0.35, 0.69, 0.41, 0.49)
+  trackingStatus=LIMITED
+  re-detection REJECTED — see warning below — keeping previous anchor
+20:35:59.611  [+74.7s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+20:35:59.683  [+74.7s] [EightWallSession] camera (periodic, throttled 1/s) = (4.89, 18.44, 1.32) trackingStatus=LIMITED reason=INITIALIZING
+20:35:59.718  [+74.8s] [ImageTarget] FOUND "site-tracking-front"
+  scale=1.458m pos=(1.23, 7.82, 2.72) rot=(0.30, -0.73, -0.35, -0.51)
+  trackingStatus=LIMITED
+  re-detection REJECTED — see warning below — keeping previous anchor
+20:35:59.886  [+74.9s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+20:36:00.081  [+75.1s] [ImageTarget] FOUND "site-tracking-front"
+  scale=1.804m pos=(0.47, 5.51, 3.00) rot=(0.24, -0.76, -0.29, -0.53)
+  trackingStatus=LIMITED
+  re-detection REJECTED — see warning below — keeping previous anchor
+20:36:00.082  [+75.1s] [ImageTarget] scale mismatch: engine sees 1.804 m, manifest declares 0.03 m (ratio 60.13). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:36:00.082  [+75.1s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:36:00.106  [+75.2s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=1.829m pos=(0.39, 5.39, 3.01) rot=(0.23, -0.76, -0.29, -0.53)
+20:36:00.696  [+75.8s] [EightWallSession] camera (periodic, throttled 1/s) = (4.60, 12.08, 1.52) trackingStatus=LIMITED reason=INITIALIZING
+20:36:01.094  [+76.2s] [ImageTarget] scale mismatch: engine sees 2.750 m, manifest declares 0.03 m (ratio 91.67). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:36:01.095  [+76.2s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:36:01.113  [+76.2s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=2.759m pos=(-1.56, 0.23, 3.48) rot=(0.17, -0.77, -0.27, -0.55)
+20:36:01.393  [+76.4s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+20:36:01.711  [+76.8s] [EightWallSession] camera (periodic, throttled 1/s) = (2.01, 10.32, 2.76) trackingStatus=LIMITED reason=INITIALIZING
+20:36:02.118  [+77.2s] [ImageTarget] FOUND "site-tracking-front"
+  scale=13.708m pos=(0.69, -46.41, 7.95) rot=(0.24, 0.67, 0.62, -0.33)
+  trackingStatus=LIMITED
+  re-detection REJECTED — see warning below — keeping previous anchor
+20:36:02.119  [+77.2s] [ImageTarget] scale mismatch: engine sees 13.708 m, manifest declares 0.03 m (ratio 456.94). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:36:02.119  [+77.2s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:36:02.135  [+77.2s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=11.335m pos=(0.17, -36.64, 7.08) rot=(0.16, 0.70, 0.64, -0.26)
+20:36:02.244  [+77.3s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+20:36:02.718  [+77.8s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.15, 11.70, 3.90) trackingStatus=LIMITED reason=INITIALIZING
+20:36:03.164  [+78.2s] [ImageTarget] FOUND "site-tracking-front"
+  scale=2.969m pos=(0.19, -0.56, 4.64) rot=(0.15, 0.74, 0.61, -0.24)
+  trackingStatus=LIMITED
+  re-detection REJECTED — see warning below — keeping previous anchor
+20:36:03.165  [+78.2s] [ImageTarget] scale mismatch: engine sees 2.969 m, manifest declares 0.03 m (ratio 98.98). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:36:03.165  [+78.2s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:36:03.186  [+78.2s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=3.544m pos=(0.38, -3.14, 4.76) rot=(0.15, 0.74, 0.61, -0.24)
+20:36:03.722  [+78.8s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.82, 12.98, 3.86) trackingStatus=LIMITED reason=INITIALIZING
+20:36:04.172  [+79.2s] [ImageTarget] scale mismatch: engine sees 0.661 m, manifest declares 0.03 m (ratio 22.04). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:36:04.173  [+79.2s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:36:04.193  [+79.3s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.659m pos=(-0.55, 9.94, 4.10) rot=(0.12, 0.74, 0.61, -0.24)
+20:36:04.734  [+79.8s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.70, 12.60, 3.98) trackingStatus=LIMITED reason=INITIALIZING
+20:36:05.184  [+80.2s] [ImageTarget] scale mismatch: engine sees 0.634 m, manifest declares 0.03 m (ratio 21.14). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:36:05.185  [+80.2s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:36:05.203  [+80.3s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.619m pos=(-0.37, 9.05, 4.17) rot=(0.09, 0.75, 0.63, -0.19)
+20:36:05.277  [+80.3s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+20:36:05.401  [+80.5s] [ImageTarget] FOUND "site-tracking-front"
+  scale=0.848m pos=(-0.26, 7.85, 4.26) rot=(0.09, 0.74, 0.64, -0.18)
+  trackingStatus=LIMITED
+  re-detection REJECTED — see warning below — keeping previous anchor
+20:36:05.453  [+80.5s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+20:36:05.736  [+80.8s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.39, 10.04, 3.94) trackingStatus=LIMITED reason=INITIALIZING
+20:36:06.752  [+81.8s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.05, 8.90, 3.99) trackingStatus=LIMITED reason=INITIALIZING
+20:36:07.752  [+82.8s] [EightWallSession] camera (periodic, throttled 1/s) = (0.62, 9.06, 4.08) trackingStatus=LIMITED reason=INITIALIZING
+20:36:08.768  [+83.8s] [EightWallSession] camera (periodic, throttled 1/s) = (0.56, 9.24, 3.88) trackingStatus=LIMITED reason=INITIALIZING
+20:36:09.781  [+84.8s] [EightWallSession] camera (periodic, throttled 1/s) = (0.14, 10.95, 3.26) trackingStatus=LIMITED reason=INITIALIZING
+20:36:10.197  [+85.3s] [ImageTarget] FOUND "site-tracking-front"
+  scale=1.006m pos=(0.21, 7.59, 4.12) rot=(0.06, 0.83, 0.53, -0.17)
+  trackingStatus=LIMITED
+  re-detection REJECTED — see warning below — keeping previous anchor
+20:36:10.198  [+85.3s] [ImageTarget] scale mismatch: engine sees 1.006 m, manifest declares 0.03 m (ratio 33.53). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:36:10.198  [+85.3s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:36:10.217  [+85.3s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=1.014m pos=(0.21, 7.59, 4.13) rot=(0.06, 0.83, 0.53, -0.17)
+20:36:10.792  [+85.8s] [EightWallSession] camera (periodic, throttled 1/s) = (-1.04, 13.93, 5.63) trackingStatus=LIMITED reason=INITIALIZING
+20:36:11.207  [+86.3s] [ImageTarget] scale mismatch: engine sees 1.197 m, manifest declares 0.03 m (ratio 39.91). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:36:11.208  [+86.3s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:36:11.228  [+86.3s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=1.195m pos=(0.17, 7.78, 4.56) rot=(0.47, 0.36, 0.26, -0.76)
+20:36:11.804  [+86.9s] [EightWallSession] camera (periodic, throttled 1/s) = (-1.20, 14.42, 5.61) trackingStatus=LIMITED reason=INITIALIZING
+20:36:12.209  [+87.3s] [ImageTarget] scale mismatch: engine sees 1.473 m, manifest declares 0.03 m (ratio 49.11). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:36:12.209  [+87.3s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:36:12.242  [+87.3s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=1.553m pos=(0.69, 5.56, 4.19) rot=(0.46, 0.38, 0.27, -0.75)
+20:36:12.817  [+87.9s] [EightWallSession] camera (periodic, throttled 1/s) = (-1.73, 14.98, 4.50) trackingStatus=LIMITED reason=INITIALIZING
+20:36:13.214  [+88.3s] [ImageTarget] scale mismatch: engine sees 1.515 m, manifest declares 0.03 m (ratio 50.50). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:36:13.215  [+88.3s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:36:13.250  [+88.3s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=1.517m pos=(-0.06, 6.06, 3.30) rot=(0.05, 0.84, 0.53, -0.12)
+20:36:13.822  [+88.9s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.78, 16.90, 0.31) trackingStatus=LIMITED reason=INITIALIZING
+20:36:14.230  [+89.3s] [ImageTarget] scale mismatch: engine sees 1.492 m, manifest declares 0.03 m (ratio 49.74). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:36:14.230  [+89.3s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:36:14.267  [+89.3s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=1.487m pos=(-0.00, 5.85, 3.36) rot=(0.03, 0.85, 0.51, -0.13)
+20:36:14.832  [+89.9s] [EightWallSession] camera (periodic, throttled 1/s) = (-1.06, 18.11, -0.12) trackingStatus=LIMITED reason=INITIALIZING
+20:36:15.238  [+90.3s] [ImageTarget] scale mismatch: engine sees 1.437 m, manifest declares 0.03 m (ratio 47.90). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:36:15.238  [+90.3s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:36:15.275  [+90.3s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=1.392m pos=(0.10, 5.96, 3.54) rot=(0.02, 0.86, 0.50, -0.12)
+20:36:15.850  [+90.9s] [EightWallSession] camera (periodic, throttled 1/s) = (-1.14, 18.88, -0.25) trackingStatus=LIMITED reason=INITIALIZING
+20:36:16.240  [+91.3s] [ImageTarget] scale mismatch: engine sees 1.404 m, manifest declares 0.03 m (ratio 46.81). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:36:16.241  [+91.3s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:36:16.282  [+91.3s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=1.265m pos=(0.07, 6.50, 3.56) rot=(-0.00, 0.86, 0.50, -0.13)
+20:36:16.857  [+91.9s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.54, 19.91, -0.48) trackingStatus=LIMITED reason=INITIALIZING
+20:36:17.256  [+92.3s] [ImageTarget] scale mismatch: engine sees 1.148 m, manifest declares 0.03 m (ratio 38.26). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:36:17.257  [+92.3s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:36:17.293  [+92.3s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=1.147m pos=(-0.05, 7.19, 3.40) rot=(-0.02, 0.87, 0.49, -0.08)
+20:36:17.872  [+92.9s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.43, 20.60, -0.86) trackingStatus=LIMITED reason=INITIALIZING
+20:36:18.272  [+93.3s] [ImageTarget] scale mismatch: engine sees 1.021 m, manifest declares 0.03 m (ratio 34.03). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:36:18.273  [+93.3s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:36:18.314  [+93.4s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+20:36:18.405  [+93.5s] [ImageTarget] FOUND "site-tracking-front"
+  scale=0.963m pos=(-0.03, 8.82, 3.10) rot=(-0.01, 0.89, 0.46, -0.06)
+  trackingStatus=LIMITED
+  re-detection REJECTED — see warning below — keeping previous anchor
+20:36:18.422  [+93.5s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.965m pos=(-0.02, 8.82, 3.11) rot=(-0.01, 0.89, 0.46, -0.06)
+20:36:18.439  [+93.5s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+20:36:18.530  [+93.6s] [ImageTarget] FOUND "site-tracking-front"
+  scale=1.032m pos=(0.01, 7.97, 3.40) rot=(-0.02, 0.89, 0.46, -0.05)
+  trackingStatus=LIMITED
+  re-detection REJECTED — see warning below — keeping previous anchor
+20:36:18.672  [+93.7s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+20:36:18.739  [+93.8s] [ImageTarget] FOUND "site-tracking-front"
+  scale=1.009m pos=(-0.07, 7.87, 3.50) rot=(-0.02, 0.89, 0.46, -0.06)
+  trackingStatus=LIMITED
+  re-detection REJECTED — see warning below — keeping previous anchor
+20:36:18.846  [+93.9s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+20:36:18.888  [+93.9s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.06, 22.11, -1.58) trackingStatus=LIMITED reason=INITIALIZING
+20:36:18.923  [+94.0s] [ImageTarget] FOUND "site-tracking-front"
+  scale=1.017m pos=(-0.04, 7.79, 3.54) rot=(-0.02, 0.88, 0.47, -0.04)
+  trackingStatus=LIMITED
+  re-detection REJECTED — see warning below — keeping previous anchor
+20:36:18.940  [+94.0s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+20:36:19.047  [+94.1s] [ImageTarget] FOUND "site-tracking-front"
+  scale=1.015m pos=(-0.08, 7.94, 3.50) rot=(-0.02, 0.88, 0.46, -0.04)
+  trackingStatus=LIMITED
+  re-detection REJECTED — see warning below — keeping previous anchor
+20:36:19.104  [+94.2s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+20:36:19.173  [+94.2s] [ImageTarget] FOUND "site-tracking-front"
+  scale=1.049m pos=(-0.07, 7.26, 3.70) rot=(-0.02, 0.89, 0.46, -0.05)
+  trackingStatus=LIMITED
+  re-detection REJECTED — see warning below — keeping previous anchor
+20:36:19.286  [+94.3s] [ImageTarget] scale mismatch: engine sees 1.061 m, manifest declares 0.03 m (ratio 35.35). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:36:19.286  [+94.3s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:36:19.434  [+94.5s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.980m pos=(-0.06, 8.27, 3.35) rot=(-0.01, 0.89, 0.46, -0.05)
+20:36:19.907  [+95.0s] [EightWallSession] camera (periodic, throttled 1/s) = (0.04, 22.65, -1.76) trackingStatus=LIMITED reason=INITIALIZING
+20:36:20.299  [+95.4s] [ImageTarget] scale mismatch: engine sees 0.985 m, manifest declares 0.03 m (ratio 32.83). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:36:20.300  [+95.4s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:36:20.441  [+95.5s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+20:36:20.573  [+95.6s] [ImageTarget] FOUND "site-tracking-front"
+  scale=0.972m pos=(-0.08, 8.23, 3.36) rot=(-0.02, 0.88, 0.47, -0.04)
+  trackingStatus=LIMITED
+  re-detection REJECTED — see warning below — keeping previous anchor
+20:36:20.592  [+95.6s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.970m pos=(-0.08, 8.23, 3.36) rot=(-0.01, 0.88, 0.47, -0.04)
+20:36:20.924  [+96.0s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.01, 21.22, -0.87) trackingStatus=LIMITED reason=INITIALIZING
+20:36:21.307  [+96.4s] [ImageTarget] scale mismatch: engine sees 1.159 m, manifest declares 0.03 m (ratio 38.63). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:36:21.308  [+96.4s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:36:21.606  [+96.7s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=1.238m pos=(-0.17, 5.24, 4.89) rot=(-0.18, 0.83, 0.46, 0.25)
+20:36:21.934  [+97.0s] [EightWallSession] camera (periodic, throttled 1/s) = (4.62, 21.68, 1.81) trackingStatus=LIMITED reason=INITIALIZING
+20:36:22.314  [+97.4s] [ImageTarget] scale mismatch: engine sees 1.382 m, manifest declares 0.03 m (ratio 46.07). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:36:22.314  [+97.4s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:36:22.607  [+97.7s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=1.379m pos=(-0.09, 4.32, 4.62) rot=(0.33, -0.69, -0.36, -0.53)
+20:36:22.940  [+98.0s] [EightWallSession] camera (periodic, throttled 1/s) = (5.66, 21.82, 3.21) trackingStatus=LIMITED reason=INITIALIZING
+20:36:23.327  [+98.4s] [ImageTarget] scale mismatch: engine sees 1.432 m, manifest declares 0.03 m (ratio 47.73). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:36:23.328  [+98.4s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:36:23.609  [+98.7s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=1.438m pos=(-0.23, 3.91, 4.61) rot=(0.33, -0.69, -0.36, -0.53)
+20:36:23.953  [+99.0s] [EightWallSession] camera (periodic, throttled 1/s) = (5.67, 21.79, 3.26) trackingStatus=LIMITED reason=INITIALIZING
+20:36:24.333  [+99.4s] [ImageTarget] scale mismatch: engine sees 1.450 m, manifest declares 0.03 m (ratio 48.35). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:36:24.334  [+99.4s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:36:24.610  [+99.7s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=1.471m pos=(-0.22, 3.88, 4.52) rot=(0.34, -0.69, -0.36, -0.53)
+20:36:24.968  [+100.0s] [EightWallSession] camera (periodic, throttled 1/s) = (5.41, 21.21, 3.19) trackingStatus=LIMITED reason=INITIALIZING
+20:36:25.341  [+100.4s] [ImageTarget] scale mismatch: engine sees 1.497 m, manifest declares 0.03 m (ratio 49.89). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:36:25.342  [+100.4s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:36:25.624  [+100.7s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=1.503m pos=(-0.14, 3.90, 4.56) rot=(0.34, -0.69, -0.36, -0.53)
+20:36:25.982  [+101.0s] [EightWallSession] camera (periodic, throttled 1/s) = (5.17, 20.90, 2.98) trackingStatus=LIMITED reason=INITIALIZING
+20:36:26.355  [+101.4s] [ImageTarget] scale mismatch: engine sees 1.480 m, manifest declares 0.03 m (ratio 49.34). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:36:26.355  [+101.4s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:36:26.640  [+101.7s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=1.627m pos=(-0.20, 3.31, 4.64) rot=(0.35, -0.68, -0.36, -0.53)
+20:36:26.988  [+102.0s] [EightWallSession] camera (periodic, throttled 1/s) = (4.98, 20.49, 2.68) trackingStatus=LIMITED reason=INITIALIZING
+20:36:27.357  [+102.4s] [ImageTarget] scale mismatch: engine sees 1.615 m, manifest declares 0.03 m (ratio 53.84). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:36:27.358  [+102.4s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:36:27.651  [+102.7s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=1.439m pos=(0.74, 5.97, 4.30) rot=(0.36, -0.69, -0.36, -0.51)
+20:36:28.002  [+103.1s] [EightWallSession] camera (periodic, throttled 1/s) = (4.89, 19.63, 3.08) trackingStatus=LIMITED reason=INITIALIZING
+20:36:28.108  [+103.2s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+20:36:28.250  [+103.3s] [ImageTarget] FOUND "site-tracking-front"
+  scale=1.664m pos=(0.49, 5.41, 3.96) rot=(0.34, -0.69, -0.36, -0.53)
+  trackingStatus=LIMITED
+  re-detection REJECTED — see warning below — keeping previous anchor
+20:36:28.310  [+103.4s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+20:36:29.016  [+104.1s] [EightWallSession] camera (periodic, throttled 1/s) = (4.16, 17.63, 4.28) trackingStatus=LIMITED reason=INITIALIZING
+20:36:29.106  [+104.2s] [ImageTarget] FOUND "site-tracking-front"
+  scale=2.425m pos=(1.68, 4.17, 4.05) rot=(0.53, -0.43, -0.48, -0.55)
+  trackingStatus=LIMITED
+  re-detection REJECTED — see warning below — keeping previous anchor
+20:36:29.106  [+104.2s] [ImageTarget] scale mismatch: engine sees 2.425 m, manifest declares 0.03 m (ratio 80.82). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:36:29.107  [+104.2s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:36:29.126  [+104.2s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=2.416m pos=(1.69, 4.16, 4.03) rot=(0.53, -0.43, -0.48, -0.55)
+20:36:30.024  [+105.1s] [EightWallSession] camera (periodic, throttled 1/s) = (4.18, 16.12, 3.83) trackingStatus=LIMITED reason=INITIALIZING
+20:36:30.117  [+105.2s] [ImageTarget] scale mismatch: engine sees 1.979 m, manifest declares 0.03 m (ratio 65.96). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:36:30.118  [+105.2s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:36:30.136  [+105.2s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=2.036m pos=(2.77, 8.11, 4.30) rot=(0.47, -0.48, -0.49, -0.55)
+20:36:30.334  [+105.4s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+20:36:30.553  [+105.6s] [ImageTarget] FOUND "site-tracking-front"
+  scale=1.992m pos=(2.58, 6.48, 4.96) rot=(0.46, -0.51, -0.52, -0.50)
+  trackingStatus=LIMITED
+  re-detection REJECTED — see warning below — keeping previous anchor
+20:36:30.611  [+105.7s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+20:36:30.696  [+105.8s] [ImageTarget] FOUND "site-tracking-front"
+  scale=2.435m pos=(1.74, 2.74, 5.19) rot=(0.45, -0.51, -0.53, -0.51)
+  trackingStatus=LIMITED
+  re-detection REJECTED — see warning below — keeping previous anchor
+20:36:31.041  [+106.1s] [EightWallSession] camera (periodic, throttled 1/s) = (4.96, 19.78, 4.59) trackingStatus=LIMITED reason=INITIALIZING
+20:36:31.130  [+106.2s] [ImageTarget] scale mismatch: engine sees 1.810 m, manifest declares 0.03 m (ratio 60.34). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:36:31.130  [+106.2s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:36:31.152  [+106.2s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=1.809m pos=(2.21, 6.47, 5.01) rot=(0.44, -0.52, -0.51, -0.52)
+20:36:31.437  [+106.5s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+20:36:31.591  [+106.6s] [ImageTarget] FOUND "site-tracking-front"
+  scale=2.802m pos=(0.52, -1.13, 5.26) rot=(0.47, -0.49, -0.52, -0.52)
+  trackingStatus=LIMITED
+  re-detection REJECTED — see warning below — keeping previous anchor
+20:36:31.770  [+106.8s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+20:36:32.048  [+107.1s] [EightWallSession] camera (periodic, throttled 1/s) = (3.06, 21.91, 5.02) trackingStatus=LIMITED reason=INITIALIZING
+20:36:32.123  [+107.2s] [ImageTarget] FOUND "site-tracking-front"
+  scale=1.733m pos=(2.70, 8.79, 5.40) rot=(0.39, -0.61, -0.47, -0.50)
+  trackingStatus=LIMITED
+  re-detection REJECTED — see warning below — keeping previous anchor
+20:36:32.143  [+107.2s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+20:36:32.228  [+107.3s] [ImageTarget] FOUND "site-tracking-front"
+  scale=1.644m pos=(2.57, 9.74, 5.45) rot=(-0.43, 0.56, 0.53, 0.47)
+  trackingStatus=LIMITED
+  re-detection REJECTED — see warning below — keeping previous anchor
+20:36:32.229  [+107.3s] [ImageTarget] scale mismatch: engine sees 1.644 m, manifest declares 0.03 m (ratio 54.80). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:36:32.229  [+107.3s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:36:32.244  [+107.3s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=1.663m pos=(2.53, 9.61, 5.45) rot=(-0.44, 0.56, 0.53, 0.47)
+20:36:33.062  [+108.1s] [EightWallSession] camera (periodic, throttled 1/s) = (2.53, 21.86, 5.07) trackingStatus=LIMITED reason=INITIALIZING
+20:36:33.171  [+108.2s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+20:36:33.695  [+108.8s] [ImageTarget] FOUND "site-tracking-front"
+  scale=4.584m pos=(-0.30, -16.37, 5.79) rot=(0.74, -0.00, -0.12, -0.66)
+  trackingStatus=LIMITED
+  re-detection REJECTED — see warning below — keeping previous anchor
+20:36:33.696  [+108.8s] [ImageTarget] scale mismatch: engine sees 4.584 m, manifest declares 0.03 m (ratio 152.80). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:36:33.697  [+108.8s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:36:33.717  [+108.8s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=3.717m pos=(1.52, -10.04, 5.12) rot=(0.73, 0.20, 0.13, -0.63)
+20:36:34.078  [+109.1s] [EightWallSession] camera (periodic, throttled 1/s) = (0.81, 21.29, 8.71) trackingStatus=LIMITED reason=INITIALIZING
+20:36:34.716  [+109.8s] [ImageTarget] scale mismatch: engine sees 5.346 m, manifest declares 0.03 m (ratio 178.21). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:36:34.716  [+109.8s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:36:34.737  [+109.8s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=4.410m pos=(2.39, -17.81, 3.99) rot=(0.67, 0.21, 0.15, -0.70)
+20:36:35.080  [+110.1s] [EightWallSession] camera (periodic, throttled 1/s) = (1.16, 21.61, 8.31) trackingStatus=LIMITED reason=INITIALIZING
+20:36:35.720  [+110.8s] [ImageTarget] scale mismatch: engine sees 3.497 m, manifest declares 0.03 m (ratio 116.56). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:36:35.721  [+110.8s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+20:36:35.753  [+110.8s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=3.497m pos=(7.09, -14.68, 6.41) rot=(0.53, 0.50, 0.43, -0.53)
+20:36:35.912  [+111.0s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+20:36:36.089  [+111.1s] [EightWallSession] camera (periodic, throttled 1/s) = (0.85, 21.21, 8.71) trackingStatus=LIMITED reason=INITIALIZING
+20:36:37.092  [+112.1s] [EightWallSession] camera (periodic, throttled 1/s) = (1.20, 22.71, 8.85) trackingStatus=LIMITED reason=INITIALIZING
+20:36:38.103  [+113.2s] [EightWallSession] camera (periodic, throttled 1/s) = (1.62, 24.07, 8.88) trackingStatus=LIMITED reason=INITIALIZING
+20:36:39.112  [+114.2s] [EightWallSession] camera (periodic, throttled 1/s) = (0.41, 19.67, 8.70) trackingStatus=LIMITED reason=INITIALIZING
+20:36:40.079  [+115.1s] [TrackingStatus] NORMAL reason=UNSPECIFIED — was LIMITED (INITIALIZING)
+20:36:40.080  [DIAG T+116548ms] tracking-status-first-normal
+20:36:40.127  [+115.2s] [EightWallSession] camera (periodic, throttled 1/s) = (0.00, 1.00, 0.00) trackingStatus=NORMAL reason=UNSPECIFIED
+20:36:41.066  [+116.1s] [ImageTarget] FOUND "site-tracking-front"
+  scale=0.058m pos=(-0.02, 0.86, 0.00) rot=(0.66, -0.08, -0.11, -0.74)
+  trackingStatus=NORMAL
+  re-detection REJECTED — see warning below — keeping previous anchor
+20:36:41.067  [+116.1s] [ImageTarget] scale mismatch: engine sees 0.058 m, manifest declares 0.03 m (ratio 1.94). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:36:41.090  [+116.1s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.056m pos=(-0.02, 0.86, 0.00) rot=(0.66, -0.07, -0.10, -0.74)
+20:36:41.138  [+116.2s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.01, 1.11, 0.03) trackingStatus=NORMAL reason=UNSPECIFIED
+20:36:42.077  [+117.1s] [ImageTarget] scale mismatch: engine sees 0.046 m, manifest declares 0.03 m (ratio 1.54). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:36:42.097  [+117.2s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.048m pos=(-0.02, 0.89, 0.01) rot=(0.65, -0.06, -0.08, -0.75)
+20:36:42.145  [+117.2s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.01, 1.11, 0.05) trackingStatus=NORMAL reason=UNSPECIFIED
+20:36:43.097  [+118.2s] [ImageTarget] scale mismatch: engine sees 0.073 m, manifest declares 0.03 m (ratio 2.43). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:36:43.116  [+118.2s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.074m pos=(-0.02, 0.78, 0.01) rot=(0.69, 0.14, 0.11, -0.71)
+20:36:43.154  [+118.2s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.02, 1.24, 0.10) trackingStatus=NORMAL reason=UNSPECIFIED
+20:36:44.113  [+119.2s] [ImageTarget] scale mismatch: engine sees 0.072 m, manifest declares 0.03 m (ratio 2.40). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:36:44.131  [+119.2s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.073m pos=(-0.03, 0.77, -0.00) rot=(0.68, 0.21, 0.16, -0.69)
+20:36:44.176  [+119.2s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.04, 1.15, 0.08) trackingStatus=NORMAL reason=UNSPECIFIED
+20:36:44.783  [+119.8s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+20:36:45.180  [+120.2s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.02, 0.99, 0.00) trackingStatus=NORMAL reason=UNSPECIFIED
+20:36:46.187  [+121.2s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.49, 1.75, 0.17) trackingStatus=NORMAL reason=UNSPECIFIED
+20:36:47.199  [+122.3s] [EightWallSession] camera (periodic, throttled 1/s) = (-1.00, 2.45, 0.38) trackingStatus=NORMAL reason=UNSPECIFIED
+20:36:47.447  [+122.5s] [ImageTarget] FOUND "site-tracking-front"
+  scale=5.839m pos=(4.73, -43.32, -5.30) rot=(0.59, 0.42, 0.32, -0.61)
+  trackingStatus=NORMAL
+  re-detection REJECTED — see warning below — keeping previous anchor
+20:36:47.448  [+122.5s] [ImageTarget] scale mismatch: engine sees 5.839 m, manifest declares 0.03 m (ratio 194.64). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:36:47.470  [+122.5s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=4.705m pos=(3.67, -34.68, -4.23) rot=(0.59, 0.42, 0.32, -0.61)
+20:36:48.203  [+123.3s] [EightWallSession] camera (periodic, throttled 1/s) = (-1.13, 2.71, 0.42) trackingStatus=NORMAL reason=UNSPECIFIED
+20:36:48.450  [+123.5s] [ImageTarget] scale mismatch: engine sees 0.198 m, manifest declares 0.03 m (ratio 6.59). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:36:48.471  [+123.5s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.202m pos=(-0.85, 0.96, 0.21) rot=(0.59, 0.41, 0.33, -0.61)
+20:36:48.576  [+123.6s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+20:36:48.679  [+123.7s] [ImageTarget] FOUND "site-tracking-front"
+  scale=0.190m pos=(-0.86, 1.05, 0.23) rot=(0.59, 0.41, 0.33, -0.61)
+  trackingStatus=NORMAL
+  re-detection REJECTED — see warning below — keeping previous anchor
+20:36:48.888  [+123.9s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+20:36:49.213  [+124.3s] [EightWallSession] camera (periodic, throttled 1/s) = (-1.00, 2.77, 0.40) trackingStatus=NORMAL reason=UNSPECIFIED
+20:36:49.511  [+124.6s] [ImageTarget] FOUND "site-tracking-front"
+  scale=0.243m pos=(-0.89, 1.35, 0.24) rot=(0.54, 0.30, 0.31, -0.72)
+  trackingStatus=NORMAL
+  re-detection REJECTED — see warning below — keeping previous anchor
+20:36:49.512  [+124.6s] [ImageTarget] scale mismatch: engine sees 0.243 m, manifest declares 0.03 m (ratio 8.11). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:36:49.531  [+124.6s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.232m pos=(-0.90, 1.44, 0.25) rot=(0.55, 0.30, 0.31, -0.72)
+20:36:50.217  [+125.3s] [EightWallSession] camera (periodic, throttled 1/s) = (-1.00, 2.56, 0.39) trackingStatus=NORMAL reason=UNSPECIFIED
+20:36:50.516  [+125.6s] [ImageTarget] scale mismatch: engine sees 0.356 m, manifest declares 0.03 m (ratio 11.85). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:36:50.537  [+125.6s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.303m pos=(-1.02, 1.43, 0.23) rot=(0.63, 0.07, 0.12, -0.77)
+20:36:50.576  [+125.6s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+20:36:50.722  [+125.8s] [ImageTarget] FOUND "site-tracking-front"
+  scale=0.196m pos=(-1.03, 1.80, 0.28) rot=(0.63, -0.07, -0.01, -0.78)
+  trackingStatus=NORMAL
+  re-detection REJECTED — see warning below — keeping previous anchor
+20:36:50.741  [+125.8s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+20:36:51.233  [+126.3s] [EightWallSession] camera (periodic, throttled 1/s) = (-1.00, 2.33, 0.34) trackingStatus=NORMAL reason=UNSPECIFIED
+20:36:52.250  [+127.3s] [EightWallSession] camera (periodic, throttled 1/s) = (-1.04, 2.29, 0.37) trackingStatus=NORMAL reason=UNSPECIFIED
+20:36:53.267  [+128.3s] [EightWallSession] camera (periodic, throttled 1/s) = (-1.13, 2.56, 0.33) trackingStatus=NORMAL reason=UNSPECIFIED
+20:36:54.273  [+129.3s] [EightWallSession] camera (periodic, throttled 1/s) = (-1.13, 2.77, 0.27) trackingStatus=NORMAL reason=UNSPECIFIED
+20:36:55.277  [+130.3s] [EightWallSession] camera (periodic, throttled 1/s) = (-1.08, 3.03, 0.18) trackingStatus=NORMAL reason=UNSPECIFIED
+20:36:56.283  [+131.3s] [EightWallSession] camera (periodic, throttled 1/s) = (-1.10, 3.24, 0.12) trackingStatus=NORMAL reason=UNSPECIFIED
+20:36:57.299  [+132.4s] [EightWallSession] camera (periodic, throttled 1/s) = (-1.06, 3.50, 0.06) trackingStatus=NORMAL reason=UNSPECIFIED
+20:36:57.862  [+132.9s] [ImageTarget] FOUND "site-tracking-front"
+  scale=0.244m pos=(-1.08, 2.59, 0.22) rot=(-0.16, 0.71, 0.68, 0.04)
+  trackingStatus=NORMAL
+  re-detection REJECTED — see warning below — keeping previous anchor
+20:36:57.863  [+132.9s] [ImageTarget] scale mismatch: engine sees 0.244 m, manifest declares 0.03 m (ratio 8.14). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:36:57.884  [+132.9s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.244m pos=(-1.08, 2.60, 0.22) rot=(-0.16, 0.71, 0.68, 0.04)
+20:36:58.301  [+133.4s] [EightWallSession] camera (periodic, throttled 1/s) = (-1.04, 3.70, 0.05) trackingStatus=NORMAL reason=UNSPECIFIED
+20:36:58.888  [+133.9s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.295m pos=(-1.10, 2.29, 0.26) rot=(-0.15, 0.74, 0.64, 0.14)
+20:36:58.889  [+133.9s] [ImageTarget] scale mismatch: engine sees 0.295 m, manifest declares 0.03 m (ratio 9.84). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:36:59.305  [+134.4s] [EightWallSession] camera (periodic, throttled 1/s) = (-1.02, 3.88, -0.08) trackingStatus=NORMAL reason=UNSPECIFIED
+20:36:59.901  [+135.0s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.257m pos=(-1.09, 2.44, 0.23) rot=(-0.17, 0.73, 0.64, 0.18)
+20:36:59.902  [+135.0s] [ImageTarget] scale mismatch: engine sees 0.257 m, manifest declares 0.03 m (ratio 8.57). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:37:00.321  [+135.4s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.99, 4.01, -0.08) trackingStatus=NORMAL reason=UNSPECIFIED
+20:37:00.915  [+136.0s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.243m pos=(-1.08, 2.41, 0.22) rot=(-0.23, 0.69, 0.64, 0.26)
+20:37:00.916  [+136.0s] [ImageTarget] scale mismatch: engine sees 0.243 m, manifest declares 0.03 m (ratio 8.11). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:37:01.326  [+136.4s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.93, 4.16, -0.08) trackingStatus=NORMAL reason=UNSPECIFIED
+20:37:01.916  [+137.0s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.222m pos=(-1.09, 2.46, 0.21) rot=(-0.27, 0.66, 0.63, 0.31)
+20:37:01.937  [+137.0s] [ImageTarget] scale mismatch: engine sees 0.223 m, manifest declares 0.03 m (ratio 7.43). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:37:02.330  [+137.4s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.78, 4.35, 0.02) trackingStatus=NORMAL reason=UNSPECIFIED
+20:37:02.805  [+137.9s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+20:37:02.952  [+138.0s] [ImageTarget] FOUND "site-tracking-front"
+  scale=0.182m pos=(-1.05, 2.66, 0.22) rot=(0.43, -0.53, -0.55, -0.48)
+  trackingStatus=NORMAL
+  re-detection REJECTED — see warning below — keeping previous anchor
+20:37:02.952  [+138.0s] [ImageTarget] scale mismatch: engine sees 0.182 m, manifest declares 0.03 m (ratio 6.05). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:37:02.976  [+138.0s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.191m pos=(-1.07, 2.56, 0.24) rot=(0.41, -0.54, -0.56, -0.47)
+20:37:03.319  [+138.4s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+20:37:03.341  [+138.4s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.60, 4.67, 0.08) trackingStatus=NORMAL reason=UNSPECIFIED
+20:37:03.402  [+138.5s] [ImageTarget] FOUND "site-tracking-front"
+  scale=0.204m pos=(-1.11, 2.36, 0.27) rot=(0.40, -0.53, -0.56, -0.49)
+  trackingStatus=NORMAL
+  re-detection REJECTED — see warning below — keeping previous anchor
+20:37:03.782  [+138.8s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+20:37:03.973  [+139.0s] [ImageTarget] FOUND "site-tracking-front"
+  scale=0.191m pos=(-1.10, 2.50, 0.27) rot=(0.39, -0.54, -0.55, -0.51)
+  trackingStatus=NORMAL
+  re-detection REJECTED — see warning below — keeping previous anchor
+20:37:03.974  [+139.0s] [ImageTarget] scale mismatch: engine sees 0.191 m, manifest declares 0.03 m (ratio 6.37). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:37:03.998  [+139.1s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.191m pos=(-1.10, 2.50, 0.27) rot=(0.39, -0.54, -0.55, -0.51)
+20:37:04.243  [+139.3s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+20:37:04.349  [+139.4s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.40, 4.91, 0.06) trackingStatus=NORMAL reason=UNSPECIFIED
+20:37:05.355  [+140.4s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.29, 4.86, 0.02) trackingStatus=NORMAL reason=UNSPECIFIED
+20:37:06.368  [+141.4s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.77, 5.03, -0.11) trackingStatus=NORMAL reason=UNSPECIFIED
+20:37:06.744  [+141.8s] [ImageTarget] FOUND "site-tracking-front"
+  scale=0.461m pos=(-1.68, 2.56, 0.11) rot=(0.33, -0.61, -0.61, -0.38)
+  trackingStatus=NORMAL
+  re-detection REJECTED — see warning below — keeping previous anchor
+20:37:06.745  [+141.8s] [ImageTarget] scale mismatch: engine sees 0.461 m, manifest declares 0.03 m (ratio 15.36). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:37:06.765  [+141.8s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.463m pos=(-1.69, 2.55, 0.10) rot=(0.33, -0.61, -0.61, -0.38)
+20:37:07.368  [+142.4s] [EightWallSession] camera (periodic, throttled 1/s) = (-1.78, 5.29, -0.82) trackingStatus=NORMAL reason=UNSPECIFIED
+20:37:07.750  [+142.8s] [ImageTarget] scale mismatch: engine sees 1.185 m, manifest declares 0.03 m (ratio 39.49). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:37:07.767  [+142.8s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=1.188m pos=(-1.95, 0.12, 0.04) rot=(0.05, 0.71, 0.70, -0.02)
+20:37:08.371  [+143.4s] [EightWallSession] camera (periodic, throttled 1/s) = (-2.75, 5.49, -1.21) trackingStatus=NORMAL reason=UNSPECIFIED
+20:37:08.766  [+143.8s] [ImageTarget] scale mismatch: engine sees 1.138 m, manifest declares 0.03 m (ratio 37.93). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:37:08.790  [+143.8s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=1.106m pos=(-1.91, -0.25, -0.23) rot=(0.25, 0.69, 0.64, -0.22)
+20:37:09.380  [+144.4s] [EightWallSession] camera (periodic, throttled 1/s) = (-3.31, 5.76, -1.30) trackingStatus=NORMAL reason=UNSPECIFIED
+20:37:09.782  [+144.8s] [ImageTarget] scale mismatch: engine sees 0.906 m, manifest declares 0.03 m (ratio 30.19). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:37:09.804  [+144.9s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.906m pos=(-1.81, -0.31, -0.32) rot=(0.31, 0.67, 0.61, -0.30)
+20:37:10.381  [+145.4s] [EightWallSession] camera (periodic, throttled 1/s) = (-3.55, 6.20, -1.17) trackingStatus=NORMAL reason=UNSPECIFIED
+20:37:10.791  [+145.8s] [ImageTarget] scale mismatch: engine sees 0.703 m, manifest declares 0.03 m (ratio 23.43). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:37:10.814  [+145.9s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.704m pos=(-2.14, 1.04, -0.53) rot=(0.33, 0.66, 0.60, -0.31)
+20:37:11.146  [+146.2s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+20:37:11.396  [+146.5s] [EightWallSession] camera (periodic, throttled 1/s) = (-3.58, 6.41, -1.07) trackingStatus=NORMAL reason=UNSPECIFIED
+20:37:12.074  [+147.1s] [ImageTarget] FOUND "site-tracking-front"
+  scale=0.736m pos=(-1.95, 1.68, -0.29) rot=(0.47, 0.64, 0.21, -0.58)
+  trackingStatus=NORMAL
+  re-detection REJECTED — see warning below — keeping previous anchor
+20:37:12.075  [+147.1s] [ImageTarget] scale mismatch: engine sees 0.736 m, manifest declares 0.03 m (ratio 24.53). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:37:12.099  [+147.2s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.736m pos=(-1.96, 1.69, -0.30) rot=(0.47, 0.64, 0.21, -0.58)
+20:37:12.415  [+147.5s] [EightWallSession] camera (periodic, throttled 1/s) = (-3.57, 6.42, -1.07) trackingStatus=NORMAL reason=UNSPECIFIED
+20:37:12.914  [+148.0s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+20:37:13.061  [+148.1s] [ImageTarget] FOUND "site-tracking-front"
+  scale=0.065m pos=(-3.46, 6.07, -1.02) rot=(0.38, 0.61, 0.33, -0.61)
+  trackingStatus=NORMAL
+  re-detection REJECTED — see warning below — keeping previous anchor
+20:37:13.085  [+148.1s] [ImageTarget] scale mismatch: engine sees 0.066 m, manifest declares 0.03 m (ratio 2.22). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:37:13.108  [+148.2s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.067m pos=(-3.46, 6.07, -1.01) rot=(0.38, 0.60, 0.33, -0.62)
+20:37:13.423  [+148.5s] [EightWallSession] camera (periodic, throttled 1/s) = (-3.56, 6.47, -1.01) trackingStatus=NORMAL reason=UNSPECIFIED
+20:37:13.533  [+148.6s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+20:37:13.644  [+148.7s] [ImageTarget] FOUND "site-tracking-front"
+  scale=0.072m pos=(-3.46, 6.06, -1.02) rot=(0.34, 0.60, 0.46, -0.56)
+  trackingStatus=NORMAL
+  re-detection REJECTED — see warning below — keeping previous anchor
+20:37:13.861  [+148.9s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+20:37:14.232  [+149.3s] [ImageTarget] FOUND "site-tracking-front"
+  scale=0.083m pos=(-3.46, 6.07, -1.02) rot=(0.30, 0.63, 0.56, -0.45)
+  trackingStatus=NORMAL
+  re-detection REJECTED — see warning below — keeping previous anchor
+20:37:14.233  [+149.3s] [ImageTarget] scale mismatch: engine sees 0.083 m, manifest declares 0.03 m (ratio 2.77). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:37:14.253  [+149.3s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.084m pos=(-3.46, 6.07, -1.02) rot=(0.28, 0.65, 0.57, -0.42)
+20:37:14.440  [+149.5s] [EightWallSession] camera (periodic, throttled 1/s) = (-3.48, 6.58, -1.02) trackingStatus=NORMAL reason=UNSPECIFIED
+20:37:15.245  [+150.3s] [ImageTarget] scale mismatch: engine sees 0.111 m, manifest declares 0.03 m (ratio 3.71). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+20:37:15.266  [+150.3s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.112m pos=(-3.50, 6.12, -1.04) rot=(0.08, 0.73, 0.67, -0.12)
+20:37:15.448  [+150.5s] [EightWallSession] camera (periodic, throttled 1/s) = (-3.49, 6.69, -1.07) trackingStatus=NORMAL reason=UNSPECIFIED
+20:37:16.041  [+151.1s] [ImageTargetAnchorSource]  camera=(-3.49, 6.73, -1.06) anchor=(-2.92, 6.63, -1.67) dist=0.85m anchor-rot=(-0.03, 0.92, -0.00, -0.38) euler(YXZ, deg)=(yaw=-135.0, pitch=1.6, roll=-2.7)
+20:37:16.041  [DIAG T+152510ms] trustworthy-pose-applied — ratio=1.12
+20:37:16.042  [+151.1s] [ImageTargetAnchorSource] first trustworthy pose accepted (ratio=1.12) — revealing anchor group. Continuous per-frame updates are now ignored; a fresh re-detection can still re-ground it (§26).
+20:37:16.056  [DIAG T+152525ms] scene-revealed
+20:37:16.057  [DIAG] ---- timeline (24 marks) ----
+20:37:16.058  [DIAG] T+1412ms  (+1412ms)  main-start
+20:37:16.058  [DIAG] T+1413ms  (+1ms)  glb-load-start
+20:37:16.059  [DIAG] T+1413ms  (+0ms)  rive-file-load-start
+20:37:16.059  [DIAG] T+1413ms  (+0ms)  manifest-resolved
+20:37:16.059  [DIAG] T+1419ms  (+6ms)  image-target-json-fetch-start
+20:37:16.060  [DIAG] T+1471ms  (+52ms)  card-attach-end
+20:37:16.060  [DIAG] T+1906ms  (+435ms)  image-target-json-fetch-end
+20:37:16.061  [DIAG] T+1906ms  (+0ms)  start-ar-button-shown
+20:37:16.061  [DIAG] T+7347ms  (+5441ms)  rive-file-load-end
+20:37:16.061  [DIAG] T+7347ms  (+0ms)  glb-load-end
+20:37:16.061  [DIAG] T+7348ms  (+1ms)  markers-attach-start
+20:37:16.062  [DIAG] T+7372ms  (+24ms)  markers-attach-end
+20:37:16.062  [DIAG] T+7373ms  (+1ms)  scene-content-ready
+20:37:16.062  [DIAG] T+9654ms  (+2281ms)  start-ar-tapped
+20:37:16.063  [DIAG] T+9659ms  (+5ms)  xr8-engine-module-import-start
+20:37:16.063  [DIAG] T+9965ms  (+306ms)  xr8-engine-module-ready
+20:37:16.063  [DIAG] T+9977ms  (+12ms)  xr8-run-invoked
+20:37:16.063  [DIAG] T+11431ms  (+1454ms)  xr8-pipeline-onstart
+20:37:16.064  [DIAG] T+11474ms  (+43ms)  xr8-onstart-fired
+20:37:16.064  [DIAG] T+14818ms  (+3344ms)  first-pose-applied (bootstrap, unchecked)
+20:37:16.064  [DIAG] T+14824ms  (+6ms)  first-image-found-acquired (bootstrap, not yet revealed)
+20:37:16.064  [DIAG] T+116548ms  (+101724ms)  tracking-status-first-normal
+20:37:16.065  [DIAG] T+152510ms  (+35962ms)  trustworthy-pose-applied
+20:37:16.065  [DIAG] T+152525ms  (+15ms)  scene-revealed
+20:37:16.065  [DIAG] ---- end timeline ----
+20:37:16.077  [+151.1s] [ImageTargetAnchorSource] isTracking()
+  acquired=true imageVisible=true
+  trackingStatus=NORMAL reason=UNSPECIFIED
+  => true
+20:37:16.078  [+151.1s] [HotspotProjector] "hotspot_building_00" -> HIDDEN (frustum=false) (screen=2819,8629)
+20:37:16.079  [+151.1s] [HotspotProjector] "hotspot_building_03" -> HIDDEN (frustum=false) (screen=7941,-8774)
+20:37:16.079  [+151.1s] [HotspotProjector] "hotspot_building_05" -> HIDDEN (frustum=false) (screen=-358818,343310)
+20:37:16.079  [+151.1s] [HotspotProjector] "hotspot_building_06" -> HIDDEN (frustum=false) (screen=-16046,20604)
+20:37:16.079  [+151.1s] [HotspotProjector] "hotspot_building_07" -> HIDDEN (frustum=false) (screen=-4756,9119)
+20:37:16.080  [+151.1s] [HotspotProjector] "hotspot_building_08" -> HIDDEN (frustum=false) (screen=-4104,7986)
+20:37:16.080  [+151.1s] [HotspotProjector] "hotspot_building_09" -> HIDDEN (frustum=false) (screen=-6574,12254)
+20:37:16.080  [+151.1s] [HotspotProjector] "hotspot_building_10" -> HIDDEN (frustum=false) (screen=-14166,15758)
+20:37:16.081  [+151.1s] [HotspotProjector] "hotspot_building_11" -> HIDDEN (frustum=false) (screen=-7063,9844)
+20:37:16.081  [+151.1s] [HotspotProjector] "hotspot_building_12" -> HIDDEN (frustum=false) (screen=-9561,13065)
+20:37:16.082  [+151.1s] [HotspotProjector] "hotspot_building_13" -> HIDDEN (frustum=false) (screen=-24966,26006)
+20:37:16.082  [+151.1s] [HotspotProjector] "hotspot_building_14" -> HIDDEN (frustum=false) (screen=-3914,7430)
+20:37:16.280  [+151.3s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.068m pos=(-3.50, 6.43, -1.11) rot=(0.29, 0.64, 0.63, -0.33)
+20:37:16.464  [+151.5s] [EightWallSession] camera (periodic, throttled 1/s) = (-3.49, 6.72, -1.07) trackingStatus=NORMAL reason=UNSPECIFIED
+20:37:16.930  [+152.0s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+20:37:16.931  [+152.0s] [ImageTargetAnchorSource] isTracking()
+  acquired=true imageVisible=false
+  trackingStatus=NORMAL reason=UNSPECIFIED
+  => true
+20:37:17.473  [+152.5s] [EightWallSession] camera (periodic, throttled 1/s) = (-3.56, 6.90, -0.97) trackingStatus=NORMAL reason=UNSPECIFIED
+20:37:18.488  [+153.5s] [EightWallSession] camera (periodic, throttled 1/s) = (-3.68, 7.26, -0.69) trackingStatus=NORMAL reason=UNSPECIFIED
+20:37:18.812  [+153.9s] [HotspotProjector] "hotspot_building_00" -> VISIBLE (screen=393,431)
+20:37:18.812  [+153.9s] [MarkerLayer] "hotspot_building_00" -> display:block (projection visible at 393,431)
+20:37:18.813  [DIAG T+155281ms] first-marker-visible — hotspot_building_00
+20:37:19.051  [+154.1s] [HotspotProjector] "hotspot_building_03" -> VISIBLE (screen=387,687)
+20:37:19.052  [+154.1s] [MarkerLayer] "hotspot_building_03" -> display:block (projection visible at 387,687)
+20:37:19.263  [+154.3s] [HotspotProjector] "hotspot_building_05" -> VISIBLE (screen=387,679)
+20:37:19.263  [+154.3s] [MarkerLayer] "hotspot_building_05" -> display:block (projection visible at 387,679)
+20:37:19.325  [+154.4s] [HotspotProjector] "hotspot_building_06" -> VISIBLE (screen=390,600)
+20:37:19.326  [+154.4s] [MarkerLayer] "hotspot_building_06" -> display:block (projection visible at 390,600)
+20:37:19.487  [+154.5s] [HotspotProjector] "hotspot_building_09" -> VISIBLE (screen=392,490)
+20:37:19.488  [+154.5s] [MarkerLayer] "hotspot_building_09" -> display:block (projection visible at 392,490)
+20:37:19.526  [+154.6s] [EightWallSession] camera (periodic, throttled 1/s) = (-3.92, 7.53, -0.41) trackingStatus=NORMAL reason=UNSPECIFIED
+20:37:19.719  [+154.8s] [HotspotProjector] "hotspot_building_13" -> VISIBLE (screen=389,538)
+20:37:19.720  [+154.8s] [MarkerLayer] "hotspot_building_13" -> display:block (projection visible at 389,538)
+20:37:19.798  [+154.9s] [HotspotProjector] "hotspot_building_07" -> VISIBLE (screen=392,438)
+20:37:19.806  [+154.9s] [HotspotProjector] "hotspot_building_12" -> VISIBLE (screen=380,478)
+20:37:19.810  [+154.9s] [MarkerLayer] "hotspot_building_07" -> display:block (projection visible at 392,438)
+20:37:19.811  [+154.9s] [MarkerLayer] "hotspot_building_12" -> display:block (projection visible at 380,478)
+20:37:19.855  [+154.9s] [HotspotProjector] "hotspot_building_10" -> VISIBLE (screen=390,522)
+20:37:19.862  [+154.9s] [MarkerLayer] "hotspot_building_10" -> display:block (projection visible at 390,522)
+20:37:19.910  [+155.0s] [HotspotProjector] "hotspot_building_11" -> VISIBLE (screen=389,469)
+20:37:19.918  [+155.0s] [MarkerLayer] "hotspot_building_11" -> display:block (projection visible at 389,469)
+20:37:19.966  [+155.0s] [HotspotProjector] "hotspot_building_08" -> VISIBLE (screen=388,418)
+20:37:19.985  [+155.0s] [MarkerLayer] "hotspot_building_08" -> display:block (projection visible at 388,418)
+20:37:20.166  [+155.2s] [HotspotProjector] "hotspot_building_14" -> VISIBLE (screen=388,475)
+20:37:20.167  [+155.2s] [MarkerLayer] "hotspot_building_14" -> display:block (projection visible at 388,475)
+20:37:20.567  [+155.6s] [EightWallSession] camera (periodic, throttled 1/s) = (-4.00, 7.57, -0.27) trackingStatus=NORMAL reason=UNSPECIFIED
+20:37:21.570  [+156.6s] [EightWallSession] camera (periodic, throttled 1/s) = (-4.00, 7.56, -0.27) trackingStatus=NORMAL reason=UNSPECIFIED

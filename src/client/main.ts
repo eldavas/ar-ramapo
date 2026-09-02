@@ -695,9 +695,45 @@ async function runEightWallExperience(experience: ExperienceManifest): Promise<v
   const STILLNESS_MOVE_THRESHOLD_METERS = 0.04;
   let lastStillnessCheckPos: { x: number; y: number; z: number } | null = null;
   let stillMs = 0;
-  let escalated = false;
+  let stillnessEscalated = false;
+
+  // Extended-initialization escalation (2026-09-02, troubleshooting doc
+  // §36 / docs/log-8.txt): a capture showed trackingStatus stuck at
+  // LIMITED/INITIALIZING for 115 STRAIGHT seconds (every prior capture
+  // reached NORMAL within ~17s), with the camera-position telemetry
+  // above swinging by whole meters between consecutive 1s samples the
+  // entire time — that is SLAM/VIO noise from a tracker that hasn't
+  // converged yet, not real hand motion, and it read as constant
+  // "movement" to the stillness check, so the stillness message correctly
+  // never fired — but nothing else told the person testing anything was
+  // wrong, leaving "Still locking on…" up for nearly two minutes. This
+  // fires once on wall-clock time alone (position isn't trustworthy
+  // before NORMAL, so it can't be the signal here) and names the actual
+  // failure mode instead of the closer/farther text, which was already
+  // on screen and was not the problem in that capture.
+  const NOT_NORMAL_ESCALATION_AFTER_MS = 20000;
+  let notNormalEscalated = false;
+  const initTimerStartedAtMs = Date.now();
+
   const stillnessTimer = setInterval(() => {
     if (stableResolved || !eightWallSession) return;
+    const normal = eightWallSession.trackingStatus === 'NORMAL';
+
+    if (!notNormalEscalated && !normal && Date.now() - initTimerStartedAtMs >= NOT_NORMAL_ESCALATION_AFTER_MS) {
+      notNormalEscalated = true;
+      const text =
+        'This is taking longer than usual — try a well-lit area and slowly pan across more of the room, ' +
+        'not just the flat surface, to help your phone get its bearings.';
+      overlay.showHint(text);
+      arStatusStore.getState().setPhase('stabilizing', text);
+      return;
+    }
+    // Position telemetry is only meaningful once trackingStatus is NORMAL
+    // (§36) — before that, apparent "movement" is tracker noise, not the
+    // phone actually moving, so the stillness check below would be
+    // measuring the wrong thing.
+    if (!normal) return;
+
     const pos = eightWallSession.getCameraPosition();
     if (pos) {
       if (lastStillnessCheckPos) {
@@ -709,8 +745,8 @@ async function runEightWallExperience(experience: ExperienceManifest): Promise<v
       }
       lastStillnessCheckPos = pos;
     }
-    if (!escalated && stillMs >= STILLNESS_ESCALATION_AFTER_MS) {
-      escalated = true;
+    if (!stillnessEscalated && stillMs >= STILLNESS_ESCALATION_AFTER_MS) {
+      stillnessEscalated = true;
       const text =
         "Keep your phone moving — holding it still is why this is taking a while. " +
         'Try a slow, repeated closer-then-farther motion, or move it side to side.';
