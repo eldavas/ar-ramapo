@@ -1,0 +1,817 @@
+21:48:00.823  [ar-debug-console] active before module script — 2026-09-02T21:48:00.822Z
+21:48:00.972  8th Wall XR Version: 0.0.0.0s
+21:48:01.335  [DIAG T+722ms] main-start
+21:48:01.335  [DIAG T+722ms] manifest-resolved — site
+21:48:01.335  [DIAG T+723ms] glb-load-start
+21:48:01.335  [DIAG T+723ms] rive-file-load-start
+21:48:01.341  [DIAG T+728ms] image-target-json-fetch-start
+21:48:01.342  [DIAG T+729ms] card-attach-end
+21:48:01.490  [DIAG T+878ms] glb-load-end — 12 hotspots, 29 occluders
+21:48:01.490  [DIAG T+878ms] rive-file-load-end
+21:48:01.491  [runEightWallExperience] SceneGraphLoader found 12 hotspot_* node(s) and 29 occluder mesh(es) in /assets/site-scene.glb.
+21:48:01.491  [DIAG T+878ms] markers-attach-start
+21:48:01.504  [DIAG T+892ms] markers-attach-end
+21:48:01.505  [runEightWallExperience] MarkerLayer and CardPanel attached — content pipeline is live.
+21:48:01.505  [DIAG T+893ms] scene-content-ready
+21:48:01.619  [DIAG T+1007ms] image-target-json-fetch-end
+21:48:01.619  [DIAG T+1007ms] start-ar-button-shown
+21:48:14.527  [DIAG T+13915ms] start-ar-tapped
+21:48:14.533  [DIAG T+13920ms] xr8-engine-module-import-start
+21:48:14.735  [DIAG T+14122ms] xr8-engine-module-ready
+21:48:14.757  [DIAG T+14145ms] xr8-run-invoked
+21:48:18.822  [DIAG T+18209ms] xr8-pipeline-onstart
+21:48:18.823  [EightWallSession] canvas diagnostics @ onStart, BEFORE installFullWindowResize:
+  canvas.getBoundingClientRect() = 300.0 x 150.0 (left=0.0, top=0.0)
+  canvas.width/height (drawing buffer) = 300 x 150
+  window.innerWidth/innerHeight = 393 x 695
+  visualViewport = 393.0 x 695.0 scale=1.000
+  window.devicePixelRatio = 3
+  renderer.getSize() = 300.0 x 150.0, renderer.getPixelRatio() = 1
+  camera.aspect = 2.000
+  renderer.domElement === #camerafeed -> true
+  canvas.id="camerafeed" canvas.isConnected=true
+  canvas.style.cssText (inline) = "position: fixed; inset: 0px; width: 300px; height: 150px; display: block; touch-action: none;"
+  getComputedStyle: position=fixed display=block width=300px height=150px inset=0px
+21:48:18.824  [EightWallSession] canvas diagnostics @ onStart, AFTER installFullWindowResize:
+  canvas.getBoundingClientRect() = 393.0 x 695.0 (left=0.0, top=0.0)
+  canvas.width/height (drawing buffer) = 1179 x 2085
+  window.innerWidth/innerHeight = 393 x 695
+  visualViewport = 393.0 x 695.0 scale=1.000
+  window.devicePixelRatio = 3
+  renderer.getSize() = 393.0 x 695.0, renderer.getPixelRatio() = 3
+  camera.aspect = 0.565
+  renderer.domElement === #camerafeed -> true
+  canvas.id="camerafeed" canvas.isConnected=true
+  canvas.style.cssText (inline) = "position: fixed; inset: 0px; width: 393px; height: 695px; display: block; touch-action: none;"
+  getComputedStyle: position=fixed display=block width=393px height=695px inset=0px
+21:48:18.854  [DIAG T+18242ms] xr8-onstart-fired
+21:48:18.855  [+17.5s] [ImageTargetAnchorSource] acquire() — waiting for first imagefound of any of "site-tracking-front", "site-tracking-back", "site-tracking-left", "site-tracking-right"...
+21:48:18.860  [EightWallSession] canvas diagnostics @ first requestAnimationFrame after onStart:
+  canvas.getBoundingClientRect() = 393.0 x 695.0 (left=0.0, top=0.0)
+  canvas.width/height (drawing buffer) = 1179 x 2085
+  window.innerWidth/innerHeight = 393 x 695
+  visualViewport = 393.0 x 695.0 scale=1.000
+  window.devicePixelRatio = 3
+  renderer.getSize() = 393.0 x 695.0, renderer.getPixelRatio() = 3
+  camera.aspect = 0.565
+  renderer.domElement === #camerafeed -> true
+  canvas.id="camerafeed" canvas.isConnected=true
+  canvas.style.cssText (inline) = "position: fixed; inset: 0px; width: 393px; height: 695px; display: block; touch-action: none;"
+  getComputedStyle: position=fixed display=block width=393px height=695px inset=0px
+21:48:18.890  [+17.6s] [EightWallSession] camera (periodic, throttled 1/s) = (0.00, 1.00, 0.00) trackingStatus=UNSPECIFIED reason=UNSPECIFIED
+21:48:18.916  [+17.6s] [TrackingStatus] LIMITED reason=INITIALIZING — was UNSPECIFIED (UNSPECIFIED)
+21:48:19.252  [+17.9s] [ImageTarget] scanning for target...
+21:48:19.829  [EightWallSession] canvas diagnostics @ +1000ms after onStart:
+  canvas.getBoundingClientRect() = 393.0 x 695.0 (left=0.0, top=0.0)
+  canvas.width/height (drawing buffer) = 1179 x 2085
+  window.innerWidth/innerHeight = 393 x 695
+  visualViewport = 393.0 x 695.0 scale=1.000
+  window.devicePixelRatio = 3
+  renderer.getSize() = 393.0 x 695.0, renderer.getPixelRatio() = 3
+  camera.aspect = 0.565
+  renderer.domElement === #camerafeed -> true
+  canvas.id="camerafeed" canvas.isConnected=true
+  canvas.style.cssText (inline) = "position: fixed; inset: 0px; width: 393px; height: 695px; display: block; touch-action: none;"
+  getComputedStyle: position=fixed display=block width=393px height=695px inset=0px
+21:48:19.907  [+18.6s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.02, 1.00, 0.00) trackingStatus=LIMITED reason=INITIALIZING
+21:48:20.909  [+19.6s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.06, 0.65, -0.16) trackingStatus=LIMITED reason=INITIALIZING
+21:48:21.168  [+19.8s] [ImageTarget] FOUND "site-tracking-front"
+  scale=0.061m pos=(-0.03, 0.09, -0.31) rot=(0.53, 0.07, 0.04, -0.85)
+  trackingStatus=LIMITED
+  acquired: false -> true (bootstrap — pose applied, anchor stays hidden until a trustworthy sample lands)
+21:48:21.169  [+19.8s] [ImageTargetAnchorSource]  camera=(-0.08, 0.58, -0.19) anchor=(-0.86, 0.08, -0.43) dist=0.96m anchor-rot=(-0.23, 0.08, -0.02, -0.97) euler(YXZ, deg)=(yaw=-9.2, pitch=26.2, roll=0.5)
+21:48:21.169  [DIAG T+20556ms] first-pose-applied (bootstrap, unchecked) — ratio=2.05
+21:48:21.175  [DIAG T+20562ms] first-image-found-acquired (bootstrap, not yet revealed)
+21:48:21.190  [+19.9s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.061m pos=(-0.03, 0.09, -0.31) rot=(0.53, 0.07, 0.04, -0.84)
+21:48:21.191  [+19.9s] [ImageTarget] scale mismatch: engine sees 0.061 m, manifest declares 0.03 m (ratio 2.04). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+21:48:21.191  [+19.9s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+21:48:21.315  [+20.0s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+21:48:21.381  [+20.0s] [ImageTarget] FOUND "site-tracking-front"
+  scale=0.064m pos=(-0.04, 0.13, -0.30) rot=(0.54, 0.19, 0.12, -0.81)
+  trackingStatus=LIMITED
+  re-detection REJECTED — see warning below — keeping previous anchor
+21:48:21.515  [+20.2s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+21:48:21.581  [+20.2s] [ImageTarget] FOUND "site-tracking-front"
+  scale=0.063m pos=(-0.04, 0.13, -0.30) rot=(0.54, 0.36, 0.27, -0.71)
+  trackingStatus=LIMITED
+  re-detection REJECTED — see warning below — keeping previous anchor
+21:48:21.910  [+20.6s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.07, 0.45, -0.29) trackingStatus=LIMITED reason=INITIALIZING
+21:48:22.205  [+20.9s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.073m pos=(-0.04, 0.06, -0.32) rot=(0.52, 0.42, 0.36, -0.65)
+21:48:22.206  [+20.9s] [ImageTarget] scale mismatch: engine sees 0.073 m, manifest declares 0.03 m (ratio 2.42). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+21:48:22.206  [+20.9s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+21:48:22.917  [+21.6s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.03, 0.45, -0.32) trackingStatus=LIMITED reason=INITIALIZING
+21:48:23.214  [+21.9s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.077m pos=(-0.04, 0.05, -0.32) rot=(0.56, 0.40, 0.40, -0.61)
+21:48:23.215  [+21.9s] [ImageTarget] scale mismatch: engine sees 0.077 m, manifest declares 0.03 m (ratio 2.55). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+21:48:23.215  [+21.9s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+21:48:23.931  [+22.6s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.04, 0.43, -0.32) trackingStatus=LIMITED reason=INITIALIZING
+21:48:24.216  [+22.9s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.084m pos=(-0.04, 0.03, -0.32) rot=(0.53, 0.45, 0.45, -0.56)
+21:48:24.217  [+22.9s] [ImageTarget] scale mismatch: engine sees 0.084 m, manifest declares 0.03 m (ratio 2.80). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+21:48:24.217  [+22.9s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+21:48:24.933  [+23.6s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.03, 0.42, -0.33) trackingStatus=LIMITED reason=INITIALIZING
+21:48:25.227  [+23.9s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.103m pos=(-0.05, -0.01, -0.34) rot=(-0.37, -0.59, -0.60, 0.39)
+21:48:25.227  [+23.9s] [ImageTarget] scale mismatch: engine sees 0.103 m, manifest declares 0.03 m (ratio 3.44). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+21:48:25.227  [+23.9s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+21:48:25.934  [+24.6s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.07, 0.40, -0.26) trackingStatus=LIMITED reason=INITIALIZING
+21:48:26.041  [+24.7s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+21:48:26.112  [+24.8s] [ImageTarget] FOUND "site-tracking-front"
+  scale=0.162m pos=(-0.08, -0.16, -0.32) rot=(-0.09, -0.70, -0.70, 0.10)
+  trackingStatus=LIMITED
+  re-detection REJECTED — see warning below — keeping previous anchor
+21:48:26.150  [+24.8s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+21:48:26.952  [+25.6s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.16, 0.41, -0.32) trackingStatus=LIMITED reason=INITIALIZING
+21:48:27.964  [+26.6s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.14, 0.55, -0.44) trackingStatus=LIMITED reason=INITIALIZING
+21:48:28.966  [+27.6s] [EightWallSession] camera (periodic, throttled 1/s) = (0.03, 0.85, -0.50) trackingStatus=LIMITED reason=INITIALIZING
+21:48:29.983  [+28.6s] [EightWallSession] camera (periodic, throttled 1/s) = (0.02, 1.05, -0.48) trackingStatus=LIMITED reason=INITIALIZING
+21:48:30.444  [+29.1s] [ImageTarget] FOUND "site-tracking-front"
+  scale=0.147m pos=(0.05, 0.47, -0.49) rot=(0.36, 0.54, 0.49, -0.58)
+  trackingStatus=LIMITED
+  re-detection REJECTED — see warning below — keeping previous anchor
+21:48:30.444  [+29.1s] [ImageTarget] scale mismatch: engine sees 0.147 m, manifest declares 0.03 m (ratio 4.89). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+21:48:30.444  [+29.1s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+21:48:30.463  [+29.1s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.154m pos=(0.05, 0.44, -0.49) rot=(0.35, 0.55, 0.49, -0.58)
+21:48:30.983  [+29.6s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.01, 1.18, -0.47) trackingStatus=LIMITED reason=INITIALIZING
+21:48:31.450  [+30.1s] [ImageTarget] scale mismatch: engine sees 0.132 m, manifest declares 0.03 m (ratio 4.41). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+21:48:31.450  [+30.1s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+21:48:31.466  [+30.1s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.132m pos=(0.05, 0.52, -0.49) rot=(0.40, 0.52, 0.48, -0.58)
+21:48:31.821  [+30.5s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+21:48:31.912  [+30.6s] [ImageTarget] FOUND "site-tracking-front"
+  scale=0.100m pos=(0.04, 0.70, -0.48) rot=(0.41, 0.53, 0.46, -0.58)
+  trackingStatus=LIMITED
+  re-detection REJECTED — see warning below — keeping previous anchor
+21:48:31.998  [+30.7s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.03, 1.30, -0.46) trackingStatus=LIMITED reason=INITIALIZING
+21:48:32.180  [+30.8s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+21:48:32.254  [+30.9s] [ImageTarget] FOUND "site-tracking-front"
+  scale=0.091m pos=(0.03, 0.76, -0.48) rot=(0.40, 0.53, 0.46, -0.59)
+  trackingStatus=LIMITED
+  re-detection REJECTED — see warning below — keeping previous anchor
+21:48:32.342  [+31.0s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+21:48:32.589  [+31.3s] [ImageTarget] FOUND "site-tracking-front"
+  scale=0.100m pos=(0.03, 0.75, -0.48) rot=(0.39, 0.54, 0.45, -0.60)
+  trackingStatus=LIMITED
+  re-detection REJECTED — see warning below — keeping previous anchor
+21:48:32.589  [+31.3s] [ImageTarget] scale mismatch: engine sees 0.100 m, manifest declares 0.03 m (ratio 3.32). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+21:48:32.589  [+31.3s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+21:48:32.609  [+31.3s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.100m pos=(0.03, 0.75, -0.48) rot=(0.39, 0.53, 0.45, -0.60)
+21:48:32.627  [+31.3s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+21:48:32.700  [+31.4s] [ImageTarget] FOUND "site-tracking-front"
+  scale=0.114m pos=(0.04, 0.66, -0.49) rot=(0.39, 0.53, 0.44, -0.60)
+  trackingStatus=LIMITED
+  re-detection REJECTED — see warning below — keeping previous anchor
+21:48:33.010  [+31.7s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.10, 1.54, -0.47) trackingStatus=LIMITED reason=INITIALIZING
+21:48:33.601  [+32.3s] [ImageTarget] scale mismatch: engine sees 0.136 m, manifest declares 0.03 m (ratio 4.52). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+21:48:33.601  [+32.3s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+21:48:33.617  [+32.3s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+21:48:33.734  [+32.4s] [TrackingStatus] NORMAL reason=UNSPECIFIED — was LIMITED (INITIALIZING)
+21:48:33.734  [DIAG T+33122ms] tracking-status-first-normal
+21:48:34.013  [+32.7s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.00, 0.19, -0.00) trackingStatus=NORMAL reason=UNSPECIFIED
+21:48:34.154  [+32.8s] [ImageTarget] FOUND "site-tracking-front"
+  scale=0.021m pos=(-0.01, 0.02, -0.03) rot=(0.63, -0.14, -0.05, -0.76)
+  trackingStatus=NORMAL
+  re-detection REJECTED — see warning below — keeping previous anchor
+21:48:34.173  [+32.8s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.021m pos=(-0.01, 0.02, -0.03) rot=(0.63, -0.14, -0.05, -0.76)
+21:48:34.385  [+33.0s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+21:48:34.596  [+33.3s] [ImageTarget] FOUND "site-tracking-front"
+  scale=0.022m pos=(-0.01, 0.02, -0.03) rot=(0.67, -0.10, -0.05, -0.73)
+  trackingStatus=NORMAL
+  re-detection REJECTED — see warning below — keeping previous anchor
+21:48:34.613  [+33.3s] [ImageTarget] scale mismatch: engine sees 0.022 m, manifest declares 0.03 m (ratio 0.73). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+21:48:34.636  [+33.3s] [ImageTargetAnchorSource] rotation not yet corroborated for "site-tracking-front" (yaw=9.8°) — awaiting a confirming sample before applying (§37)
+21:48:34.653  [+33.3s] [ImageTargetAnchorSource]  camera=(-0.02, 0.19, -0.03) anchor=(-0.82, 0.05, 0.18) dist=0.84m anchor-rot=(-0.04, -0.12, 0.03, -0.99) euler(YXZ, deg)=(yaw=13.5, pitch=4.9, roll=-2.6)
+21:48:34.654  [DIAG T+34041ms] trustworthy-pose-applied — ratio=0.77
+21:48:34.654  [+33.3s] [ImageTargetAnchorSource] first trustworthy pose accepted (ratio=0.77) — revealing anchor group. Continuous per-frame updates are now ignored; a fresh re-detection can still re-ground it (§26).
+21:48:34.668  [DIAG T+34055ms] scene-revealed
+21:48:34.669  [DIAG] ---- timeline (24 marks) ----
+21:48:34.669  [DIAG] T+722ms  (+722ms)  manifest-resolved
+21:48:34.669  [DIAG] T+722ms  (+0ms)  main-start
+21:48:34.669  [DIAG] T+723ms  (+1ms)  glb-load-start
+21:48:34.669  [DIAG] T+723ms  (+0ms)  rive-file-load-start
+21:48:34.669  [DIAG] T+728ms  (+5ms)  image-target-json-fetch-start
+21:48:34.669  [DIAG] T+729ms  (+1ms)  card-attach-end
+21:48:34.669  [DIAG] T+878ms  (+149ms)  markers-attach-start
+21:48:34.669  [DIAG] T+878ms  (+0ms)  glb-load-end
+21:48:34.669  [DIAG] T+878ms  (+0ms)  rive-file-load-end
+21:48:34.669  [DIAG] T+892ms  (+14ms)  markers-attach-end
+21:48:34.669  [DIAG] T+893ms  (+1ms)  scene-content-ready
+21:48:34.669  [DIAG] T+1007ms  (+114ms)  start-ar-button-shown
+21:48:34.670  [DIAG] T+1007ms  (+0ms)  image-target-json-fetch-end
+21:48:34.670  [DIAG] T+13915ms  (+12908ms)  start-ar-tapped
+21:48:34.670  [DIAG] T+13920ms  (+5ms)  xr8-engine-module-import-start
+21:48:34.670  [DIAG] T+14122ms  (+202ms)  xr8-engine-module-ready
+21:48:34.670  [DIAG] T+14145ms  (+23ms)  xr8-run-invoked
+21:48:34.670  [DIAG] T+18209ms  (+4064ms)  xr8-pipeline-onstart
+21:48:34.670  [DIAG] T+18242ms  (+33ms)  xr8-onstart-fired
+21:48:34.670  [DIAG] T+20556ms  (+2314ms)  first-pose-applied (bootstrap, unchecked)
+21:48:34.670  [DIAG] T+20562ms  (+6ms)  first-image-found-acquired (bootstrap, not yet revealed)
+21:48:34.670  [DIAG] T+33121ms  (+12559ms)  tracking-status-first-normal
+21:48:34.670  [DIAG] T+34041ms  (+920ms)  trustworthy-pose-applied
+21:48:34.670  [DIAG] T+34055ms  (+14ms)  scene-revealed
+21:48:34.670  [DIAG] ---- end timeline ----
+21:48:34.682  [+33.3s] [ImageTargetAnchorSource] isTracking()
+  acquired=true imageVisible=true
+  trackingStatus=NORMAL reason=UNSPECIFIED
+  => true
+21:48:34.682  [+33.3s] [HotspotProjector] "hotspot_building_00" -> HIDDEN (frustum=false) (screen=-14493,-46848)
+21:48:34.683  [+33.3s] [HotspotProjector] "hotspot_building_03" -> HIDDEN (frustum=false) (screen=1640,-1373)
+21:48:34.683  [+33.3s] [HotspotProjector] "hotspot_building_05" -> HIDDEN (frustum=false) (screen=2265,-1656)
+21:48:34.683  [+33.3s] [HotspotProjector] "hotspot_building_06" -> HIDDEN (frustum=false) (screen=2290,-2289)
+21:48:34.683  [+33.3s] [HotspotProjector] "hotspot_building_07" -> HIDDEN (frustum=false) (screen=2703,-4127)
+21:48:34.683  [+33.3s] [HotspotProjector] "hotspot_building_08" -> HIDDEN (frustum=false) (screen=3107,-4882)
+21:48:34.683  [+33.3s] [HotspotProjector] "hotspot_building_09" -> HIDDEN (frustum=false) (screen=2273,-3323)
+21:48:34.683  [+33.3s] [HotspotProjector] "hotspot_building_10" -> HIDDEN (frustum=false) (screen=2690,-2376)
+21:48:34.683  [+33.3s] [HotspotProjector] "hotspot_building_11" -> HIDDEN (frustum=false) (screen=2913,-3258)
+21:48:34.683  [+33.3s] [HotspotProjector] "hotspot_building_12" -> HIDDEN (frustum=false) (screen=2571,-2786)
+21:48:34.683  [+33.3s] [HotspotProjector] "hotspot_building_13" -> HIDDEN (frustum=false) (screen=2482,-2021)
+21:48:34.683  [+33.3s] [HotspotProjector] "hotspot_building_14" -> HIDDEN (frustum=false) (screen=3456,-5346)
+21:48:34.799  [+33.5s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+21:48:34.799  [+33.5s] [ImageTargetAnchorSource] isTracking()
+  acquired=true imageVisible=false
+  trackingStatus=NORMAL reason=UNSPECIFIED
+  => true
+21:48:34.887  [+33.6s] [ImageTarget] FOUND "site-tracking-front"
+  scale=0.023m pos=(-0.01, 0.02, -0.03) rot=(0.69, -0.06, -0.03, -0.72)
+  trackingStatus=NORMAL
+  re-detection — firing onOriginChanged, pose discontinuity
+21:48:34.887  [+33.6s] [ImageTargetAnchorSource] rotation not yet corroborated for "site-tracking-front" (yaw=7.0°) — awaiting a confirming sample before applying (§37)
+21:48:34.887  [+33.6s] [ImageTargetAnchorSource] isTracking()
+  acquired=true imageVisible=true
+  trackingStatus=NORMAL reason=UNSPECIFIED
+  => true
+21:48:34.962  [+33.6s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+21:48:34.962  [+33.6s] [ImageTargetAnchorSource] isTracking()
+  acquired=true imageVisible=false
+  trackingStatus=NORMAL reason=UNSPECIFIED
+  => true
+21:48:35.024  [+33.7s] [ImageTarget] FOUND "site-tracking-front"
+  scale=0.025m pos=(-0.01, 0.01, -0.03) rot=(0.68, 0.06, 0.08, -0.72)
+  trackingStatus=NORMAL
+  re-detection — firing onOriginChanged, pose discontinuity
+21:48:35.024  [+33.7s] [ImageTargetAnchorSource]  camera=(-0.01, 0.20, -0.05) anchor=(-0.83, 0.03, -0.18) dist=0.84m anchor-rot=(-0.03, 0.10, 0.01, -0.99) euler(YXZ, deg)=(yaw=-11.5, pitch=2.8, roll=-1.5)
+21:48:35.025  [+33.7s] [ImageTargetAnchorSource] isTracking()
+  acquired=true imageVisible=true
+  trackingStatus=NORMAL reason=UNSPECIFIED
+  => true
+21:48:35.025  [+33.7s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.02, 0.20, -0.05) trackingStatus=NORMAL reason=UNSPECIFIED
+21:48:35.176  [+33.8s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.027m pos=(-0.01, 0.00, -0.03) rot=(0.68, 0.07, 0.09, -0.72)
+21:48:35.382  [+34.0s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+21:48:35.383  [+34.0s] [ImageTargetAnchorSource] isTracking()
+  acquired=true imageVisible=false
+  trackingStatus=NORMAL reason=UNSPECIFIED
+  => true
+21:48:35.488  [+34.2s] [ImageTarget] FOUND "site-tracking-front"
+  scale=0.021m pos=(-0.01, 0.04, -0.03) rot=(0.66, 0.12, 0.13, -0.73)
+  trackingStatus=NORMAL
+  re-detection REJECTED — see warning below — keeping previous anchor
+21:48:35.489  [+34.2s] [ImageTargetAnchorSource] isTracking()
+  acquired=true imageVisible=true
+  trackingStatus=NORMAL reason=UNSPECIFIED
+  => true
+21:48:35.700  [+34.4s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+21:48:35.701  [+34.4s] [ImageTargetAnchorSource] isTracking()
+  acquired=true imageVisible=false
+  trackingStatus=NORMAL reason=UNSPECIFIED
+  => true
+21:48:35.830  [+34.5s] [ImageTarget] FOUND "site-tracking-front"
+  scale=0.024m pos=(-0.01, 0.02, -0.03) rot=(0.62, 0.11, 0.14, -0.76)
+  trackingStatus=NORMAL
+  re-detection — firing onOriginChanged, pose discontinuity
+21:48:35.831  [+34.5s] [ImageTargetAnchorSource] rotation not yet corroborated for "site-tracking-front" (yaw=-20.9°) — awaiting a confirming sample before applying (§37)
+21:48:35.831  [+34.5s] [ImageTargetAnchorSource] isTracking()
+  acquired=true imageVisible=true
+  trackingStatus=NORMAL reason=UNSPECIFIED
+  => true
+21:48:36.030  [+34.7s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.02, 0.25, -0.01) trackingStatus=NORMAL reason=UNSPECIFIED
+21:48:36.181  [+34.8s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.025m pos=(-0.01, 0.01, -0.03) rot=(0.59, 0.08, 0.16, -0.79)
+21:48:36.215  [+34.9s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+21:48:36.216  [+34.9s] [ImageTargetAnchorSource] isTracking()
+  acquired=true imageVisible=false
+  trackingStatus=NORMAL reason=UNSPECIFIED
+  => true
+21:48:36.413  [+35.1s] [ImageTarget] FOUND "site-tracking-front"
+  scale=0.025m pos=(-0.01, 0.01, -0.03) rot=(0.57, 0.09, 0.16, -0.80)
+  trackingStatus=NORMAL
+  re-detection — firing onOriginChanged, pose discontinuity
+21:48:36.413  [+35.1s] [ImageTargetAnchorSource]  camera=(-0.02, 0.29, 0.02) anchor=(-0.80, 0.13, -0.29) dist=0.85m anchor-rot=(-0.16, 0.17, 0.05, -0.97) euler(YXZ, deg)=(yaw=-21.6, pitch=17.2, roll=-8.9)
+21:48:36.414  [+35.1s] [ImageTargetAnchorSource] isTracking()
+  acquired=true imageVisible=true
+  trackingStatus=NORMAL reason=UNSPECIFIED
+  => true
+21:48:36.447  [+35.1s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+21:48:36.447  [+35.1s] [ImageTargetAnchorSource] isTracking()
+  acquired=true imageVisible=false
+  trackingStatus=NORMAL reason=UNSPECIFIED
+  => true
+21:48:36.830  [+35.5s] [ImageTarget] FOUND "site-tracking-front"
+  scale=0.026m pos=(-0.01, 0.00, -0.03) rot=(0.56, 0.10, 0.14, -0.81)
+  trackingStatus=NORMAL
+  re-detection — firing onOriginChanged, pose discontinuity
+21:48:36.830  [+35.5s] [ImageTargetAnchorSource] rotation not yet corroborated for "site-tracking-front" (yaw=-20.8°) — awaiting a confirming sample before applying (§37)
+21:48:36.831  [+35.5s] [ImageTargetAnchorSource] isTracking()
+  acquired=true imageVisible=true
+  trackingStatus=NORMAL reason=UNSPECIFIED
+  => true
+21:48:36.880  [+35.5s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+21:48:36.881  [+35.5s] [ImageTargetAnchorSource] isTracking()
+  acquired=true imageVisible=false
+  trackingStatus=NORMAL reason=UNSPECIFIED
+  => true
+21:48:37.046  [+35.7s] [ImageTarget] FOUND "site-tracking-front"
+  scale=0.026m pos=(-0.01, 0.01, -0.03) rot=(0.55, 0.10, 0.14, -0.81)
+  trackingStatus=NORMAL
+  re-detection — firing onOriginChanged, pose discontinuity
+21:48:37.047  [+35.7s] [ImageTargetAnchorSource]  camera=(-0.03, 0.35, 0.06) anchor=(-0.80, 0.09, -0.29) dist=0.88m anchor-rot=(-0.18, 0.17, 0.03, -0.97) euler(YXZ, deg)=(yaw=-21.3, pitch=20.3, roll=-6.8)
+21:48:37.047  [+35.7s] [ImageTargetAnchorSource] isTracking()
+  acquired=true imageVisible=true
+  trackingStatus=NORMAL reason=UNSPECIFIED
+  => true
+21:48:37.047  [+35.7s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.03, 0.35, 0.06) trackingStatus=NORMAL reason=UNSPECIFIED
+21:48:37.080  [+35.7s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+21:48:37.081  [+35.7s] [ImageTargetAnchorSource] isTracking()
+  acquired=true imageVisible=false
+  trackingStatus=NORMAL reason=UNSPECIFIED
+  => true
+21:48:37.230  [+35.9s] [ImageTarget] FOUND "site-tracking-front"
+  scale=0.026m pos=(-0.01, 0.00, -0.03) rot=(0.55, 0.11, 0.14, -0.82)
+  trackingStatus=NORMAL
+  re-detection — firing onOriginChanged, pose discontinuity
+21:48:37.230  [+35.9s] [ImageTargetAnchorSource] rotation not yet corroborated for "site-tracking-front" (yaw=-21.7°) — awaiting a confirming sample before applying (§37)
+21:48:37.230  [+35.9s] [ImageTargetAnchorSource] isTracking()
+  acquired=true imageVisible=true
+  trackingStatus=NORMAL reason=UNSPECIFIED
+  => true
+21:48:37.247  [+35.9s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.026m pos=(-0.01, 0.00, -0.03) rot=(0.55, 0.11, 0.14, -0.82)
+21:48:37.364  [+36.0s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+21:48:37.364  [+36.0s] [ImageTargetAnchorSource] isTracking()
+  acquired=true imageVisible=false
+  trackingStatus=NORMAL reason=UNSPECIFIED
+  => true
+21:48:37.430  [+36.1s] [ImageTarget] FOUND "site-tracking-front"
+  scale=0.026m pos=(-0.01, 0.00, -0.03) rot=(0.46, 0.12, 0.11, -0.87)
+  trackingStatus=NORMAL
+  re-detection — firing onOriginChanged, pose discontinuity
+21:48:37.430  [+36.1s] [ImageTargetAnchorSource]  camera=(-0.04, 0.37, 0.07) anchor=(-0.81, 0.07, -0.28) dist=0.90m anchor-rot=(-0.29, 0.16, -0.00, -0.94) euler(YXZ, deg)=(yaw=-21.7, pitch=33.5, roll=-6.2)
+21:48:37.431  [+36.1s] [ImageTargetAnchorSource] isTracking()
+  acquired=true imageVisible=true
+  trackingStatus=NORMAL reason=UNSPECIFIED
+  => true
+21:48:37.447  [+36.1s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+21:48:37.447  [+36.1s] [ImageTargetAnchorSource] isTracking()
+  acquired=true imageVisible=false
+  trackingStatus=NORMAL reason=UNSPECIFIED
+  => true
+21:48:37.530  [+36.2s] [ImageTarget] FOUND "site-tracking-front"
+  scale=0.026m pos=(-0.01, 0.00, -0.03) rot=(0.46, 0.11, 0.12, -0.87)
+  trackingStatus=NORMAL
+  re-detection — firing onOriginChanged, pose discontinuity
+21:48:37.530  [+36.2s] [ImageTargetAnchorSource] rotation not yet corroborated for "site-tracking-front" (yaw=-21.5°) — awaiting a confirming sample before applying (§37)
+21:48:37.531  [+36.2s] [ImageTargetAnchorSource] isTracking()
+  acquired=true imageVisible=true
+  trackingStatus=NORMAL reason=UNSPECIFIED
+  => true
+21:48:37.547  [+36.2s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+21:48:37.547  [+36.2s] [ImageTargetAnchorSource] isTracking()
+  acquired=true imageVisible=false
+  trackingStatus=NORMAL reason=UNSPECIFIED
+  => true
+21:48:37.647  [+36.3s] [ImageTarget] FOUND "site-tracking-front"
+  scale=0.026m pos=(-0.01, 0.00, -0.04) rot=(0.44, 0.12, 0.11, -0.88)
+  trackingStatus=NORMAL
+  re-detection — firing onOriginChanged, pose discontinuity
+21:48:37.648  [+36.3s] [ImageTargetAnchorSource]  camera=(-0.04, 0.39, 0.09) anchor=(-0.80, 0.07, -0.29) dist=0.91m anchor-rot=(-0.31, 0.17, -0.01, -0.94) euler(YXZ, deg)=(yaw=-22.6, pitch=35.5, roll=-6.5)
+21:48:37.648  [+36.3s] [ImageTargetAnchorSource] isTracking()
+  acquired=true imageVisible=true
+  trackingStatus=NORMAL reason=UNSPECIFIED
+  => true
+21:48:37.748  [+36.4s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+21:48:37.749  [+36.4s] [ImageTargetAnchorSource] isTracking()
+  acquired=true imageVisible=false
+  trackingStatus=NORMAL reason=UNSPECIFIED
+  => true
+21:48:38.047  [+36.7s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.08, 0.41, 0.13) trackingStatus=NORMAL reason=UNSPECIFIED
+21:48:38.188  [+36.9s] [HotspotProjector] "hotspot_building_00" -> VISIBLE (screen=8,1)
+21:48:38.188  [+36.9s] [MarkerLayer] "hotspot_building_00" -> display:block (projection visible at 8,1)
+21:48:38.188  [DIAG T+37576ms] first-marker-visible — hotspot_building_00
+21:48:39.049  [+37.7s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.13, 0.56, 0.40) trackingStatus=NORMAL reason=UNSPECIFIED
+21:48:39.834  [+38.5s] [HotspotProjector] "hotspot_building_00" -> HIDDEN (frustum=false) (screen=397,326)
+21:48:40.061  [+38.7s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.24, 0.61, 0.63) trackingStatus=NORMAL reason=UNSPECIFIED
+21:48:40.081  [+38.7s] [MarkerLayer] "hotspot_building_00" -> display:none (hysteresis 250ms expired; cause: frustum=false)
+21:48:40.683  [+39.3s] [HotspotProjector] "hotspot_building_00" -> VISIBLE (screen=383,260)
+21:48:40.683  [+39.3s] [MarkerLayer] "hotspot_building_00" -> display:block (projection visible at 383,260)
+21:48:41.070  [+39.7s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.18, 0.62, 0.68) trackingStatus=NORMAL reason=UNSPECIFIED
+21:48:41.092  [+39.8s] [HotspotProjector] "hotspot_building_09" -> VISIBLE (screen=385,313)
+21:48:41.093  [+39.8s] [MarkerLayer] "hotspot_building_09" -> display:block (projection visible at 385,313)
+21:48:41.141  [+39.8s] [HotspotProjector] "hotspot_building_03" -> VISIBLE (screen=388,370)
+21:48:41.144  [+39.8s] [HotspotProjector] "hotspot_building_07" -> VISIBLE (screen=386,289)
+21:48:41.148  [+39.8s] [MarkerLayer] "hotspot_building_03" -> display:block (projection visible at 388,370)
+21:48:41.148  [+39.8s] [MarkerLayer] "hotspot_building_07" -> display:block (projection visible at 386,289)
+21:48:41.179  [+39.8s] [HotspotProjector] "hotspot_building_08" -> VISIBLE (screen=391,265)
+21:48:41.183  [+39.8s] [MarkerLayer] "hotspot_building_08" -> display:block (projection visible at 391,265)
+21:48:41.241  [+39.9s] [HotspotProjector] "hotspot_building_06" -> VISIBLE (screen=383,331)
+21:48:41.251  [+39.9s] [MarkerLayer] "hotspot_building_06" -> display:block (projection visible at 383,331)
+21:48:41.293  [+40.0s] [HotspotProjector] "hotspot_building_12" -> VISIBLE (screen=385,306)
+21:48:41.296  [+40.0s] [HotspotProjector] "hotspot_building_14" -> VISIBLE (screen=381,247)
+21:48:41.297  [+40.0s] [MarkerLayer] "hotspot_building_12" -> display:block (projection visible at 385,306)
+21:48:41.297  [+40.0s] [MarkerLayer] "hotspot_building_14" -> display:block (projection visible at 381,247)
+21:48:41.327  [+40.0s] [HotspotProjector] "hotspot_building_05" -> VISIBLE (screen=392,348)
+21:48:41.343  [+40.0s] [HotspotProjector] "hotspot_building_11" -> VISIBLE (screen=390,286)
+21:48:41.349  [+40.0s] [MarkerLayer] "hotspot_building_05" -> display:block (projection visible at 392,348)
+21:48:41.350  [+40.0s] [MarkerLayer] "hotspot_building_11" -> display:block (projection visible at 390,286)
+21:48:41.447  [+40.1s] [HotspotProjector] "hotspot_building_10" -> VISIBLE (screen=382,305)
+21:48:41.457  [+40.1s] [HotspotProjector] "hotspot_building_13" -> VISIBLE (screen=371,325)
+21:48:41.460  [+40.1s] [MarkerLayer] "hotspot_building_10" -> display:block (projection visible at 382,305)
+21:48:41.461  [+40.1s] [MarkerLayer] "hotspot_building_13" -> display:block (projection visible at 371,325)
+21:48:41.926  [+40.6s] [HotspotProjector] "hotspot_building_00" -> HIDDEN (frustum=false) (screen=-9,441)
+21:48:42.120  [+40.8s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.09, 0.82, 0.90) trackingStatus=NORMAL reason=UNSPECIFIED
+21:48:42.144  [+40.8s] [HotspotProjector] "hotspot_building_00" -> VISIBLE (screen=2,494)
+21:48:42.254  [+40.9s] [HotspotProjector] "hotspot_building_00" -> HIDDEN (frustum=false) (screen=-2,483)
+21:48:42.466  [+41.1s] [HotspotProjector] "hotspot_building_00" -> VISIBLE (screen=4,426)
+21:48:42.691  [+41.4s] [HotspotProjector] "hotspot_building_00" -> HIDDEN (frustum=false) (screen=-2,341)
+21:48:42.854  [+41.5s] [HotspotProjector] "hotspot_building_00" -> VISIBLE (screen=6,252)
+21:48:43.144  [+41.8s] [HotspotProjector] "hotspot_building_10" -> HIDDEN (frustum=false) (screen=406,161)
+21:48:43.157  [+41.8s] [EightWallSession] camera (periodic, throttled 1/s) = (0.00, 0.29, 0.62) trackingStatus=NORMAL reason=UNSPECIFIED
+21:48:43.204  [+41.9s] [HotspotProjector] "hotspot_building_13" -> HIDDEN (frustum=false) (screen=402,176)
+21:48:43.233  [+41.9s] [HotspotProjector] "hotspot_building_05" -> HIDDEN (frustum=false) (screen=416,179)
+21:48:43.245  [+41.9s] [HotspotProjector] "hotspot_building_11" -> HIDDEN (frustum=false) (screen=417,118)
+21:48:43.290  [+42.0s] [HotspotProjector] "hotspot_building_12" -> HIDDEN (frustum=false) (screen=415,117)
+21:48:43.291  [+42.0s] [HotspotProjector] "hotspot_building_14" -> HIDDEN (frustum=false) (screen=416,57)
+21:48:43.317  [+42.0s] [HotspotProjector] "hotspot_building_06" -> HIDDEN (frustum=false) (screen=420,133)
+21:48:43.318  [+42.0s] [HotspotProjector] "hotspot_building_07" -> HIDDEN (frustum=false) (screen=395,85)
+21:48:43.318  [+42.0s] [HotspotProjector] "hotspot_building_08" -> HIDDEN (frustum=false) (screen=423,60)
+21:48:43.347  [+42.0s] [HotspotProjector] "hotspot_building_03" -> HIDDEN (frustum=false) (screen=394,187)
+21:48:43.350  [+42.0s] [MarkerLayer] "hotspot_building_10" -> display:none (hysteresis 250ms expired; cause: frustum=false)
+21:48:43.395  [+42.1s] [MarkerLayer] "hotspot_building_13" -> display:none (hysteresis 250ms expired; cause: frustum=false)
+21:48:43.439  [+42.1s] [MarkerLayer] "hotspot_building_05" -> display:none (hysteresis 250ms expired; cause: frustum=false)
+21:48:43.440  [+42.1s] [MarkerLayer] "hotspot_building_11" -> display:none (hysteresis 250ms expired; cause: frustum=false)
+21:48:43.464  [+42.1s] [HotspotProjector] "hotspot_building_09" -> HIDDEN (frustum=false) (screen=400,155)
+21:48:43.487  [+42.2s] [MarkerLayer] "hotspot_building_12" -> display:none (hysteresis 250ms expired; cause: frustum=false)
+21:48:43.488  [+42.2s] [MarkerLayer] "hotspot_building_14" -> display:none (hysteresis 250ms expired; cause: frustum=false)
+21:48:43.533  [+42.2s] [MarkerLayer] "hotspot_building_06" -> display:none (hysteresis 250ms expired; cause: frustum=false)
+21:48:43.533  [+42.2s] [MarkerLayer] "hotspot_building_07" -> display:none (hysteresis 250ms expired; cause: frustum=false)
+21:48:43.534  [+42.2s] [MarkerLayer] "hotspot_building_08" -> display:none (hysteresis 250ms expired; cause: frustum=false)
+21:48:43.580  [+42.2s] [MarkerLayer] "hotspot_building_03" -> display:none (hysteresis 250ms expired; cause: frustum=false)
+21:48:43.692  [+42.4s] [MarkerLayer] "hotspot_building_09" -> display:none (hysteresis 250ms expired; cause: frustum=false)
+21:48:43.841  [+42.5s] [HotspotProjector] "hotspot_building_09" -> VISIBLE (screen=391,129)
+21:48:43.842  [+42.5s] [MarkerLayer] "hotspot_building_09" -> display:block (projection visible at 391,129)
+21:48:43.912  [+42.6s] [HotspotProjector] "hotspot_building_03" -> VISIBLE (screen=391,193)
+21:48:43.916  [+42.6s] [MarkerLayer] "hotspot_building_03" -> display:block (projection visible at 391,193)
+21:48:43.944  [+42.6s] [HotspotProjector] "hotspot_building_07" -> VISIBLE (screen=392,99)
+21:48:43.948  [+42.6s] [MarkerLayer] "hotspot_building_07" -> display:block (projection visible at 392,99)
+21:48:44.097  [+42.8s] [HotspotProjector] "hotspot_building_06" -> VISIBLE (screen=385,140)
+21:48:44.104  [+42.8s] [HotspotProjector] "hotspot_building_08" -> VISIBLE (screen=390,67)
+21:48:44.107  [+42.8s] [MarkerLayer] "hotspot_building_06" -> display:block (projection visible at 385,140)
+21:48:44.108  [+42.8s] [MarkerLayer] "hotspot_building_08" -> display:block (projection visible at 390,67)
+21:48:44.190  [+42.9s] [EightWallSession] camera (periodic, throttled 1/s) = (0.08, 0.31, 0.57) trackingStatus=NORMAL reason=UNSPECIFIED
+21:48:44.271  [+42.9s] [HotspotProjector] "hotspot_building_12" -> VISIBLE (screen=392,120)
+21:48:44.273  [+42.9s] [MarkerLayer] "hotspot_building_12" -> display:block (projection visible at 392,120)
+21:48:44.320  [+43.0s] [HotspotProjector] "hotspot_building_14" -> VISIBLE (screen=388,62)
+21:48:44.321  [+43.0s] [MarkerLayer] "hotspot_building_14" -> display:block (projection visible at 388,62)
+21:48:44.348  [+43.0s] [HotspotProjector] "hotspot_building_05" -> VISIBLE (screen=391,175)
+21:48:44.368  [+43.0s] [MarkerLayer] "hotspot_building_05" -> display:block (projection visible at 391,175)
+21:48:44.411  [+43.1s] [HotspotProjector] "hotspot_building_11" -> VISIBLE (screen=393,104)
+21:48:44.418  [+43.1s] [MarkerLayer] "hotspot_building_11" -> display:block (projection visible at 393,104)
+21:48:44.522  [+43.2s] [HotspotProjector] "hotspot_building_13" -> VISIBLE (screen=392,147)
+21:48:44.526  [+43.2s] [MarkerLayer] "hotspot_building_13" -> display:block (projection visible at 392,147)
+21:48:44.544  [+43.2s] [HotspotProjector] "hotspot_building_00" -> HIDDEN (frustum=false) (screen=-7,77)
+21:48:44.775  [+43.4s] [MarkerLayer] "hotspot_building_00" -> display:none (hysteresis 250ms expired; cause: frustum=false)
+21:48:44.825  [+43.5s] [HotspotProjector] "hotspot_building_13" -> HIDDEN (frustum=false) (screen=394,107)
+21:48:44.913  [+43.6s] [HotspotProjector] "hotspot_building_11" -> HIDDEN (frustum=false) (screen=395,52)
+21:48:44.942  [+43.6s] [HotspotProjector] "hotspot_building_00" -> VISIBLE (screen=3,25)
+21:48:44.945  [+43.6s] [HotspotProjector] "hotspot_building_05" -> HIDDEN (frustum=false) (screen=395,125)
+21:48:44.961  [+43.6s] [HotspotProjector] "hotspot_building_14" -> HIDDEN (frustum=false) (screen=384,-2)
+21:48:44.961  [+43.6s] [MarkerLayer] "hotspot_building_00" -> display:block (projection visible at 3,25)
+21:48:45.044  [+43.7s] [MarkerLayer] "hotspot_building_13" -> display:none (hysteresis 250ms expired; cause: frustum=false)
+21:48:45.083  [+43.7s] [HotspotProjector] "hotspot_building_12" -> HIDDEN (frustum=false) (screen=401,64)
+21:48:45.116  [+43.8s] [HotspotProjector] "hotspot_building_08" -> HIDDEN (frustum=false) (screen=393,5)
+21:48:45.120  [+43.8s] [MarkerLayer] "hotspot_building_11" -> display:none (hysteresis 250ms expired; cause: frustum=false)
+21:48:45.182  [+43.8s] [HotspotProjector] "hotspot_building_06" -> HIDDEN (frustum=false) (screen=399,88)
+21:48:45.188  [+43.9s] [MarkerLayer] "hotspot_building_05" -> display:none (hysteresis 250ms expired; cause: frustum=false)
+21:48:45.189  [+43.9s] [MarkerLayer] "hotspot_building_14" -> display:none (hysteresis 250ms expired; cause: frustum=false)
+21:48:45.222  [+43.9s] [EightWallSession] camera (periodic, throttled 1/s) = (0.10, 0.31, 0.53) trackingStatus=NORMAL reason=UNSPECIFIED
+21:48:45.315  [+44.0s] [MarkerLayer] "hotspot_building_12" -> display:none (hysteresis 250ms expired; cause: frustum=false)
+21:48:45.347  [+44.0s] [MarkerLayer] "hotspot_building_08" -> display:none (hysteresis 250ms expired; cause: frustum=false)
+21:48:45.404  [+44.1s] [HotspotProjector] "hotspot_building_06" -> VISIBLE (screen=387,83)
+21:48:45.516  [+44.2s] [HotspotProjector] "hotspot_building_06" -> HIDDEN (frustum=false) (screen=393,75)
+21:48:45.618  [+44.3s] [HotspotProjector] "hotspot_building_07" -> HIDDEN (frustum=false) (screen=387,-6)
+21:48:45.648  [+44.3s] [HotspotProjector] "hotspot_building_00" -> HIDDEN (frustum=false) (screen=57,-12)
+21:48:45.703  [+44.4s] [HotspotProjector] "hotspot_building_09" -> HIDDEN (frustum=false) (screen=378,-11)
+21:48:45.724  [+44.4s] [HotspotProjector] "hotspot_building_03" -> HIDDEN (frustum=false) (screen=402,65)
+21:48:45.725  [+44.4s] [MarkerLayer] "hotspot_building_06" -> display:none (hysteresis 250ms expired; cause: frustum=false)
+21:48:45.831  [+44.5s] [MarkerLayer] "hotspot_building_07" -> display:none (hysteresis 250ms expired; cause: frustum=false)
+21:48:45.869  [+44.5s] [MarkerLayer] "hotspot_building_00" -> display:none (hysteresis 250ms expired; cause: frustum=false)
+21:48:45.934  [+44.6s] [MarkerLayer] "hotspot_building_09" -> display:none (hysteresis 250ms expired; cause: frustum=false)
+21:48:45.951  [+44.6s] [MarkerLayer] "hotspot_building_03" -> display:none (hysteresis 250ms expired; cause: frustum=false)
+21:48:46.230  [+44.9s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.22, 0.35, 0.35) trackingStatus=NORMAL reason=UNSPECIFIED
+21:48:47.239  [+45.9s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.53, 0.32, -0.05) trackingStatus=NORMAL reason=UNSPECIFIED
+21:48:48.248  [+46.9s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.52, 0.30, -0.50) trackingStatus=NORMAL reason=UNSPECIFIED
+21:48:49.250  [+47.9s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.35, 0.18, -0.59) trackingStatus=NORMAL reason=UNSPECIFIED
+21:48:50.266  [+48.9s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.33, 0.14, -0.62) trackingStatus=NORMAL reason=UNSPECIFIED
+21:48:50.977  [+49.6s] [ImageTarget] FOUND "site-tracking-left"
+  scale=0.027m pos=(-0.35, 0.01, -0.66) rot=(0.61, 0.36, 0.51, -0.48)
+  trackingStatus=NORMAL
+  first sighting of a NEW plaque — applied (trackingStatus exemption), firing onOriginChanged
+21:48:50.978  [+49.6s] [ImageTargetAnchorSource] rotation not yet corroborated for "site-tracking-left" (yaw=12.2°) — awaiting a confirming sample before applying (§37)
+21:48:50.978  [+49.6s] [ImageTargetAnchorSource] isTracking()
+  acquired=true imageVisible=true
+  trackingStatus=NORMAL reason=UNSPECIFIED
+  => true
+21:48:50.994  [+49.7s] [ImageTarget] updated (throttled 1/s) "site-tracking-left" scale=0.027m pos=(-0.35, 0.01, -0.66) rot=(0.61, 0.36, 0.51, -0.48)
+21:48:51.177  [+49.8s] [ImageTarget] LOST "site-tracking-left"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+21:48:51.177  [+49.8s] [ImageTargetAnchorSource] isTracking()
+  acquired=true imageVisible=false
+  trackingStatus=NORMAL reason=UNSPECIFIED
+  => true
+21:48:51.284  [+49.9s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.35, 0.19, -0.70) trackingStatus=NORMAL reason=UNSPECIFIED
+21:48:51.557  [+50.2s] [TrackingStatus] LIMITED reason=INITIALIZING — was NORMAL (UNSPECIFIED)
+21:48:51.558  [+50.2s] [ImageTargetAnchorSource] isTracking()
+  acquired=true imageVisible=false
+  trackingStatus=LIMITED reason=INITIALIZING
+  => false (markers hidden while false)
+21:48:51.558  [+50.2s] [HotspotProjector] "hotspot_building_00" -> HIDDEN (tracking=false) (screen=915,-594)
+21:48:51.559  [+50.2s] [HotspotProjector] "hotspot_building_03" -> HIDDEN (tracking=false) (screen=875,-608)
+21:48:51.559  [+50.2s] [HotspotProjector] "hotspot_building_05" -> HIDDEN (tracking=false) (screen=873,-632)
+21:48:51.559  [+50.2s] [HotspotProjector] "hotspot_building_06" -> HIDDEN (tracking=false) (screen=879,-636)
+21:48:51.559  [+50.2s] [HotspotProjector] "hotspot_building_07" -> HIDDEN (tracking=false) (screen=884,-663)
+21:48:51.559  [+50.2s] [HotspotProjector] "hotspot_building_08" -> HIDDEN (tracking=false) (screen=882,-687)
+21:48:51.560  [+50.2s] [HotspotProjector] "hotspot_building_09" -> HIDDEN (tracking=false) (screen=885,-641)
+21:48:51.560  [+50.2s] [HotspotProjector] "hotspot_building_10" -> HIDDEN (tracking=false) (screen=869,-672)
+21:48:51.560  [+50.2s] [HotspotProjector] "hotspot_building_11" -> HIDDEN (tracking=false) (screen=875,-679)
+21:48:51.560  [+50.2s] [HotspotProjector] "hotspot_building_12" -> HIDDEN (tracking=false) (screen=877,-658)
+21:48:51.560  [+50.2s] [HotspotProjector] "hotspot_building_13" -> HIDDEN (tracking=false) (screen=871,-653)
+21:48:51.560  [+50.2s] [HotspotProjector] "hotspot_building_14" -> HIDDEN (tracking=false) (screen=879,-708)
+21:48:52.294  [+51.0s] [EightWallSession] camera (periodic, throttled 1/s) = (-4.74, 3.52, -6.49) trackingStatus=LIMITED reason=INITIALIZING
+21:48:52.915  [+51.6s] [TrackingStatus] NORMAL reason=UNSPECIFIED — was LIMITED (INITIALIZING)
+21:48:52.916  [+51.6s] [ImageTargetAnchorSource] isTracking()
+  acquired=true imageVisible=false
+  trackingStatus=NORMAL reason=UNSPECIFIED
+  => true
+21:48:52.917  [+51.6s] [HotspotProjector] "hotspot_building_00" -> HIDDEN (frustum=false) (screen=136,-368)
+21:48:52.917  [+51.6s] [HotspotProjector] "hotspot_building_03" -> HIDDEN (frustum=false) (screen=1242,82)
+21:48:52.917  [+51.6s] [HotspotProjector] "hotspot_building_05" -> HIDDEN (frustum=false) (screen=1836,-5)
+21:48:52.918  [+51.6s] [HotspotProjector] "hotspot_building_06" -> HIDDEN (frustum=false) (screen=1593,-163)
+21:48:52.918  [+51.6s] [HotspotProjector] "hotspot_building_07" -> HIDDEN (frustum=false) (screen=1558,-544)
+21:48:52.919  [+51.6s] [HotspotProjector] "hotspot_building_08" -> HIDDEN (frustum=false) (screen=1797,-775)
+21:48:52.919  [+51.6s] [HotspotProjector] "hotspot_building_09" -> HIDDEN (frustum=false) (screen=1339,-332)
+21:48:52.919  [+51.6s] [HotspotProjector] "hotspot_building_10" -> HIDDEN (frustum=false) (screen=2320,-403)
+21:48:52.919  [+51.6s] [HotspotProjector] "hotspot_building_11" -> HIDDEN (frustum=false) (screen=2127,-582)
+21:48:52.920  [+51.6s] [HotspotProjector] "hotspot_building_12" -> HIDDEN (frustum=false) (screen=1830,-375)
+21:48:52.920  [+51.6s] [HotspotProjector] "hotspot_building_13" -> HIDDEN (frustum=false) (screen=2081,-204)
+21:48:52.921  [+51.6s] [HotspotProjector] "hotspot_building_14" -> HIDDEN (frustum=false) (screen=2064,-977)
+21:48:53.299  [+52.0s] [EightWallSession] camera (periodic, throttled 1/s) = (0.23, 0.40, 0.00) trackingStatus=NORMAL reason=UNSPECIFIED
+21:48:53.619  [+52.3s] [HotspotProjector] "hotspot_building_03" -> VISIBLE (screen=322,320)
+21:48:53.620  [+52.3s] [MarkerLayer] "hotspot_building_03" -> display:block (projection visible at 322,320)
+21:48:53.765  [+52.4s] [HotspotProjector] "hotspot_building_06" -> VISIBLE (screen=388,236)
+21:48:53.766  [+52.4s] [MarkerLayer] "hotspot_building_06" -> display:block (projection visible at 388,236)
+21:48:53.894  [+52.6s] [HotspotProjector] "hotspot_building_03" -> HIDDEN (frustum=false) (screen=-8,517)
+21:48:54.087  [+52.8s] [HotspotProjector] "hotspot_building_09" -> VISIBLE (screen=139,18)
+21:48:54.088  [+52.8s] [MarkerLayer] "hotspot_building_09" -> display:block (projection visible at 139,18)
+21:48:54.108  [+52.8s] [HotspotProjector] "hotspot_building_09" -> HIDDEN (frustum=false) (screen=183,-50)
+21:48:54.132  [+52.8s] [HotspotProjector] "hotspot_building_09" -> VISIBLE (screen=156,6)
+21:48:54.133  [+52.8s] [MarkerLayer] "hotspot_building_03" -> display:none (hysteresis 250ms expired; cause: frustum=false)
+21:48:54.157  [+52.8s] [HotspotProjector] "hotspot_building_09" -> HIDDEN (frustum=false) (screen=52,-18)
+21:48:54.179  [+52.8s] [HotspotProjector] "hotspot_building_06" -> HIDDEN (frustum=false) (screen=-143,322)
+21:48:54.238  [+52.9s] [HotspotProjector] "hotspot_building_09" -> VISIBLE (screen=13,49)
+21:48:54.260  [+52.9s] [HotspotProjector] "hotspot_building_12" -> VISIBLE (screen=378,223)
+21:48:54.261  [+52.9s] [MarkerLayer] "hotspot_building_12" -> display:block (projection visible at 378,223)
+21:48:54.283  [+52.9s] [HotspotProjector] "hotspot_building_12" -> HIDDEN (frustum=false) (screen=409,225)
+21:48:54.307  [+53.0s] [HotspotProjector] "hotspot_building_12" -> VISIBLE (screen=344,236)
+21:48:54.308  [+53.0s] [EightWallSession] camera (periodic, throttled 1/s) = (0.59, 0.41, -0.21) trackingStatus=NORMAL reason=UNSPECIFIED
+21:48:54.376  [+53.0s] [HotspotProjector] "hotspot_building_07" -> VISIBLE (screen=173,12)
+21:48:54.382  [+53.0s] [MarkerLayer] "hotspot_building_07" -> display:block (projection visible at 173,12)
+21:48:54.401  [+53.1s] [HotspotProjector] "hotspot_building_07" -> HIDDEN (frustum=false) (screen=218,-45)
+21:48:54.411  [+53.1s] [HotspotProjector] "hotspot_building_13" -> VISIBLE (screen=4,642)
+21:48:54.411  [+53.1s] [MarkerLayer] "hotspot_building_13" -> display:block (projection visible at 4,642)
+21:48:54.441  [+53.1s] [MarkerLayer] "hotspot_building_06" -> display:none (hysteresis 250ms expired; cause: frustum=false)
+21:48:54.463  [+53.1s] [HotspotProjector] "hotspot_building_06" -> VISIBLE (screen=5,210)
+21:48:54.474  [+53.1s] [MarkerLayer] "hotspot_building_06" -> display:block (projection visible at 5,210)
+21:48:54.585  [+53.3s] [HotspotProjector] "hotspot_building_00" -> VISIBLE (screen=101,10)
+21:48:54.597  [+53.3s] [MarkerLayer] "hotspot_building_00" -> display:block (projection visible at 101,10)
+21:48:54.621  [+53.3s] [HotspotProjector] "hotspot_building_03" -> VISIBLE (screen=10,320)
+21:48:54.634  [+53.3s] [MarkerLayer] "hotspot_building_03" -> display:block (projection visible at 10,320)
+21:48:54.664  [+53.3s] [HotspotProjector] "hotspot_building_05" -> VISIBLE (screen=0,445)
+21:48:54.671  [+53.3s] [HotspotProjector] "hotspot_building_07" -> VISIBLE (screen=308,37)
+21:48:54.681  [+53.3s] [MarkerLayer] "hotspot_building_05" -> display:block (projection visible at 0,445)
+21:48:54.896  [+53.6s] [HotspotProjector] "hotspot_building_10" -> VISIBLE (screen=382,677)
+21:48:54.903  [+53.6s] [MarkerLayer] "hotspot_building_10" -> display:block (projection visible at 382,677)
+21:48:54.942  [+53.6s] [HotspotProjector] "hotspot_building_10" -> HIDDEN (frustum=false) (screen=319,717)
+21:48:54.975  [+53.6s] [HotspotProjector] "hotspot_building_05" -> HIDDEN (frustum=false) (screen=-5,520)
+21:48:55.073  [+53.7s] [HotspotProjector] "hotspot_building_11" -> VISIBLE (screen=341,394)
+21:48:55.077  [+53.7s] [HotspotProjector] "hotspot_building_13" -> HIDDEN (frustum=false) (screen=-24,604)
+21:48:55.078  [+53.7s] [MarkerLayer] "hotspot_building_11" -> display:block (projection visible at 341,394)
+21:48:55.150  [+53.8s] [HotspotProjector] "hotspot_building_03" -> VISIBLE (occluded=true — marker dimmed, not hidden) (screen=11,409)
+21:48:55.167  [+53.8s] [MarkerLayer] "hotspot_building_10" -> display:none (hysteresis 250ms expired; cause: frustum=false)
+21:48:55.208  [+53.9s] [MarkerLayer] "hotspot_building_05" -> display:none (hysteresis 250ms expired; cause: frustum=false)
+21:48:55.247  [+53.9s] [HotspotProjector] "hotspot_building_08" -> VISIBLE (screen=356,216)
+21:48:55.257  [+53.9s] [MarkerLayer] "hotspot_building_08" -> display:block (projection visible at 356,216)
+21:48:55.303  [+54.0s] [MarkerLayer] "hotspot_building_13" -> display:none (hysteresis 250ms expired; cause: frustum=false)
+21:48:55.330  [+54.0s] [HotspotProjector] "hotspot_building_06" -> HIDDEN (frustum=false) (screen=-3,406)
+21:48:55.346  [+54.0s] [EightWallSession] camera (periodic, throttled 1/s) = (0.72, 0.51, -0.35) trackingStatus=NORMAL reason=UNSPECIFIED
+21:48:55.418  [+54.1s] [HotspotProjector] "hotspot_building_06" -> VISIBLE (screen=0,408)
+21:48:55.522  [+54.2s] [HotspotProjector] "hotspot_building_14" -> VISIBLE (screen=373,166)
+21:48:55.523  [+54.2s] [MarkerLayer] "hotspot_building_14" -> display:block (projection visible at 373,166)
+21:48:55.547  [+54.2s] [HotspotProjector] "hotspot_building_00" -> VISIBLE (occluded=true — marker dimmed, not hidden) (screen=290,171)
+21:48:55.562  [+54.2s] [HotspotProjector] "hotspot_building_09" -> VISIBLE (occluded=true — marker dimmed, not hidden) (screen=128,307)
+21:48:55.569  [+54.2s] [HotspotProjector] "hotspot_building_12" -> VISIBLE (occluded=true — marker dimmed, not hidden) (screen=28,398)
+21:48:55.646  [+54.3s] [HotspotProjector] "hotspot_building_06" -> VISIBLE (occluded=true — marker dimmed, not hidden) (screen=39,381)
+21:48:55.787  [+54.5s] [HotspotProjector] "hotspot_building_11" -> VISIBLE (occluded=true — marker dimmed, not hidden) (screen=39,326)
+21:48:55.817  [+54.5s] [HotspotProjector] "hotspot_building_00" -> VISIBLE (screen=342,172)
+21:48:55.820  [+54.5s] [HotspotProjector] "hotspot_building_03" -> VISIBLE (screen=79,362)
+21:48:55.874  [+54.5s] [HotspotProjector] "hotspot_building_11" -> VISIBLE (screen=41,305)
+21:48:55.958  [+54.6s] [HotspotProjector] "hotspot_building_08" -> VISIBLE (occluded=true — marker dimmed, not hidden) (screen=187,178)
+21:48:56.143  [+54.8s] [HotspotProjector] "hotspot_building_11" -> HIDDEN (frustum=false) (screen=-5,299)
+21:48:56.350  [+55.0s] [EightWallSession] camera (periodic, throttled 1/s) = (0.86, 0.52, -0.59) trackingStatus=NORMAL reason=UNSPECIFIED
+21:48:56.374  [+55.0s] [HotspotProjector] "hotspot_building_00" -> VISIBLE (occluded=true — marker dimmed, not hidden) (screen=333,219)
+21:48:56.378  [+55.0s] [HotspotProjector] "hotspot_building_03" -> VISIBLE (occluded=true — marker dimmed, not hidden) (screen=82,371)
+21:48:56.383  [+55.0s] [HotspotProjector] "hotspot_building_07" -> VISIBLE (occluded=true — marker dimmed, not hidden) (screen=134,281)
+21:48:56.391  [+55.1s] [HotspotProjector] "hotspot_building_11" -> VISIBLE (occluded=true — marker dimmed, not hidden) (screen=9,326)
+21:48:56.397  [+55.1s] [HotspotProjector] "hotspot_building_14" -> VISIBLE (occluded=true — marker dimmed, not hidden) (screen=110,214)
+21:48:56.427  [+55.1s] [HotspotProjector] "hotspot_building_05" -> VISIBLE (occluded=true — marker dimmed, not hidden) (screen=1,387)
+21:48:56.446  [+55.1s] [MarkerLayer] "hotspot_building_05" -> display:block (projection visible at 1,387)
+21:48:56.467  [+55.1s] [HotspotProjector] "hotspot_building_00" -> VISIBLE (screen=350,213)
+21:48:56.471  [+55.1s] [HotspotProjector] "hotspot_building_03" -> VISIBLE (screen=94,366)
+21:48:56.474  [+55.1s] [HotspotProjector] "hotspot_building_05" -> VISIBLE (screen=6,385)
+21:48:56.479  [+55.1s] [HotspotProjector] "hotspot_building_07" -> VISIBLE (screen=143,278)
+21:48:56.486  [+55.2s] [HotspotProjector] "hotspot_building_11" -> VISIBLE (screen=16,324)
+21:48:56.491  [+55.2s] [HotspotProjector] "hotspot_building_14" -> VISIBLE (screen=113,214)
+21:48:56.523  [+55.2s] [HotspotProjector] "hotspot_building_07" -> VISIBLE (occluded=true — marker dimmed, not hidden) (screen=165,282)
+21:48:56.555  [+55.2s] [HotspotProjector] "hotspot_building_00" -> HIDDEN (frustum=false) (screen=399,217)
+21:48:56.578  [+55.2s] [HotspotProjector] "hotspot_building_13" -> VISIBLE (screen=10,383)
+21:48:56.581  [+55.2s] [MarkerLayer] "hotspot_building_13" -> display:block (projection visible at 10,383)
+21:48:56.609  [+55.3s] [HotspotProjector] "hotspot_building_03" -> VISIBLE (occluded=true — marker dimmed, not hidden) (screen=139,365)
+21:48:56.612  [+55.3s] [HotspotProjector] "hotspot_building_05" -> VISIBLE (occluded=true — marker dimmed, not hidden) (screen=51,380)
+21:48:56.625  [+55.3s] [HotspotProjector] "hotspot_building_11" -> VISIBLE (occluded=true — marker dimmed, not hidden) (screen=57,318)
+21:48:56.630  [+55.3s] [HotspotProjector] "hotspot_building_13" -> VISIBLE (occluded=true — marker dimmed, not hidden) (screen=18,378)
+21:48:56.632  [+55.3s] [HotspotProjector] "hotspot_building_14" -> VISIBLE (occluded=true — marker dimmed, not hidden) (screen=155,207)
+21:48:56.671  [+55.3s] [HotspotProjector] "hotspot_building_10" -> VISIBLE (occluded=true — marker dimmed, not hidden) (screen=7,364)
+21:48:56.681  [+55.3s] [MarkerLayer] "hotspot_building_10" -> display:block (projection visible at 7,364)
+21:48:56.824  [+55.5s] [MarkerLayer] "hotspot_building_00" -> display:none (hysteresis 250ms expired; cause: frustum=false)
+21:48:57.100  [+55.8s] [HotspotProjector] "hotspot_building_07" -> HIDDEN (frustum=false) (screen=425,219)
+21:48:57.102  [+55.8s] [HotspotProjector] "hotspot_building_08" -> HIDDEN (frustum=false) (screen=437,145)
+21:48:57.102  [+55.8s] [HotspotProjector] "hotspot_building_09" -> HIDDEN (frustum=false) (screen=418,263)
+21:48:57.112  [+55.8s] [HotspotProjector] "hotspot_building_14" -> HIDDEN (frustum=false) (screen=422,35)
+21:48:57.236  [+55.9s] [HotspotProjector] "hotspot_building_03" -> HIDDEN (frustum=false) (screen=398,381)
+21:48:57.317  [+56.0s] [MarkerLayer] "hotspot_building_07" -> display:none (hysteresis 250ms expired; cause: frustum=false)
+21:48:57.318  [+56.0s] [MarkerLayer] "hotspot_building_08" -> display:none (hysteresis 250ms expired; cause: frustum=false)
+21:48:57.318  [+56.0s] [MarkerLayer] "hotspot_building_09" -> display:none (hysteresis 250ms expired; cause: frustum=false)
+21:48:57.318  [+56.0s] [MarkerLayer] "hotspot_building_14" -> display:none (hysteresis 250ms expired; cause: frustum=false)
+21:48:57.342  [+56.0s] [HotspotProjector] "hotspot_building_06" -> HIDDEN (frustum=false) (screen=394,333)
+21:48:57.352  [+56.0s] [EightWallSession] camera (periodic, throttled 1/s) = (0.82, 0.48, -0.59) trackingStatus=NORMAL reason=UNSPECIFIED
+21:48:57.379  [+56.0s] [HotspotProjector] "hotspot_building_06" -> VISIBLE (occluded=true — marker dimmed, not hidden) (screen=388,326)
+21:48:57.455  [+56.1s] [HotspotProjector] "hotspot_building_03" -> VISIBLE (occluded=true — marker dimmed, not hidden) (screen=382,349)
+21:48:57.509  [+56.2s] [HotspotProjector] "hotspot_building_14" -> VISIBLE (occluded=true — marker dimmed, not hidden) (screen=383,150)
+21:48:57.510  [+56.2s] [MarkerLayer] "hotspot_building_14" -> display:block (projection visible at 383,150)
+21:48:57.576  [+56.2s] [HotspotProjector] "hotspot_building_07" -> VISIBLE (occluded=true — marker dimmed, not hidden) (screen=371,199)
+21:48:57.579  [+56.2s] [HotspotProjector] "hotspot_building_08" -> VISIBLE (occluded=true — marker dimmed, not hidden) (screen=358,147)
+21:48:57.582  [+56.2s] [HotspotProjector] "hotspot_building_09" -> VISIBLE (occluded=true — marker dimmed, not hidden) (screen=378,233)
+21:48:57.595  [+56.3s] [MarkerLayer] "hotspot_building_07" -> display:block (projection visible at 371,199)
+21:48:57.595  [+56.3s] [MarkerLayer] "hotspot_building_08" -> display:block (projection visible at 358,147)
+21:48:57.595  [+56.3s] [MarkerLayer] "hotspot_building_09" -> display:block (projection visible at 378,233)
+21:48:57.767  [+56.4s] [HotspotProjector] "hotspot_building_10" -> HIDDEN (frustum=false) (screen=-33,218)
+21:48:57.809  [+56.5s] [HotspotProjector] "hotspot_building_11" -> HIDDEN (frustum=false) (screen=-9,162)
+21:48:57.812  [+56.5s] [HotspotProjector] "hotspot_building_13" -> HIDDEN (frustum=false) (screen=-12,220)
+21:48:57.833  [+56.5s] [HotspotProjector] "hotspot_building_05" -> HIDDEN (frustum=false) (screen=-2,204)
+21:48:57.846  [+56.5s] [HotspotProjector] "hotspot_building_14" -> HIDDEN (frustum=false) (screen=-29,14)
+21:48:57.870  [+56.5s] [HotspotProjector] "hotspot_building_08" -> HIDDEN (frustum=false) (screen=-7,39)
+21:48:57.874  [+56.5s] [HotspotProjector] "hotspot_building_12" -> HIDDEN (frustum=false) (screen=-36,141)
+21:48:57.894  [+56.6s] [HotspotProjector] "hotspot_building_06" -> HIDDEN (frustum=false) (screen=-38,120)
+21:48:57.895  [+56.6s] [HotspotProjector] "hotspot_building_07" -> HIDDEN (frustum=false) (screen=-5,31)
+21:48:57.916  [+56.6s] [HotspotProjector] "hotspot_building_03" -> HIDDEN (frustum=false) (screen=-47,130)
+21:48:57.917  [+56.6s] [HotspotProjector] "hotspot_building_09" -> HIDDEN (frustum=false) (screen=-31,36)
+21:48:57.967  [+56.6s] [MarkerLayer] "hotspot_building_10" -> display:none (hysteresis 250ms expired; cause: frustum=false)
+21:48:58.005  [+56.7s] [MarkerLayer] "hotspot_building_11" -> display:none (hysteresis 250ms expired; cause: frustum=false)
+21:48:58.006  [+56.7s] [MarkerLayer] "hotspot_building_13" -> display:none (hysteresis 250ms expired; cause: frustum=false)
+21:48:58.052  [+56.7s] [MarkerLayer] "hotspot_building_05" -> display:none (hysteresis 250ms expired; cause: frustum=false)
+21:48:58.053  [+56.7s] [MarkerLayer] "hotspot_building_14" -> display:none (hysteresis 250ms expired; cause: frustum=false)
+21:48:58.103  [+56.8s] [MarkerLayer] "hotspot_building_08" -> display:none (hysteresis 250ms expired; cause: frustum=false)
+21:48:58.104  [+56.8s] [MarkerLayer] "hotspot_building_12" -> display:none (hysteresis 250ms expired; cause: frustum=false)
+21:48:58.127  [+56.8s] [MarkerLayer] "hotspot_building_06" -> display:none (hysteresis 250ms expired; cause: frustum=false)
+21:48:58.128  [+56.8s] [MarkerLayer] "hotspot_building_07" -> display:none (hysteresis 250ms expired; cause: frustum=false)
+21:48:58.149  [+56.8s] [MarkerLayer] "hotspot_building_03" -> display:none (hysteresis 250ms expired; cause: frustum=false)
+21:48:58.150  [+56.8s] [MarkerLayer] "hotspot_building_09" -> display:none (hysteresis 250ms expired; cause: frustum=false)
+21:48:58.286  [+57.0s] [TrackingStatus] LIMITED reason=INITIALIZING — was NORMAL (UNSPECIFIED)
+21:48:58.287  [+57.0s] [ImageTargetAnchorSource] isTracking()
+  acquired=true imageVisible=false
+  trackingStatus=LIMITED reason=INITIALIZING
+  => false (markers hidden while false)
+21:48:58.288  [+57.0s] [HotspotProjector] "hotspot_building_00" -> HIDDEN (tracking=false) (screen=168,113)
+21:48:58.288  [+57.0s] [HotspotProjector] "hotspot_building_03" -> HIDDEN (tracking=false) (screen=144,145)
+21:48:58.288  [+57.0s] [HotspotProjector] "hotspot_building_05" -> HIDDEN (tracking=false) (screen=139,150)
+21:48:58.288  [+57.0s] [HotspotProjector] "hotspot_building_06" -> HIDDEN (tracking=false) (screen=144,144)
+21:48:58.288  [+57.0s] [HotspotProjector] "hotspot_building_07" -> HIDDEN (tracking=false) (screen=150,140)
+21:48:58.288  [+57.0s] [HotspotProjector] "hotspot_building_08" -> HIDDEN (tracking=false) (screen=152,141)
+21:48:58.289  [+57.0s] [HotspotProjector] "hotspot_building_09" -> HIDDEN (tracking=false) (screen=149,139)
+21:48:58.289  [+57.0s] [HotspotProjector] "hotspot_building_10" -> HIDDEN (tracking=false) (screen=141,153)
+21:48:58.289  [+57.0s] [HotspotProjector] "hotspot_building_11" -> HIDDEN (tracking=false) (screen=145,148)
+21:48:58.289  [+57.0s] [HotspotProjector] "hotspot_building_12" -> HIDDEN (tracking=false) (screen=145,146)
+21:48:58.289  [+57.0s] [HotspotProjector] "hotspot_building_13" -> HIDDEN (tracking=false) (screen=140,151)
+21:48:58.290  [+57.0s] [HotspotProjector] "hotspot_building_14" -> HIDDEN (tracking=false) (screen=152,143)
+21:48:58.369  [+57.0s] [EightWallSession] camera (periodic, throttled 1/s) = (4.56, 4.25, -2.40) trackingStatus=LIMITED reason=INITIALIZING
+21:48:59.139  [+57.8s] [ImageTarget] FOUND "site-tracking-front"
+  scale=0.426m pos=(2.93, 0.07, -1.65) rot=(0.48, -0.49, -0.55, -0.48)
+  trackingStatus=LIMITED
+  re-detection REJECTED — see warning below — keeping previous anchor
+21:48:59.139  [+57.8s] [ImageTarget] scale mismatch: engine sees 0.426 m, manifest declares 0.03 m (ratio 14.18). Absolute scale may not have converged yet, or physicalTargetWidthMeters is wrong. Pose sample rejected — anchor holds its last known-good transform.
+21:48:59.140  [+57.8s] [ImageTarget] pose sample rejected — trackingStatus=LIMITED reason=INITIALIZING (not NORMAL). Anchor holds its last known-good transform.
+21:48:59.140  [+57.8s] [ImageTargetAnchorSource] isTracking()
+  acquired=true imageVisible=true
+  trackingStatus=LIMITED reason=INITIALIZING
+  => false (markers hidden while false)
+21:48:59.158  [+57.8s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.426m pos=(2.93, 0.08, -1.65) rot=(0.48, -0.49, -0.55, -0.47)
+21:48:59.377  [+58.0s] [EightWallSession] camera (periodic, throttled 1/s) = (2.78, 2.24, -1.93) trackingStatus=LIMITED reason=INITIALIZING
+21:48:59.657  [+58.3s] [TrackingStatus] NORMAL reason=UNSPECIFIED — was LIMITED (INITIALIZING)
+21:48:59.657  [+58.3s] [ImageTargetAnchorSource] isTracking()
+  acquired=true imageVisible=true
+  trackingStatus=NORMAL reason=UNSPECIFIED
+  => true
+21:48:59.658  [+58.3s] [HotspotProjector] "hotspot_building_00" -> HIDDEN (frustum=false) (screen=1417,416)
+21:48:59.658  [+58.3s] [HotspotProjector] "hotspot_building_03" -> HIDDEN (frustum=false) (screen=1311,3413)
+21:48:59.658  [+58.3s] [HotspotProjector] "hotspot_building_05" -> HIDDEN (frustum=false) (screen=841,3041)
+21:48:59.658  [+58.3s] [HotspotProjector] "hotspot_building_06" -> HIDDEN (frustum=false) (screen=929,2257)
+21:48:59.658  [+58.3s] [HotspotProjector] "hotspot_building_07" -> HIDDEN (frustum=false) (screen=947,1602)
+21:48:59.658  [+58.3s] [HotspotProjector] "hotspot_building_08" -> HIDDEN (frustum=false) (screen=913,1539)
+21:48:59.659  [+58.3s] [HotspotProjector] "hotspot_building_09" -> HIDDEN (frustum=false) (screen=1004,1710)
+21:48:59.659  [+58.3s] [HotspotProjector] "hotspot_building_10" -> HIDDEN (frustum=false) (screen=799,2316)
+21:48:59.659  [+58.3s] [HotspotProjector] "hotspot_building_11" -> HIDDEN (frustum=false) (screen=844,1906)
+21:48:59.659  [+58.3s] [HotspotProjector] "hotspot_building_12" -> HIDDEN (frustum=false) (screen=887,2022)
+21:48:59.659  [+58.3s] [HotspotProjector] "hotspot_building_13" -> HIDDEN (frustum=false) (screen=814,2579)
+21:48:59.660  [+58.3s] [HotspotProjector] "hotspot_building_14" -> HIDDEN (frustum=false) (screen=885,1528)
+21:49:00.168  [+58.8s] [ImageTarget] updated (throttled 1/s) "site-tracking-front" scale=0.037m pos=(-0.02, 0.01, -0.04) rot=(-0.40, -0.56, -0.63, 0.36)
+21:49:00.352  [+59.0s] [ImageTarget] LOST "site-tracking-front"
+  imageVisible: true -> false; acquired stays true
+  pose frozen at last snap — SLAM world tracking persists it
+21:49:00.353  [+59.0s] [ImageTargetAnchorSource] isTracking()
+  acquired=true imageVisible=false
+  trackingStatus=NORMAL reason=UNSPECIFIED
+  => true
+21:49:00.385  [+59.1s] [EightWallSession] camera (periodic, throttled 1/s) = (0.00, 0.20, -0.04) trackingStatus=NORMAL reason=UNSPECIFIED
+21:49:01.238  [+59.9s] [HotspotProjector] "hotspot_building_03" -> VISIBLE (screen=6,198)
+21:49:01.239  [+59.9s] [MarkerLayer] "hotspot_building_03" -> display:block (projection visible at 6,198)
+21:49:01.260  [+59.9s] [HotspotProjector] "hotspot_building_05" -> VISIBLE (screen=8,144)
+21:49:01.261  [+59.9s] [MarkerLayer] "hotspot_building_05" -> display:block (projection visible at 8,144)
+21:49:01.403  [+60.1s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.27, 0.55, -0.25) trackingStatus=NORMAL reason=UNSPECIFIED
+21:49:01.430  [+60.1s] [HotspotProjector] "hotspot_building_06" -> VISIBLE (screen=1,144)
+21:49:01.431  [+60.1s] [MarkerLayer] "hotspot_building_06" -> display:block (projection visible at 1,144)
+21:49:01.462  [+60.1s] [HotspotProjector] "hotspot_building_13" -> VISIBLE (screen=2,127)
+21:49:01.462  [+60.1s] [MarkerLayer] "hotspot_building_13" -> display:block (projection visible at 2,127)
+21:49:01.684  [+60.4s] [HotspotProjector] "hotspot_building_09" -> VISIBLE (screen=0,190)
+21:49:01.688  [+60.4s] [HotspotProjector] "hotspot_building_10" -> VISIBLE (screen=2,146)
+21:49:01.692  [+60.4s] [HotspotProjector] "hotspot_building_12" -> VISIBLE (screen=1,163)
+21:49:01.696  [+60.4s] [MarkerLayer] "hotspot_building_09" -> display:block (projection visible at 0,190)
+21:49:01.696  [+60.4s] [MarkerLayer] "hotspot_building_10" -> display:block (projection visible at 2,146)
+21:49:01.696  [+60.4s] [MarkerLayer] "hotspot_building_12" -> display:block (projection visible at 1,163)
+21:49:01.902  [+60.6s] [HotspotProjector] "hotspot_building_11" -> VISIBLE (screen=1,157)
+21:49:01.909  [+60.6s] [MarkerLayer] "hotspot_building_11" -> display:block (projection visible at 1,157)
+21:49:01.942  [+60.6s] [HotspotProjector] "hotspot_building_07" -> VISIBLE (screen=2,174)
+21:49:01.959  [+60.6s] [MarkerLayer] "hotspot_building_07" -> display:block (projection visible at 2,174)
+21:49:02.031  [+60.7s] [HotspotProjector] "hotspot_building_00" -> VISIBLE (screen=25,314)
+21:49:02.059  [+60.7s] [MarkerLayer] "hotspot_building_00" -> display:block (projection visible at 25,314)
+21:49:02.097  [+60.8s] [HotspotProjector] "hotspot_building_08" -> VISIBLE (screen=1,130)
+21:49:02.113  [+60.8s] [MarkerLayer] "hotspot_building_08" -> display:block (projection visible at 1,130)
+21:49:02.389  [+61.1s] [HotspotProjector] "hotspot_building_14" -> VISIBLE (screen=6,95)
+21:49:02.390  [+61.1s] [MarkerLayer] "hotspot_building_14" -> display:block (projection visible at 6,95)
+21:49:02.448  [+61.1s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.49, 0.64, -0.53) trackingStatus=NORMAL reason=UNSPECIFIED
+21:49:03.456  [+62.1s] [EightWallSession] camera (periodic, throttled 1/s) = (-0.68, 0.73, -0.52) trackingStatus=NORMAL reason=UNSPECIFIED

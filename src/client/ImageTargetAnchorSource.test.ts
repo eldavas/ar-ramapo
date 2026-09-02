@@ -823,3 +823,59 @@ test('a pending candidate for one target is not confirmed by an agreeing sample 
   assertVectorClose(anchor.group.position, frontPos);
   assertQuatClose(anchor.group.quaternion, frontQuat);
 });
+
+// --- Rotation PLAUSIBILITY gate (2026-09-02, §37 follow-up —
+// docs/log-10.txt) ---
+//
+// A real capture showed a sequence of individually yaw-agreeing CONFIRMED
+// re-detections whose pitch climbed steadily across confirmations (the
+// consensus gate above only ever compared yaw) — the model visibly
+// tilting more with every re-ground. Unlike yaw, every plaque is mounted
+// flat, so pitch/roll DO have a ground truth: both should stay near 0°.
+// isRotationPlausible() rejects an implausibly-tilted sample outright,
+// before it can even become or confirm a consensus candidate.
+
+test('a sample with implausible pitch/roll is rejected outright, never becoming a rotation-consensus candidate', () => {
+  const session = new FakeSession();
+  const scene = new THREE.Scene();
+  const anchor = new ImageTargetAnchorSource(session as never, scene, [FRONT]);
+
+  const bootstrapPos = new THREE.Vector3(1, 0, -1);
+  session.fire('found', simulateEventFor(FRONT.name, FRONT, bootstrapPos, new THREE.Quaternion()));
+
+  // A model orientation with a large tilt (30° pitch) — physically
+  // implausible given every plaque is mounted flat.
+  const tiltedQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(THREE.MathUtils.degToRad(30), 0, 0, 'YXZ'));
+  const pos = new THREE.Vector3(1.2, 0, -3.4);
+
+  // Fired TWICE with the identical pose — if this only failed the yaw-
+  // consensus check, the second identical sample would confirm the
+  // first. It must not: rotation implausibility is checked BEFORE a
+  // sample can even become or confirm a consensus candidate.
+  session.fire('updated', simulateEventFor(FRONT.name, FRONT, pos, tiltedQuat));
+  session.fire('updated', simulateEventFor(FRONT.name, FRONT, pos, tiltedQuat));
+
+  assert.equal(anchor.group.visible, false);
+  assertVectorClose(anchor.group.position, bootstrapPos);
+});
+
+test('a first sighting of a DIFFERENT plaque is REJECTED when its pitch/roll is implausible, even though it would be exempt from the trackingStatus check', () => {
+  const session = new FakeSession();
+  const scene = new THREE.Scene();
+  const anchor = new ImageTargetAnchorSource(session as never, scene, [FRONT, BACK]);
+
+  const frontPos = new THREE.Vector3(1.2, 0, -3.4);
+  const frontQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), 0.37);
+  session.fire('found', simulateEventFor(FRONT.name, FRONT, frontPos, frontQuat));
+
+  // BACK's first-ever sighting, tilted 30° in roll — new-target status
+  // means this would be exempt from the trackingStatus check, but §37's
+  // follow-up means implausible rotation is never exempt, same as scale
+  // (§33).
+  const backTiltedQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, THREE.MathUtils.degToRad(30), 'YXZ'));
+  session.fire('found', simulateEventFor(BACK.name, BACK, new THREE.Vector3(2.0, 0, 0.5), backTiltedQuat));
+
+  assert.equal(anchor.group.visible, false, 'an implausibly-tilted new-target sample must not reveal the group either');
+  assertVectorClose(anchor.group.position, frontPos);
+  assertQuatClose(anchor.group.quaternion, frontQuat);
+});

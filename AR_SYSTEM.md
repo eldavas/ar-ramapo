@@ -3487,3 +3487,41 @@ schema above.
   re-detection ever again lands 70-150 degrees from where it should —
   some "rotation not yet corroborated" log lines during noisy stretches
   are expected and fine.
+
+  **Progress (2026-09-02, fourteenth capture): §37 confirmed working on
+  real hardware, and it exposed exactly the gap it left open — pitch
+  climbs steadily while yaw stays put, because the gate only ever
+  compared yaw.** Full reasoning: `docs/research/
+  8th-wall-troubleshooting.md` §38 / `docs/log-10.txt`. Reported: lock
+  more reliable, scale better, rotation still wrong plus a visible tilt.
+  The log shows "rotation not yet corroborated" lines proving §37 is
+  correctly holding back isolated candidates. But of the 7 samples that
+  DID get applied, yaw settled and stayed roughly put (-21 to -23
+  degrees) from the third sample onward — §37 doing its job — while
+  pitch climbed almost monotonically across the same samples: 4.9, 2.8,
+  17.2, 20.3, 33.5, 35.5 degrees, freezing there for the rest of the
+  session (no further re-detections happened). Root cause: the §37
+  consensus gate only ever compares yaw between two samples; two samples
+  can agree perfectly on yaw while their pitch differs wildly, and the
+  confirming sample's full quaternion (pitch and roll included) is what
+  applies. A slow-drifting sequence can walk pitch arbitrarily far from
+  0 two steps at a time since each step only needs to agree with its own
+  immediately-preceding candidate.
+
+  Unlike yaw, pitch/roll have a genuine ground truth: every plaque is
+  mounted flat, so the anchored content's pitch/roll should stay near 0
+  degrees regardless of the phone's viewing angle. Every previously
+  confirmed-good sample across this project's whole history stayed under
+  10 degrees; every corrupted one seen so far was 17+ degrees. Fixed in
+  `ImageTargetAnchorSource.ts`: `isRotationPlausible()`, tolerance +/-15
+  degrees, checked BEFORE a sample can even become or confirm a
+  consensus candidate (same tier as the existing scale check, not part
+  of the yaw comparison). Applied everywhere the scale check already
+  runs, including new-target first sightings (same §33 precedent - never
+  exempted). All 56 previous tests pass unmodified (every existing test
+  simulates a pure-yaw rotation, comfortably inside tolerance); 2 new
+  tests cover an implausibly-tilted sample being rejected outright
+  (fired twice, proving it never even reaches consensus) and a new-target
+  first sighting with implausible roll still being rejected despite the
+  trackingStatus exemption. `npm run typecheck`/`build`/`test` clean,
+  58/58.

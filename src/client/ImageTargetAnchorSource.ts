@@ -75,6 +75,27 @@ const SCALE_MISMATCH_TOLERANCE = 0.25; // ±25%
 const SCALE_MISMATCH_WARN_INTERVAL_MS = 1000;
 let lastScaleMismatchWarnMs = 0;
 let lastTrackingStatusRejectWarnMs = 0;
+let lastRotationImplausibleWarnMs = 0;
+
+/**
+ * §37 follow-up (2026-09-02, docs/log-10.txt): the rotation-consensus gate
+ * (see the class doc comment) only ever compared YAW between two samples —
+ * nothing checked pitch/roll. A real capture showed a sequence of
+ * internally-yaw-agreeing CONFIRMED pairs whose pitch climbed steadily
+ * across successive re-detections (4.9° → 2.8° → 17.2° → 20.3° → 33.5° →
+ * 35.5°) while yaw stayed roughly put — the model visibly tilting more
+ * with every re-ground, reported as "inclinación." Unlike yaw (no ground
+ * truth to check one sample against), every physical plaque is mounted
+ * FLAT (coworker-confirmed — see TARGET_FRAME_TO_WORLD_FIX's own doc
+ * comment), so pitch/roll genuinely DO have a ground truth: both should
+ * stay near 0° always, regardless of the phone's own viewing angle, since
+ * the anchored content's world orientation doesn't depend on how it's
+ * being looked at. Every previously-confirmed-good sample logged across
+ * every capture this project has to date stayed under 10°; every
+ * corrupted one seen so far was 17°+ — this tolerance sits between the
+ * two clusters with margin on both sides.
+ */
+const PITCH_ROLL_PLAUSIBILITY_MAX_DEG = 15;
 
 function scaleRatio(event: Xr8ImageTrackedEvent, physicalTargetWidthMeters: number): number {
   return event.scale / physicalTargetWidthMeters;
@@ -126,6 +147,25 @@ function warnIfScaleMismatch(event: Xr8ImageTrackedEvent, physicalTargetWidthMet
   }
 }
 
+/** See PITCH_ROLL_PLAUSIBILITY_MAX_DEG's own doc comment (§37 follow-up). */
+function isRotationPlausible(pitchDeg: number, rollDeg: number): boolean {
+  return Math.abs(pitchDeg) <= PITCH_ROLL_PLAUSIBILITY_MAX_DEG && Math.abs(rollDeg) <= PITCH_ROLL_PLAUSIBILITY_MAX_DEG;
+}
+
+function warnIfRotationImplausible(pitchDeg: number, rollDeg: number): void {
+  if (!isRotationPlausible(pitchDeg, rollDeg)) {
+    const now = performance.now();
+    if (now - lastRotationImplausibleWarnMs > SCALE_MISMATCH_WARN_INTERVAL_MS) {
+      lastRotationImplausibleWarnMs = now;
+      console.warn(
+        `[${traceT()}] [ImageTarget] rotation implausible: pitch=${pitchDeg.toFixed(1)}°, roll=${rollDeg.toFixed(1)}° ` +
+          `(plaques are mounted flat — expect near 0°, tolerance ±${PITCH_ROLL_PLAUSIBILITY_MAX_DEG}°). ` +
+          'Pose sample rejected — anchor holds its last known-good transform.'
+      );
+    }
+  }
+}
+
 function anchorScaleForEvent(): number {
   // Under scale:'absolute' the GLB mounts at scale 1 always — event.scale
   // is never a render multiplier (see the class doc comment above). The
@@ -154,19 +194,27 @@ const candidateYawScratchQuat = new THREE.Quaternion();
 const candidateYawScratchEuler = new THREE.Euler();
 
 /**
- * Yaw component (degrees, YXZ order — matches cameraDiagnosticLine's own
+ * Euler angles (degrees, YXZ order — matches cameraDiagnosticLine's own
  * euler extraction) of the pose applyPose() WOULD compose for this sample,
- * without mutating the anchor group. Used only by the rotation-consensus
- * gate (§37) to compare a candidate sample's orientation against a
- * still-pending one before either is applied.
+ * without mutating the anchor group. Yaw feeds the rotation-consensus gate
+ * (§37, comparing a candidate against a still-pending one); pitch/roll
+ * feed isRotationPlausible() (§37 follow-up, checked against the known-flat
+ * mount, not against another sample).
  */
-function computeCandidateYawDeg(event: Xr8ImageTrackedEvent, target: ResolvedPlaqueTarget): number {
+function computeCandidateEulerDeg(
+  event: Xr8ImageTrackedEvent,
+  target: ResolvedPlaqueTarget
+): { yawDeg: number; pitchDeg: number; rollDeg: number } {
   candidateYawScratchQuat
     .set(event.rotation.x, event.rotation.y, event.rotation.z, event.rotation.w)
     .multiply(TARGET_FRAME_TO_WORLD_FIX)
     .multiply(yawCorrectionQuaternion(target.rotationYawDeg));
   candidateYawScratchEuler.setFromQuaternion(candidateYawScratchQuat, 'YXZ');
-  return THREE.MathUtils.radToDeg(candidateYawScratchEuler.y);
+  return {
+    yawDeg: THREE.MathUtils.radToDeg(candidateYawScratchEuler.y),
+    pitchDeg: THREE.MathUtils.radToDeg(candidateYawScratchEuler.x),
+    rollDeg: THREE.MathUtils.radToDeg(candidateYawScratchEuler.z),
+  };
 }
 
 /** Circular difference between two degree angles, always in [0, 180]. */
@@ -298,6 +346,24 @@ function formatPose(event: Xr8ImageTrackedEvent): string {
  * only meaningfully delays anything in the pathological case this exists
  * to catch: an isolated bad frame with no immediate corroborating
  * follow-up.
+ *
+ * **§37 follow-up (2026-09-02, docs/log-10.txt): the consensus gate above
+ * only ever compared YAW — pitch/roll rode along unchecked on whichever
+ * sample confirmed.** A real capture showed a sequence of individually
+ * yaw-agreeing CONFIRMED re-detections whose PITCH climbed steadily with
+ * each one (4.9° → 2.8° → 17.2° → 20.3° → 33.5° → 35.5°) while yaw stayed
+ * roughly put — the model visibly tilting more every time it re-grounded,
+ * reported as "inclinación." Unlike yaw, pitch/roll DO have a ground
+ * truth here: every plaque is mounted flat (see
+ * `TARGET_FRAME_TO_WORLD_FIX`'s own doc comment), so the anchored
+ * content's pitch/roll should stay near 0° always, independent of the
+ * phone's viewing angle. `isRotationPlausible()` (see
+ * `PITCH_ROLL_PLAUSIBILITY_MAX_DEG`'s own doc comment) rejects a sample
+ * outright — before it can even become or confirm a consensus candidate —
+ * if its pitch or roll falls outside that physically-plausible range,
+ * exactly as `isScalePlausible()` already does for scale. Same §33
+ * precedent applies: never exempted for a new target's first sighting,
+ * same as scale.
  */
 export class ImageTargetAnchorSource implements AnchorSource {
   readonly kind: OriginKind = 'image-target';
@@ -462,10 +528,15 @@ export class ImageTargetAnchorSource implements AnchorSource {
   /**
    * Second-audit finding (2026-08-14, third physical test): whether a
    * tracked sample is trustworthy enough to apply to the world anchor.
-   * Two independent gates, either can reject:
+   * Three independent gates, any can reject:
    *
    * - Scale plausibility (isScalePlausible): the same
    *   SCALE_MISMATCH_TOLERANCE check as the pre-existing warning.
+   * - Rotation plausibility (isRotationPlausible, §37 follow-up,
+   *   2026-09-02): pitch/roll checked against the known-flat plaque
+   *   mount — see PITCH_ROLL_PLAUSIBILITY_MAX_DEG's own doc comment for
+   *   the capture that motivated this (a steadily climbing tilt across
+   *   several individually yaw-agreeing confirmed re-detections).
    * - SLAM tracking status: `this.session.trackingStatus === 'NORMAL'`.
    *   isTracking() (above) already reads this exact field to gate marker
    *   VISIBILITY; applyPose() previously never read it at all, so a pose
@@ -479,8 +550,9 @@ export class ImageTargetAnchorSource implements AnchorSource {
    * Since 2026-08-31 this gate is only ever consulted before `stable` —
    * see the class doc comment's strategy section.
    */
-  private isSampleTrustworthy(ratio: number): boolean {
-    return isScalePlausible(ratio) && this.session.trackingStatus === 'NORMAL';
+  private isSampleTrustworthy(ratio: number, event: Xr8ImageTrackedEvent, target: ResolvedPlaqueTarget): boolean {
+    const { pitchDeg, rollDeg } = computeCandidateEulerDeg(event, target);
+    return isScalePlausible(ratio) && isRotationPlausible(pitchDeg, rollDeg) && this.session.trackingStatus === 'NORMAL';
   }
 
   /**
@@ -491,7 +563,7 @@ export class ImageTargetAnchorSource implements AnchorSource {
    * sample is being held pending confirmation.
    */
   private tryApplyWithRotationConsensus(event: Xr8ImageTrackedEvent, target: ResolvedPlaqueTarget): boolean {
-    const yawDeg = computeCandidateYawDeg(event, target);
+    const { yawDeg } = computeCandidateEulerDeg(event, target);
     const now = performance.now();
     const pending = this.pendingCandidate;
     if (
@@ -574,6 +646,8 @@ export class ImageTargetAnchorSource implements AnchorSource {
    */
   private logSampleRejected(event: Xr8ImageTrackedEvent, target: ResolvedPlaqueTarget, ratio: number): void {
     warnIfScaleMismatch(event, target.physicalTargetWidthMeters, ratio);
+    const { pitchDeg, rollDeg } = computeCandidateEulerDeg(event, target);
+    warnIfRotationImplausible(pitchDeg, rollDeg);
     if (this.session.trackingStatus !== 'NORMAL') {
       const now = performance.now();
       if (now - lastTrackingStatusRejectWarnMs > SCALE_MISMATCH_WARN_INTERVAL_MS) {
@@ -662,22 +736,35 @@ export class ImageTargetAnchorSource implements AnchorSource {
         // required also skipping the scale check. Fixed by exempting only
         // the trackingStatus requirement for a new target's first
         // sighting; scale plausibility is now required unconditionally,
-        // for every accepted sample, new target or not.
+        // for every accepted sample, new target or not. §37 follow-up
+        // (2026-09-02): the same reasoning applies to rotation
+        // plausibility — a new target's implausible tilt is exactly as
+        // corrupt as an implausible scale, so it gets the same
+        // unconditional treatment, never exempted.
         const isNewTarget = !this.seenTargetNames.has(event.name);
         const ratio = scaleRatio(event, target.physicalTargetWidthMeters);
         const scalePlausible = isScalePlausible(ratio);
-        const trustworthy = scalePlausible && (isNewTarget || this.session.trackingStatus === 'NORMAL');
+        const { pitchDeg, rollDeg } = computeCandidateEulerDeg(event, target);
+        const rotationPlausible = isRotationPlausible(pitchDeg, rollDeg);
+        const trustworthy = scalePlausible && rotationPlausible && (isNewTarget || this.session.trackingStatus === 'NORMAL');
+        let statusLine: string;
+        if (!scalePlausible || !rotationPlausible) {
+          const reason = !scalePlausible ? 'scale' : 'pitch/roll';
+          statusLine = isNewTarget
+            ? `  first sighting of a NEW plaque, but ${reason} implausible — REJECTED, see warning below — keeping previous anchor`
+            : `  re-detection REJECTED (${reason} implausible) — see warning below — keeping previous anchor`;
+        } else if (isNewTarget) {
+          statusLine = '  first sighting of a NEW plaque — applied (trackingStatus exemption), firing onOriginChanged';
+        } else if (trustworthy) {
+          statusLine = '  re-detection — firing onOriginChanged, pose discontinuity';
+        } else {
+          statusLine = '  re-detection REJECTED — see warning below — keeping previous anchor';
+        }
         console.log(
           `[${traceT()}] [ImageTarget] FOUND "${event.name}"\n` +
             `  scale=${event.scale.toFixed(3)}m ${formatPose(event)}\n` +
             `  trackingStatus=${this.session.trackingStatus}\n` +
-            (!scalePlausible
-              ? `  ${isNewTarget ? 'first sighting of a NEW plaque, but scale implausible' : 're-detection'} REJECTED — see warning below — keeping previous anchor`
-              : isNewTarget
-                ? '  first sighting of a NEW plaque — applied (trackingStatus exemption), firing onOriginChanged'
-                : trustworthy
-                  ? '  re-detection — firing onOriginChanged, pose discontinuity'
-                  : '  re-detection REJECTED — see warning below — keeping previous anchor')
+            statusLine
         );
         if (trustworthy) {
           if (this.tryApplyWithRotationConsensus(event, target)) {
@@ -715,7 +802,7 @@ export class ImageTargetAnchorSource implements AnchorSource {
             break;
           }
           const ratio = scaleRatio(event, target.physicalTargetWidthMeters);
-          if (this.isSampleTrustworthy(ratio)) {
+          if (this.isSampleTrustworthy(ratio, event, target)) {
             if (this.tryApplyWithRotationConsensus(event, target)) {
               console.log(`[${traceT()}] [ImageTargetAnchorSource]${this.cameraDiagnosticLine()}`);
               this.onPoseApplied(false, ratio);

@@ -1826,3 +1826,35 @@ Two back-to-back physical captures in the same log file, WITH textured objects p
 **Test suite impact:** every existing test that fired a single event and asserted immediate reveal/re-ground now fires that same event twice (an agreeing pair) first — this is a mechanical consequence of the new gate, not a behavior regression; each test's actual assertion (what pose ends up applied, when `whenStable()` resolves, etc.) is unchanged. Three new tests cover the gate itself directly: a lone sample never applies; two disagreeing samples don't apply either, only a third agreeing with the second confirms it (this is capture 1's exact scenario, reproduced deterministically); and a pending candidate for one target isn't cross-confirmed by an agreeing sample for a different target (single pending-candidate slot, by design — simplicity over handling simultaneous multi-target candidates, which real usage rarely produces since only one plaque is normally in view at a time).
 
 **Verified in software:** `npm run typecheck`/`build`/`test` clean, 56/56 (53 previous + 3 new). **Not verifiable in software:** whether requiring agreement actually prevents the wrong-orientation renders on real hardware — the next physical capture should show either a longer (but still short) delay before reveal, or occasional "rotation not yet corroborated" log lines during a genuinely noisy stretch, but never again a reveal/re-detection landing 70-150° from where it should be.
+
+---
+
+## 38. `docs/log-10.txt`: §37 IS working (consensus-rejected candidates visible in the log), but exposed the gap it left open — pitch can climb steadily even while yaw stays put, because the gate only ever compared yaw
+
+Reported: lock happens more reliably now, scale looks better, but rotation is still quite wrong and the model shows a visible tilt ("inclinación").
+
+**§37 confirmed working on real hardware.** The log shows several `rotation not yet corroborated for "site-tracking-front" (yaw=...)` lines — proof the gate is holding isolated candidates back exactly as designed, something impossible to see before this fix existed.
+
+**But every single one of the 7 samples that DID get applied this session tells the real story, read in sequence:**
+
+| applied at | yaw | pitch | roll |
+|---|---:|---:|---:|
+| +19.8s (earlier in session) | -9.2° | 26.2° | 0.5° |
+| +33.3s (reveal) | 13.5° | 4.9° | -2.6° |
+| +33.7s | -11.5° | 2.8° | -1.5° |
+| +35.1s | -21.6° | 17.2° | -8.9° |
+| +35.7s | -21.3° | 20.3° | -6.8° |
+| +36.1s | -21.7° | 33.5° | -6.2° |
+| +36.3s (last of the session) | -22.6° | 35.5° | -6.5° |
+
+**Yaw stabilizes and stays roughly put (-21° to -23°) from the third applied sample onward — §37 is doing exactly its job on the axis it protects.** But **pitch climbs almost monotonically, sample over sample: 4.9° → 2.8° → 17.2° → 20.3° → 33.5° → 35.5°**, and the anchor freezes there — no further re-detections happened for the rest of the session, so the model stayed tilted 35.5° for however long the person kept looking at it. This is exactly the reported "inclinación."
+
+**Root cause: the §37 rotation-consensus gate ONLY ever compares YAW between two samples — it says nothing about pitch or roll.** Two samples can agree perfectly on yaw (which is all §37 checks) while their pitch values are wildly different; the CONFIRMING sample's full quaternion — pitch and roll included — is what gets applied. Since each step's pitch only needed to agree with ITS OWN immediately-preceding candidate (not with any earlier "good" value), a slow-drifting sequence of samples can walk pitch arbitrarily far from 0°, two steps at a time, with the consensus check never noticing because it was never looking at that axis.
+
+**The fix has a genuine ground truth to use, unlike yaw.** Every physical plaque is mounted flat (coworker-confirmed physical review, §17/§18) — so, independent of where the phone is pointed, the anchored content's pitch and roll should always be near 0°. This is fundamentally different from yaw, which has no external reference (compass-free monocular VIO's well-known weak axis, §35). Every previously-confirmed-good sample logged across this project's entire history (§35 log-7, §36 log-8, §37 log-9, and this log's own first two applied samples) stayed under 10°; every corrupted reading seen so far (this log's climb, plus the isolated bad ones in §37) was 17° or higher — a clean separation with margin on both sides.
+
+**Fix (`ImageTargetAnchorSource.ts`, §37 follow-up): `isRotationPlausible(pitchDeg, rollDeg)`, tolerance ±15°, checked BEFORE a sample can even become or confirm a rotation-consensus candidate** — same tier as `isScalePlausible()`, not part of the consensus comparison. A sample failing this check is rejected outright (own throttled warning line, mirroring `warnIfScaleMismatch`) and never enters the pending-candidate slot at all. Applied everywhere `isScalePlausible()` already runs: the pre-freeze `'updated'` stream (`isSampleTrustworthy()` now takes the event/target too, needed to compute pitch/roll) and every `'found'` re-detection, new-target or not — same §33 precedent (never exempted, even for a first sighting of a brand-new plaque, exactly like scale). The unconditional bootstrap sample is untouched, as always.
+
+**Test suite:** all 56 previous tests pass unmodified — every existing test's simulated model orientation is a pure yaw rotation (pitch=roll=0° by construction), comfortably inside the new tolerance. Two new tests added: an implausibly-tilted sample (30° pitch) fired twice in a row never applies (proving it's rejected before consensus, not just failing to confirm against itself), and a first sighting of a different, never-before-seen plaque with implausible roll is still rejected despite the trackingStatus exemption.
+
+**Verified in software:** `npm run typecheck`/`build`/`test` clean, 58/58 (56 previous + 2 new). **Not verifiable in software:** whether ±15° is the right tolerance for real hardware noise, or whether a genuinely valid reading could ever exceed it — the next physical capture should show no more steadily-climbing tilt, and any legitimate near-flat sample should still pass without spurious "rotation implausible" rejections.
