@@ -92,6 +92,19 @@ export class EightWallSession {
   // updated logs, which now include this. Never read for any tracking
   // decision, only logged.
   private camera: THREE.PerspectiveCamera | null = null;
+  // Diagnostic only (2026-09-02, troubleshooting doc §27/§28 follow-up): a
+  // real capture showed the "model looks tiny" symptom appear during a
+  // 24-second stretch with ZERO image-target events (no found/updated/lost,
+  // no trackingStatus change) — confirmed by the person testing to NOT be
+  // ordinary distance/perspective (they stayed relatively close). The
+  // per-applied-pose camera log in ImageTargetAnchorSource can only ever
+  // fire when an image event fires, so it logged nothing during exactly the
+  // window that mattered. This ticks independently of any image event, off
+  // the SAME per-frame onUpdate the app already runs, so the next capture
+  // can show the camera's live position drifting (or not) even while no
+  // plaque is in view.
+  private lastPeriodicCameraLogMs = 0;
+  private static readonly PERIODIC_CAMERA_LOG_INTERVAL_MS = 1000;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -167,6 +180,18 @@ export class EightWallSession {
           },
           onUpdate: () => {
             this.frameBus.tick(performance.now());
+            const now = performance.now();
+            if (
+              this.camera &&
+              now - this.lastPeriodicCameraLogMs > EightWallSession.PERIODIC_CAMERA_LOG_INTERVAL_MS
+            ) {
+              this.lastPeriodicCameraLogMs = now;
+              const p = this.camera.position;
+              console.log(
+                `[${traceT()}] [EightWallSession] camera (periodic, throttled 1/s) = (${p.x.toFixed(2)}, ${p.y.toFixed(2)}, ${p.z.toFixed(2)}) ` +
+                  `trackingStatus=${this.status} reason=${this.statusReason}`
+              );
+            }
           },
           onException: (error: unknown) => {
             reject(error instanceof Error ? error : new Error(String(error)));

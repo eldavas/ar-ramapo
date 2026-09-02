@@ -3201,3 +3201,30 @@ schema above.
   not a new, separate problem.** `npm run typecheck`/`build`/`test`
   clean, 53/53. The real test of this fix is simply whether the next
   capture reaches the part of the session that matters.
+
+  **Progress (2026-09-02, same day, third capture): the throttle fix
+  worked — a clean 53+ second capture — and it caught the symptom with
+  ZERO image-target telemetry in the preceding 24 seconds.** Full
+  reasoning: `docs/research/8th-wall-troubleshooting.md` §29. From the
+  last image event (`+29.0s`) to the moment the person testing noticed
+  the model had shrunk and pulled the log (`+53.2s`), there is no
+  `FOUND`/`updated`/`LOST` line and no `TrackingStatus` change — 24
+  seconds confirmed continuously live via ongoing `HotspotProjector`/
+  `MarkerLayer` activity, during which the anchor's transform was never
+  touched. Directly asked and confirmed with the person testing: they
+  stayed relatively close, ruling out "this is just normal perspective at
+  a distance." That leaves genuine mid-session divergence between the
+  camera's own reported pose and physical reality (hypothesis (b), §27)
+  as the standing explanation.
+
+  **Fix:** every camera-position log added so far only fires from inside
+  `ImageTargetAnchorSource` on an applied pose — which structurally
+  cannot fire during a stretch with zero image events, exactly the
+  window that mattered here. `EightWallSession.ts` now also logs the
+  camera's position independently, throttled to 1/s, directly off the
+  pipeline's own per-frame `onUpdate` — so it fires for the whole
+  session regardless of whether any plaque is in view. `npm run
+  typecheck`/`build`/`test` clean, 53/53. **Next capture is the real
+  test:** does the periodic camera log show drift/a jump during a silent
+  stretch like this one — the first potentially unambiguous confirmation
+  of hypothesis (b) if so.
