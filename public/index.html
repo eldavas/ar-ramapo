@@ -103,11 +103,30 @@
         'padding:4px 6px;white-space:pre-wrap;word-break:break-word;pointer-events:none;';
       document.body.appendChild(bar);
 
+      // Full-session log export (2026-09-02, troubleshooting doc §27
+      // follow-up): a real on-device walkaround needed to reproduce the
+      // anchor-drift bug can't stay tethered to a Mac for Web Inspector —
+      // that's exactly the movement the bug needs to show up. This buffer
+      // mirrors the SAME lines the on-screen `bar` shows, but uncapped
+      // (well past MAX_LINES) and paired with a tap target that surfaces
+      // it as a real, selectable/copyable <textarea> — sidestepping BOTH
+      // limits of the on-screen panel: the 200-line rolling window, and
+      // `pointer-events:none` (deliberate, so the panel never blocks a tap
+      // on the AR scene underneath) making its own text uncopiable by
+      // touch. 20000 lines is generously past what a multi-minute session
+      // logs today; capped at all only so an extreme-length session can't
+      // grow this without bound.
+      var fullLog = [];
+      var FULL_LOG_MAX_LINES = 20000;
+
       var MAX_LINES = 200;
       function append(text, color) {
+        var stamped = new Date().toISOString().slice(11, 23) + '  ' + text;
+        fullLog.push(stamped);
+        if (fullLog.length > FULL_LOG_MAX_LINES) fullLog.shift();
         var row = document.createElement('div');
         row.style.color = color;
-        row.textContent = new Date().toISOString().slice(11, 23) + '  ' + text;
+        row.textContent = stamped;
         bar.appendChild(row);
         while (bar.childElementCount > MAX_LINES) bar.removeChild(bar.firstChild);
         bar.scrollTop = bar.scrollHeight;
@@ -132,6 +151,79 @@
       });
       window.addEventListener('unhandledrejection', function (event) {
         append('[unhandled rejection] ' + String(event.reason), '#f66');
+      });
+
+      // "Show log" button: the ONE element in this whole debug overlay with
+      // pointer-events:auto (everything else stays none, on purpose, so it
+      // never intercepts a tap meant for the AR scene). Small and
+      // bottom-right so it's reachable one-handed and out of the way of
+      // the live guidance illustration (GuidanceOverlay is centered,
+      // UxOverlay's hint strip sits at bottom:48px — see their own files).
+      var showButton = document.createElement('button');
+      showButton.textContent = 'Show log';
+      showButton.style.cssText =
+        'position:fixed;right:8px;bottom:8px;z-index:999999;pointer-events:auto;' +
+        'font:11px ui-monospace,monospace;padding:6px 10px;border-radius:6px;border:1px solid #8f8;' +
+        'background:rgba(0,0,0,0.78);color:#8f8;';
+      document.body.appendChild(showButton);
+
+      var overlay = null;
+      showButton.addEventListener('click', function () {
+        if (overlay) return;
+        overlay = document.createElement('div');
+        overlay.style.cssText =
+          'position:fixed;inset:0;z-index:9999999;background:rgba(0,0,0,0.92);' +
+          'display:flex;flex-direction:column;padding:8px;pointer-events:auto;';
+
+        var toolbar = document.createElement('div');
+        toolbar.style.cssText = 'display:flex;gap:8px;margin-bottom:6px;flex-shrink:0;';
+
+        var closeButton = document.createElement('button');
+        closeButton.textContent = 'Close';
+        closeButton.style.cssText =
+          'font:12px ui-monospace,monospace;padding:8px 12px;border-radius:6px;border:1px solid #f66;' +
+          'background:rgba(0,0,0,0.9);color:#f66;';
+        closeButton.addEventListener('click', function () {
+          document.body.removeChild(overlay);
+          overlay = null;
+        });
+
+        var status = document.createElement('span');
+        status.style.cssText = 'font:12px ui-monospace,monospace;color:#8f8;align-self:center;';
+        status.textContent = fullLog.length + ' lines. Tip: tap the text, then Select All, then Copy.';
+
+        toolbar.appendChild(closeButton);
+        toolbar.appendChild(status);
+        overlay.appendChild(toolbar);
+
+        var textarea = document.createElement('textarea');
+        textarea.readOnly = true;
+        textarea.value = fullLog.join('\n');
+        textarea.style.cssText =
+          'flex:1;width:100%;font:10px/1.4 ui-monospace,monospace;color:#8f8;background:#000;' +
+          'border:1px solid #444;padding:6px;-webkit-user-select:text;user-select:text;';
+        overlay.appendChild(textarea);
+        document.body.appendChild(overlay);
+
+        // A real <textarea> (unlike the pointer-events:none panel above)
+        // is natively selectable/copyable by touch — select() pre-selects
+        // everything so a single tap-and-copy (or Cmd+A/Cmd+C over a
+        // connected keyboard) grabs the whole session with no manual
+        // dragging through thousands of lines.
+        textarea.focus();
+        textarea.select();
+
+        // Best-effort automatic copy, IN ADDITION TO the manual
+        // select/copy path above, never instead of it — the Clipboard API
+        // can silently refuse depending on iOS Safari's permission state
+        // for a given session, so the textarea is the guaranteed fallback,
+        // not the other way around.
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(textarea.value).then(
+            function () { status.textContent = fullLog.length + ' lines — copied to clipboard automatically. Paste anywhere.'; },
+            function () { /* silent — manual select/copy above still works */ }
+          );
+        }
       });
 
       console.log('[ar-debug-console] active before module script — ' + new Date().toISOString());

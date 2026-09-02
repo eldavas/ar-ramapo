@@ -3152,3 +3152,35 @@ schema above.
   capture). **Deliberately not attempted this pass:** any further change
   to `ImageTargetAnchorSource`'s gate/composition logic — the entire point
   of this pass is to stop changing that code without evidence.
+
+  **Progress (2026-09-02): first real capture via USB-tethered Web
+  Inspector — mostly ruled out hypothesis (a), strengthened (b), didn't
+  reproduce the actual symptom; added an untethered log-export tool since
+  the cable itself was capping the movement needed to reproduce it.**
+
+  Full reasoning in `docs/research/8th-wall-troubleshooting.md` §27's
+  follow-up. Short version: the ~7× scale-mismatch readings during cold
+  start were confirmed harmless (gate correctly rejecting pre-convergence
+  garbage — the physical target really does measure 3×3cm, matching the
+  manifest); a 52-second stretch with zero telemetry lines logged is the
+  new leading suspect for ordinary SLAM/VIO position drift that
+  `trackingStatus` staying `NORMAL` would never flag. This specific
+  capture did not reproduce "anchor lost / scale miniature" — movement was
+  minimal, capped by the literal USB cable Web Inspector requires, which
+  is exactly the kind of real walkaround needed to trigger it.
+
+  **Fix to the tooling, not the anchor:** `public/index.html`'s existing
+  `?debug=1` console now also buffers the full session (uncapped past the
+  on-screen panel's 200-line window) and adds a "Show log" button — the
+  only `pointer-events:auto` element in that overlay — opening a real
+  `<textarea>` with everything pre-selected, copyable by touch with no
+  cable or Mac required. Solves the on-screen panel's two real limits at
+  once (rolling 200-line window; `pointer-events:none` making its own text
+  uncopiable) so a genuine untethered walkaround can finally be captured
+  in full.
+
+  **Verified in software:** `npm run typecheck`/`build`/`test` clean,
+  53/53 (`public/index.html` is a plain inline script, not part of the
+  TypeScript/Vite build graph — no new test surface). **Next physical
+  step, unblocked now:** one untethered walkaround reproducing the
+  symptom, then "Show log" → send the full text.
