@@ -3228,3 +3228,29 @@ schema above.
   test:** does the periodic camera log show drift/a jump during a silent
   stretch like this one — the first potentially unambiguous confirmation
   of hypothesis (b) if so.
+
+  **Progress (2026-09-02, same day, fourth capture): hypothesis (b)
+  confirmed with hard numbers — genuine SLAM height drift, not an
+  anchor-code bug. No code changed this pass; a validation step proposed
+  instead of a fifth guess.** Full reasoning and the raw capture:
+  `docs/research/8th-wall-troubleshooting.md` §30 / `docs/log-1.txt`. The
+  periodic camera-position log (§29) shows the camera's own reported
+  height climbing from 0.41m to 1.88m over ~45 seconds, with the LAST
+  image-target event of the entire 787-line capture at the 27-second
+  mark — meaning the anchor's transform was structurally frozen and
+  untouched for the rest of the session; whatever "shrunk" is the
+  camera's own drifted self-estimate, not anything `ImageTargetAnchorSource`
+  applied or rejected. Confirmed directly with the person testing that
+  this wasn't ordinary perspective from walking far away. §26's periodic
+  re-grounding-on-re-detection mitigation never got a chance to run — the
+  person went 53+ seconds absorbed in the 12 hotspot buildings without
+  looking back at any of the 4 plaques.
+
+  **Deliberately not fixed yet:** two candidate next moves — a proactive
+  UX nudge to glance at a plaque after some idle-without-re-detection
+  threshold, or first confirming that a DELIBERATE re-detection during
+  visible drift actually corrects it. Chose to validate first: building a
+  coaching nudge on top of a correction path that might itself be broken
+  would solve the wrong layer. **Next physical step, no code changed:**
+  walk until the drift is visible, look at any of the 4 plaques, report
+  whether it snaps back correctly.

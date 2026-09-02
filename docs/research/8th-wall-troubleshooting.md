@@ -1659,3 +1659,30 @@ The §28 throttle fix worked as intended — this capture ran cleanly to 53+ sec
 **Fix (`EightWallSession.ts`):** a new periodic camera-position log, throttled to 1/s, added directly to the pipeline module's `onUpdate` (already ticks every frame regardless of image events) — independent of `ImageTargetAnchorSource` entirely, so it fires continuously for the whole session, image target in view or not. Reads the same retained camera handle §27 added (`this.camera`), plus current `trackingStatus`/reason for full context each tick.
 
 **Verified in software:** `npm run typecheck`/`build`/`test` clean, 53/53 (diagnostic-only addition; no tracking decision depends on it, nothing to assert). **Not verifiable in software, and the actual test of this fix:** whether the next capture's periodic camera log shows the position drifting/jumping during a silent stretch like this one's 24 seconds — that would be direct, unambiguous confirmation of hypothesis (b), correlatable against how far the person testing knows they actually walked.
+
+---
+
+## 30. Fourth real capture (2026-09-02, same day) — hypothesis (b) confirmed with hard numbers: ~1.5m of camera-height drift over 45s with zero re-detections; no code changed this pass, a validation test proposed instead
+
+Full raw capture saved verbatim: `docs/log-1.txt` (787 lines, pasted directly from the on-screen `?debug=1` console via the Mac's connected keyboard — not the "Show log" button this time, but the same throttle fix from §28 kept it well under any character limit end to end, reaching `+79.5s`).
+
+**The number that settles it.** Reading the §29-added periodic camera-position log (independent of any image event) across the session:
+
+| session time | camera Y (height) |
+|---|---|
+| +26.9s (last re-detection — anchor established here, never touched again) | 0.41 m |
+| +38.7s | 0.50 m |
+| +55.0s | 0.68 m |
+| +66.2s | 1.07 m |
+| +72.3s | **1.88 m** |
+| +79.5s (end of capture) | 1.67 m |
+
+The camera's own SLAM-reported height climbed roughly **1.5 meters over ~45 seconds** — the person testing did not stand up, climb anything, or otherwise actually gain that much real height. **This is genuine SLAM/VIO drift in the engine's own world-tracking pose estimate, not anything `ImageTargetAnchorSource` did** — confirmed structurally, not inferred: `[ImageTarget] FOUND "site-tracking-front"` at `+26.9s` is the LAST image-target event of any kind in the entire 787-line capture. No `found`/`updated`/`lost`, no `TrackingStatus` change, for the remaining 53 seconds. The anchor's transform is therefore unconditionally frozen at whatever `applyPose()` set at `+26.9s` — there is no code path by which it could have changed. Vertical (Y-axis) drift specifically is a known weak axis for monocular visual-inertial tracking (less usable parallax than lateral motion provides, and pure-rotation phases — e.g. tilting a phone up/down at buildings/ground with little accompanying translation — are a classic degenerate-motion case that gets misattributed as translation).
+
+**Directly confirmed with the person testing, not assumed:** the shrink was noticed while still relatively close to the anchor's true position — ruling out "this is just normal perspective from having walked far away" (§29 already asked and ruled this out; this capture's actual numbers now show WHY perspective alone can't explain it: a fixed, real anchor viewed from a camera that thinks it is 1.5m higher than it really is will look wrong regardless of horizontal distance).
+
+**Why §26's existing mitigation (periodic re-grounding on re-detection) didn't help here:** it was never given the chance to run. The whole point of that design is "each fresh sighting of a plaque is a chance to re-ground it" — but this capture shows a real user, absorbed in exploring the 12 hotspot buildings, going 53+ seconds without looking back at any of the 4 plaques. The mechanism is sound; the trigger condition (the user glancing at a plaque) simply didn't occur.
+
+**Deliberately NOT fixed this pass — a validation step is needed first, not another blind change.** Two structurally different next moves were on the table: (1) build a proactive UX nudge ("glance at a nearby plaque") once some threshold of time/drift passes without a re-detection, or (2) first confirm, on a real device, that looking at ANY of the 4 plaques while the drift is visually obvious actually snaps the anchor back correctly. Chose (2): if a fresh re-detection does NOT visibly fix it even when deliberately triggered, that means something in the correction path itself (not just "the user didn't trigger it") is broken, and building a coaching nudge on top of a broken correction would be solving the wrong layer. Only after that's confirmed does a coaching-nudge design (timing, wording, which UI pattern) become the right next question to answer.
+
+**Next physical step:** walk until the model visibly drifts/shrinks (as reproduced here), then look directly at any one of the 4 plaques and confirm whether it snaps back to the correct position/scale. Report yes/no — that answer determines whether the next pass is a UX addition (nudge the user to do this proactively) or a fresh investigation (the correction path itself has a bug, evidenced by a capture where a deliberate re-detection during known drift still failed to visibly correct).
