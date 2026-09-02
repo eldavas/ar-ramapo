@@ -3254,3 +3254,30 @@ schema above.
   would solve the wrong layer. **Next physical step, no code changed:**
   walk until the drift is visible, look at any of the 4 plaques, report
   whether it snaps back correctly.
+
+  **Progress (2026-09-02, same day, fifth capture): §30's validation
+  test passed — re-detection genuinely corrects drift — and a second,
+  independent, real bug surfaced in the same walk: back/left plaques
+  never detected once.** Full reasoning: `docs/research/
+  8th-wall-troubleshooting.md` §31 / `docs/log-2.txt`. At `+90.0s`,
+  `site-tracking-right`'s first-ever sighting snapped the anchor to a new,
+  correct position (confirmed both by the person testing and by sane
+  post-snap marker projections in the log) — the reported "jumps to the
+  new target" is the correction working as designed, not a new bug;
+  §30's fork is resolved without further anchor-code changes. Separately:
+  `site-tracking-back`/`-left` produced zero `FOUND` events across the
+  entire ~140s capture while front (31×) and right (1×) worked — ruled
+  out as a code/build defect (both names correctly registered per
+  `acquire()`'s own log; all 4 compiled targets structurally identical on
+  disk). Confirmed directly with the person testing: worse print/lighting
+  quality on that side plus a walking path that didn't pass as close/
+  square-on to those two plaques — a physical-setup and content issue,
+  not a software one.
+
+  **Two independent next tracks, neither is `ImageTargetAnchorSource`
+  changes:** (1) physically re-inspect/re-print back/left and improve
+  lighting on that side — no code; (2) a proactive coaching nudge
+  ("glance at a nearby plaque") after some idle-without-re-detection
+  threshold — now well-evidenced (the correction path is confirmed to
+  work, and a nudge would also mitigate the back/left detection gap by
+  encouraging a deliberate, close, square-on look) but not yet built.
