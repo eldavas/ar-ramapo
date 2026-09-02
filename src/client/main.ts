@@ -516,6 +516,12 @@ async function runEightWallExperience(experience: ExperienceManifest): Promise<v
   // 2026-08-18). null on the tap-placement/FAKE_AR paths, which never
   // register this listener in the first place.
   let hintGate: ImageEventHintGate | null = null;
+  // Hoisted out of the real-session branch below so the stillness-escalation
+  // coaching further down (§35) can read the live camera position — null on
+  // the FAKE_AR desk-sim path, which has no real EightWallSession and whose
+  // simulated anchor resolves whenStable() immediately anyway (see the
+  // stillness check's own null guard).
+  let eightWallSession: EightWallSession | null = null;
 
   if (FAKE_AR) {
     // Desk simulation: no camera, no SLAM, no placement — an always-tracking
@@ -529,6 +535,7 @@ async function runEightWallExperience(experience: ExperienceManifest): Promise<v
     // XR8.run) from a gesture handler. Camera permission chains from the
     // same tap.
     const session = new EightWallSession(canvas, frameBus);
+    eightWallSession = session;
     const imageTargets = imageTargetsPromise === null ? null : await imageTargetsPromise;
     diagMark('start-ar-button-shown');
 
@@ -667,9 +674,55 @@ async function runEightWallExperience(experience: ExperienceManifest): Promise<v
     }
   }, POSE_COACHING_DELAY_MS);
 
+  // Stillness escalation (2026-09-02, troubleshooting doc §35): a real
+  // on-device capture PROVED the coaching text above, by itself, is not
+  // enough — the periodic camera-position log (EightWallSession's own
+  // diagnostic, §27/§29) showed the camera sitting essentially motionless
+  // (sub-3cm drift) for 40+ CONTINUOUS seconds while "Still locking on…"
+  // was already on screen the whole time, then converging within a couple
+  // of seconds the moment real movement resumed. The text was visible;
+  // it just wasn't compelling enough to change behavior — people who
+  // believe they've "found" the plaque instinctively hold the phone
+  // extra-still, which is the exact opposite of what absolute-scale
+  // convergence needs. This does not touch `isSampleTrustworthy()` or any
+  // reveal criterion — whenStable() below is still the only thing that
+  // ever reveals the scene — it only makes the EXISTING coaching react to
+  // proven inaction instead of a single fixed timer, using the camera
+  // position this file already logs for diagnostics (EightWallSession
+  // .getCameraPosition(), §27).
+  const STILLNESS_CHECK_INTERVAL_MS = 1000;
+  const STILLNESS_ESCALATION_AFTER_MS = 6000;
+  const STILLNESS_MOVE_THRESHOLD_METERS = 0.04;
+  let lastStillnessCheckPos: { x: number; y: number; z: number } | null = null;
+  let stillMs = 0;
+  let escalated = false;
+  const stillnessTimer = setInterval(() => {
+    if (stableResolved || !eightWallSession) return;
+    const pos = eightWallSession.getCameraPosition();
+    if (pos) {
+      if (lastStillnessCheckPos) {
+        const dx = pos.x - lastStillnessCheckPos.x;
+        const dy = pos.y - lastStillnessCheckPos.y;
+        const dz = pos.z - lastStillnessCheckPos.z;
+        const moved = Math.sqrt(dx * dx + dy * dy + dz * dz) > STILLNESS_MOVE_THRESHOLD_METERS;
+        stillMs = moved ? 0 : stillMs + STILLNESS_CHECK_INTERVAL_MS;
+      }
+      lastStillnessCheckPos = pos;
+    }
+    if (!escalated && stillMs >= STILLNESS_ESCALATION_AFTER_MS) {
+      escalated = true;
+      const text =
+        "Keep your phone moving — holding it still is why this is taking a while. " +
+        'Try a slow, repeated closer-then-farther motion, or move it side to side.';
+      overlay.showHint(text);
+      arStatusStore.getState().setPhase('stabilizing', text);
+    }
+  }, STILLNESS_CHECK_INTERVAL_MS);
+
   await anchorSource.whenStable();
   stableResolved = true;
   clearTimeout(coachingTimer);
+  clearInterval(stillnessTimer);
   // One-way: the coaching hint listener (if any — only the image-target
   // path registers one) can never re-show the loading UX after this,
   // however many more 'scanning'/'loading' events arrive later. Does not

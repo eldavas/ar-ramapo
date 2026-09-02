@@ -3382,3 +3382,35 @@ schema above.
   the walkaround — this time the rotation will actually be visible,
   finally answering whether the tilt is systematic (mount angle /
   `TARGET_FRAME_TO_WORLD_FIX`) or per-sample noise.
+
+  **Progress (2026-09-02, tenth capture): rotation question answered
+  (yaw drift, not a wrong constant), and the actual critical fix this
+  pass — the 30+ second first-scan stall — root-caused and corrected.**
+  Full reasoning: `docs/research/8th-wall-troubleshooting.md` §35 /
+  `docs/log-7.txt`. Three accepted samples of the same `front` plaque
+  showed pitch/roll staying small and consistent (a few degrees, near
+  0°) while yaw swung across a 68° range — pitch/roll is what
+  `TARGET_FRAME_TO_WORLD_FIX` and the flat-mount assumption govern, so
+  this clears that constant; yaw is the textbook weak axis for
+  monocular VIO with no compass reference, so the "diagonal tilt" is
+  the same root SLAM world-frame drift already characterized for
+  position (§27/§30) and scale (§32/§33), now confirmed on orientation
+  too — not a separate bug.
+
+  Separately, and more urgently: the log's periodic camera-position
+  trace (§29) proved the phone sat essentially motionless (sub-3cm
+  drift) for a continuous 43 seconds immediately after `trackingStatus`
+  reached `NORMAL`, while the scale ratio decayed toward failure the
+  entire time and only converged the instant real motion resumed. The
+  existing "Still locking on..." hint was on screen for that whole
+  window and evidently wasn't compelling enough — likely because
+  finding the plaque triggers the instinct to hold extra-still, the
+  opposite of what absolute-scale convergence needs. Fixed in
+  `main.ts`: a 1s stillness monitor (reusing the already-exposed
+  `EightWallSession.getCameraPosition()`) escalates to a direct
+  "keep your phone moving" message after 6 seconds of sub-4cm motion.
+  UX-only, no tracking/gate logic touched. `npm run
+  typecheck`/`build`/`test` clean, 53/53. **Next physical step:** repeat
+  the first scan and check whether the escalated hint actually appears
+  during a stall and whether motion (and lock) resumes sooner than the
+  43-second baseline.
