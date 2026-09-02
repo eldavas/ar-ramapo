@@ -3184,3 +3184,20 @@ schema above.
   TypeScript/Vite build graph — no new test surface). **Next physical
   step, unblocked now:** one untethered walkaround reproducing the
   symptom, then "Show log" → send the full text.
+
+  **Progress (2026-09-02, same day): the real blocker to ANY usable
+  capture found — an unthrottled per-frame console warning, not the
+  anchor.** Full write-up: `docs/research/8th-wall-troubleshooting.md`
+  §28. A second capture attempt hit its character limit still inside the
+  first ~13 seconds of cold start — `ImageTargetAnchorSource
+  .logSampleRejected()`'s trackingStatus-rejection warning had no
+  throttle (unlike the scale-mismatch warning beside it), so a sustained
+  non-NORMAL stretch printed ~60 near-identical lines per second. Cold
+  starts of 13-30+ seconds (confirmed twice now, not a one-off) produce
+  800-1800+ copies of one line before anything diagnostically useful
+  appears, in the on-screen panel (200-line cap) or any pasted/exported
+  log. Fixed: same 1/s throttle as the scale-mismatch warning. **This was
+  likely quietly sabotaging every capture in this investigation so far,
+  not a new, separate problem.** `npm run typecheck`/`build`/`test`
+  clean, 53/53. The real test of this fix is simply whether the next
+  capture reaches the part of the session that matters.

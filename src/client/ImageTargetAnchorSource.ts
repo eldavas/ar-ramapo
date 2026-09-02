@@ -60,14 +60,21 @@ const TARGET_FRAME_TO_WORLD_FIX = new THREE.Quaternion().setFromAxisAngle(new TH
  */
 const SCALE_MISMATCH_TOLERANCE = 0.25; // ±25%
 
-// isSampleTrustworthy() only runs during the brief pre-freeze convergence
-// window (see the class doc comment's 2026-08-31 strategy note) — a few
-// samples at most, not an entire session — so the once-per-second warning
-// throttle a continuous-re-snap regime needed is mostly moot now, but it's
-// harmless to keep and avoids flooding the console if convergence ever
-// takes an unusually long run of rejected samples.
+// 2026-09-02 correction: this comment previously claimed
+// isSampleTrustworthy() "only runs during the brief pre-freeze convergence
+// window... a few samples at most" — a real on-device capture refuted that
+// directly: a cold start stuck in trackingStatus=LIMITED/INITIALIZING for
+// 13-30+ seconds produces 800-1800+ rejected 'updated' samples on its own,
+// before the session even reaches anything interesting. The throttle below
+// is not "mostly moot," it is load-bearing — see the trackingStatus
+// rejection warning further down, which lacked this same throttle and was
+// confirmed (same capture) to flood both the on-screen ?debug=1 panel and
+// any copy-pasted/exported log with one repeated line per frame, crowding
+// out the FOUND/LOST/TrackingStatus-change lines actually needed to
+// diagnose anything.
 const SCALE_MISMATCH_WARN_INTERVAL_MS = 1000;
 let lastScaleMismatchWarnMs = 0;
+let lastTrackingStatusRejectWarnMs = 0;
 
 function scaleRatio(event: Xr8ImageTrackedEvent, physicalTargetWidthMeters: number): number {
   return event.scale / physicalTargetWidthMeters;
@@ -443,13 +450,28 @@ export class ImageTargetAnchorSource implements AnchorSource {
     );
   }
 
+  /**
+   * 2026-09-02 fix: this trackingStatus warning had no throttle of its own
+   * — unlike `warnIfScaleMismatch` right above it — so a sustained
+   * non-NORMAL stretch (a slow cold start, sustained RELOCALIZING mid-walk)
+   * printed this exact line every single 'updated' frame, unbounded. A
+   * real on-device capture (troubleshooting doc §27) showed a 13-30s cold
+   * start alone producing 800-1800+ copies of this one line, which is what
+   * was actually preventing a usable full-session capture — not a mystery
+   * about the anchor, a console-flooding bug in the logging itself. Reuses
+   * the same 1/s throttle as the scale-mismatch warning right above.
+   */
   private logSampleRejected(event: Xr8ImageTrackedEvent, target: ResolvedPlaqueTarget, ratio: number): void {
     warnIfScaleMismatch(event, target.physicalTargetWidthMeters, ratio);
     if (this.session.trackingStatus !== 'NORMAL') {
-      console.warn(
-        `[${traceT()}] [ImageTarget] pose sample rejected — trackingStatus=${this.session.trackingStatus} ` +
-          `reason=${this.session.trackingReason} (not NORMAL). Anchor holds its last known-good transform.`
-      );
+      const now = performance.now();
+      if (now - lastTrackingStatusRejectWarnMs > SCALE_MISMATCH_WARN_INTERVAL_MS) {
+        lastTrackingStatusRejectWarnMs = now;
+        console.warn(
+          `[${traceT()}] [ImageTarget] pose sample rejected — trackingStatus=${this.session.trackingStatus} ` +
+            `reason=${this.session.trackingReason} (not NORMAL). Anchor holds its last known-good transform.`
+        );
+      }
     }
   }
 
