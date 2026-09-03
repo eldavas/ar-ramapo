@@ -5,7 +5,47 @@ last touched 2026-07-03/07 — roughly two months behind the web client's
 current state. This analyzes exactly what's stale and what the minimal,
 low-risk path is to test it on-device today for a stability comparison
 against 8th Wall, before deciding whether a TestFlight update is even
-needed for that goal. No code changed by this document.
+needed for that goal.
+
+**Update (2026-09-03): implemented and shipped.** Physical testing needs to
+be untethered (walking around the physical table), which the Xcode-cable
+path below can't do — so this went straight to a TestFlight build instead
+of the cable-tethered path originally recommended. Changes made:
+
+- `ar-ramapo`: added `trackingImageUrl` to all four `site-tracking-*`
+  manifest entries (not just `-front`), committed and pushed
+  (`c2c0652`) — the Render deploy picks it up automatically.
+- `ar-appclip`: `AppConfig.fallbackTargetId` switched from `"bench-test"`
+  (the old dominos scene) to `"site-tracking-front"`; README's build/testing
+  instructions and the deploy script's post-upload reminder updated to
+  match (`369815e`).
+- Verified locally first: `xcodegen generate` + a Debug `xcodebuild build`
+  succeeded (confirms the code compiles and automatic signing/provisioning
+  works from this machine) before running the real archive+upload.
+- Ran `scripts/deploy-testflight.sh` — archived, uploaded, and Apple's
+  processing accepted it (`** EXPORT SUCCEEDED **`, `Upload succeeded`).
+  Build number auto-incremented 2→3 (`dc694c8`; local-only repo, no remote
+  configured, so this stays a local commit). One benign warning: no dSYM
+  bundled for `RiveRuntime.framework` — third-party binary framework
+  without shipped debug symbols, doesn't block distribution, only means
+  crash symbolication for that framework specifically won't be perfect.
+
+**Still needed, not something code can do:** the App Clip's actual
+invocation must be pointed at `?target=site-tracking-front` for physical
+testing — either update the registered "Advanced App Clip Experience" URL
+in App Store Connect's dashboard, or (faster, no dashboard involved) use
+**Settings → Developer → App Clips Testing → Local Experiences** on the
+test iPhone once the TestFlight build installs, registering
+`https://ar-ramapo.onrender.com/?target=site-tracking-front` there directly
+— `ios-app-clip-research.md` already flags this path as "notoriously flaky
+— re-register/reboot" if it doesn't take on the first try. Because
+`fallbackTargetId` now also defaults to `site-tracking-front`, even a bare
+invocation with no `?target=` at all (or a flaky one that drops it) still
+lands on the current buildings/markers experience instead of the old
+dominos scene.
+
+The rest of this document is the original pre-implementation analysis,
+kept as-is for the reasoning trail.
 
 ## The actual gap: manifest schema, not the AR code
 
