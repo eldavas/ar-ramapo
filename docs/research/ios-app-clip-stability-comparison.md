@@ -44,6 +44,50 @@ invocation with no `?target=` at all (or a flaky one that drops it) still
 lands on the current buildings/markers experience instead of the old
 dominos scene.
 
+**Update (2026-09-03, same day): first real hardware capture found a second
+bug — not a stability finding, a parser false positive.** Build 3 installed
+from TestFlight and the Local Experience registered correctly (per the
+export-compliance answer below, that dashboard prompt was answered
+separately), but the App Clip failed to load with: *"The usda layer
+declares userProperties on two prims both named 'building_15'; prim names
+carrying metadata must be unique for hotspot discovery to join on them."*
+
+Also hit along the way, unrelated to tracking: App Store Connect's TestFlight
+export-compliance questionnaire for build 3 — answered "None of the
+algorithms mentioned above" (the app only performs standard HTTPS via
+`URLSession`, no CryptoKit/CommonCrypto/custom crypto anywhere in `ARClip/`,
+verified by grep). Also added `INFOPLIST_KEY_ITSAppUsesNonExemptEncryption:
+false` to `project.yml` (`288c63e`) so this question is skipped on every
+future upload — confirmed present in the generated Info.plist and that the
+project still builds.
+
+**Root-caused directly against the shipped asset**, not guessed: unzipped
+`public/assets/site-scene.usdz` and grepped its `.usda` text. The "two prims
+named building_15" are `def Xform "building_15"` (carries the real
+`buildingId`/`heightEstimated` metadata) with a nested `def Mesh
+"building_15"` one level inside it (carries only Blender's own
+auto-generated `userProperties:blender:data_name` bookkeeping property) —
+Blender's completely standard, routine export shape for every single
+mesh-bearing object (`Xform "X" { ... Mesh "X" { ... } }`). Confirmed via
+`grep -c`/`uniq -c` across the whole file that every `building_*` and
+`hotspot_building_*` Xform name is genuinely unique — there was no real
+collision anywhere.
+
+The bug was in `ARClip/Services/USDZ/USDASceneMetadata.swift`'s parser: it
+threw at prim-**scope-open** time whenever a flat name reopened after
+already collecting real metadata, without checking whether the *reopening*
+prim (the Mesh child) would itself write anything beyond Blender's own
+`blender:`-prefixed bookkeeping — a check that already existed, correctly,
+at property-**assignment** time, just not consulted before the premature
+throw. This had never been exercised before: the old bench-test dominos
+scene's custom properties lived only on separate hotspot Empties (which
+Blender never gives a nested Mesh child), not on mesh-bearing objects
+directly, so this exact shape only started appearing once the Clip pointed
+at `site-scene.usdz`'s buildings for the first time. Fixed by removing the
+premature open-time throw and keeping only the property-assignment-time
+check (`3b530fe`) — verified compiling, then archived and uploaded as build
+4 (`2c7a3c4`), export/upload both succeeded.
+
 The rest of this document is the original pre-implementation analysis,
 kept as-is for the reasoning trail.
 
