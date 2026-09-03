@@ -130,6 +130,15 @@ export interface PlaqueTarget {
    * common case; only needed if they must differ.
    */
   imageTargetName?: string;
+  /**
+   * Raw plaque artwork (PNG) for tracking engines that consume the image
+   * directly instead of a compiled feature file — the per-target analogue
+   * of the top-level `trackingImageUrl` field, for the iOS App Clip's
+   * ARKit path (2026-09-03, native multi-target parity: each of the 4
+   * physical plaques needs its own `ARReferenceImage`). Same already-
+   * deployed raw PNGs the standalone `site-tracking-*` entries reference.
+   */
+  trackingImageUrl?: string;
   physicalTargetWidthMeters: number;
   /**
    * This plaque's position, measured from the §A reference corner (the
@@ -478,24 +487,32 @@ export const experienceManifest: ExperienceManifest[] = [
     targets: [
       {
         imageTargetUrl: '/assets/image-targets/site-tracking-front/site-tracking-front.json',
+        imageTargetName: 'site-tracking-front',
+        trackingImageUrl: '/assets/image-targets/site-tracking-front/site-tracking-front_original.png',
         physicalTargetWidthMeters: 0.03,
         originOffsetMeters: { x: 0.8375, z: -0.015 },
         rotationYawDeg: 0,
       },
       {
         imageTargetUrl: '/assets/image-targets/site-tracking-back/site-tracking-back.json',
+        imageTargetName: 'site-tracking-back',
+        trackingImageUrl: '/assets/image-targets/site-tracking-back/site-tracking-back_original.png',
         physicalTargetWidthMeters: 0.03,
         originOffsetMeters: { x: 0.8375, z: -1.399 },
         rotationYawDeg: 180,
       },
       {
         imageTargetUrl: '/assets/image-targets/site-tracking-left/site-tracking-left.json',
+        imageTargetName: 'site-tracking-left',
+        trackingImageUrl: '/assets/image-targets/site-tracking-left/site-tracking-left_original.png',
         physicalTargetWidthMeters: 0.03,
         originOffsetMeters: { x: 0.015, z: -0.707 },
         rotationYawDeg: 90,
       },
       {
         imageTargetUrl: '/assets/image-targets/site-tracking-right/site-tracking-right.json',
+        imageTargetName: 'site-tracking-right',
+        trackingImageUrl: '/assets/image-targets/site-tracking-right/site-tracking-right_original.png',
         physicalTargetWidthMeters: 0.03,
         originOffsetMeters: { x: 1.66, z: -0.707 },
         rotationYawDeg: -90,
