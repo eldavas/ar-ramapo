@@ -2227,6 +2227,55 @@ schema above.
     re-verified on device. Revisit `selection:` only with real evidence
     Apple has shipped a fix for this specific bug — not before.
 
+  **Progress (2026-09-04, build 16): build 15's physical test confirmed
+  the crash is gone (no recurrence this session), but the width
+  corruption persisted IDENTICALLY — 393pt on `appeared`, jumping to
+  528pt ~100ms later, holding for the rest of the presentation — even
+  with `selection:` entirely removed.** That's a real, important
+  falsification of the build-15 hypothesis: `selection:` was not, on its
+  own, necessary for this corruption to trigger on this device — the
+  plain `.presentationDetents([peekDetent, .medium, .large])` array
+  overload reproduces it too. Explicit direction this round: stop
+  changing layout code and guessing at fixes; instrument the full
+  presentation geometry chain on real hardware to establish, as fact,
+  which layer actually owns the 528pt before choosing any further
+  workaround.
+
+  - **`ContentSheetView` additions (no layout change):** the existing
+    pre-lock log point (`.logGeometry("root")`, before
+    `.frame(width: lockedWidth)`) was renamed `"rootBeforeLock"`, and a
+    matching `"rootAfterLock"` point was added immediately after that
+    `.frame` — so a device capture can directly compare SwiftUI's
+    proposal before vs. after the override, closing the exact gap that
+    made builds 13-15's identical "root … 528" log readings
+    undiagnosable on their own. A new `PresentationProbe`
+    (`UIViewRepresentable` wrapping a plain `UIView` subclass) walks the
+    UIKit responder chain from inside the presented content to log, on
+    every layout pass: the presented `UIViewController`'s own
+    `view.frame`/`view.bounds`, the containing `UIWindow.bounds`, and —
+    if one exists — the managing `UIPresentationController`'s concrete
+    type, `containerView.bounds`, `presentedView.frame`, and (for
+    `UISheetPresentationController` specifically)
+    `selectedDetentIdentifier`. This is the first measurement in this
+    whole investigation taken from OUTSIDE the SwiftUI layout system
+    entirely, which is the only way to confirm or rule out that the
+    528pt originates above `ContentSheetView` in the presentation
+    controller's own UIKit-level sizing, independent of anything any
+    SwiftUI `.frame` modifier requests.
+  - **`ARClipApp.swift` addition (no layout change):** a `DetentExperiment`
+    enum cycles through 5 `.presentationDetents` configurations — no
+    detents at all, `[.large]`, `[.medium]`, `[.medium, .large]`, and
+    `[.height(140)]` alone — advancing by one on every FRESH sheet
+    presentation and logging which configuration was active. The same
+    multi-hotspot manual test flow already used in every capture this
+    session (tap several different buildings per session) naturally
+    exercises several of the 5 configurations in one sitting, with no
+    new debug UI needed.
+  - Compiles clean (`xcodebuild` Debug), no new warnings, uploaded as
+    build 16. This build makes no visual/layout change whatsoever — it
+    exists purely to establish which layer owns the corruption before
+    any further fix is attempted.
+
   No changes to web-client runtime code beyond the manifest additions
   above. No WebXR work.
 
