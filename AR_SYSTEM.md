@@ -1857,13 +1857,51 @@ schema above.
     free; `DerivedData` + the project's own `build/` output were the
     disposable culprits).
 
-  Not yet re-verified after build 7: the hotspot content sheet (tapping a
-  marker should open a Card-panel-equivalent with the Google Sheet's
-  title/subtitle/body/image, mirroring `CardPanel.ts`/`ContentProvider.ts`
-  — not yet ported to the native side) and whether the searching hint's
-  copy/behavior should track 8th Wall's fuller coaching state machine
-  (`arStatusStore`'s stabilizing/loading-target phases) rather than just
-  the one cold-start message shipped so far.
+  **Progress (2026-09-03, build 8): the two gaps flagged after build 7 are
+  now closed.**
+
+  - **Content sheet ported:** `ContentProvider.swift`'s
+    `GoogleSheetContentProvider` is a line-for-line Swift port of
+    `ContentProvider.ts` — same gviz-wrapper unwrap, same header-label
+    column matching (`contentKey`/`title`/`body` required, `subtitle`/
+    `imageUrl` optional), same per-session memoization, same
+    `ContentResolutionError` message text for every failure case
+    (unreachable, malformed wrapper, bad status, missing column, duplicate
+    key). `ExperienceCoordinator.selectHotspot` mirrors `main.ts`'s
+    `markers.onMarkerTap` handler exactly, including the "last tap wins"
+    staleness check (Swift `===` on the `Hotspot` class gives the same
+    reference-identity semantics as the web's `selected === hotspot`) and
+    the re-tap-to-close behavior. Presentation uses SwiftUI's native
+    `.sheet` + `.presentationDetents([.medium, .large])` +
+    `.presentationDragIndicator(.visible)` in `ContentSheetView` — the
+    idiomatic replacement for `CardPanel.ts`'s hand-rolled peek/open
+    snap-point drag gesture, not a reimplementation of it. `Manifest.swift`
+    gained `contentUrl`/`ResolvedExperience.contentURL`; no manifest schema
+    change was needed since the live `'site'` entry already declares
+    `contentUrl` (Phase 5). Not ported: the web's per-marker Rive
+    `isSelected`/`isDimmed` boolean-input highlight (`MarkerLayer
+    .setSelected`) — the native `RiveCardController` has no boolean-input
+    accessor yet, and this is cosmetic, not the reported bug.
+  - **Coaching expanded, evidence-scoped:** `ExperienceCoordinator
+    .tickCoaching` fuses the web's two separate mechanisms — main.ts's
+    `POSE_COACHING_DELAY_MS` pre-lock escalation and `TrackingLossHint`'s
+    post-lock sustained-loss hint — into one frame-driven state machine,
+    reusing the exact same `ARSessionManager.onFrame` deltaMs callback the
+    projector already runs on. `SearchingHintView` now crossfades between
+    hint texts instead of only fading in/out, so the "still locking on" →
+    "lost track of the plaque" escalations read as ongoing coaching
+    updating rather than a new alert. Deliberately NOT ported: the web's
+    stillness-escalation and extended-initialization timers (troubleshooting
+    doc §35/§36) — those exist specifically because 8th Wall's SLAM
+    convergence can take tens of seconds to minutes on a bad capture; build
+    7's logs/5.txt showed ARKit locking instantly with zero re-grounds, so
+    porting timers tuned for a failure mode this tracker hasn't exhibited
+    would be coaching for a problem that doesn't exist here. Per-phase
+    illustrations (`PhoneGuidanceIllustration`'s orbit/voronoi art) were
+    also not ported — text and animation only, no new asset work this pass.
+  - Build 8 compiles clean (`xcodebuild` Debug, `iphoneos` SDK) with no new
+    warnings and was uploaded to TestFlight via the existing
+    `scripts/deploy-testflight.sh` flow.
 
   No changes to web-client runtime code beyond the manifest additions
   above. No WebXR work.
