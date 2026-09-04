@@ -2276,6 +2276,49 @@ schema above.
     exists purely to establish which layer owns the corruption before
     any further fix is attempted.
 
+  **Progress (2026-09-04, build 17): build 16's probe answered every
+  question in the prior entry, from two independent physical captures,
+  and the answer changes the diagnosis.**
+
+  - **The 528pt SwiftUI-internal proposal never once reaches the real
+    UIKit view, in either capture.** `vcViewFrame`, `vcViewBounds`,
+    `windowBounds`, and the `UISheetPresentationController`'s own
+    `containerView.bounds` are all a constant 393.0 across every single
+    probe sample, in both captures, regardless of detent config or
+    height. Directly comparing the two new SwiftUI-side log points
+    confirmed it structurally: `rootBeforeLock` reads 528 (even with
+    `no .presentationDetents` configured, so this is unrelated to
+    `presentationDetents` specifically), `rootAfterLock` — measured on
+    the very next line, after the existing `.frame(width:)` override —
+    is always exactly 393, matching the UIKit probe. The build 14/15
+    width-lock fix (then keyed off `UIScreen.main.bounds.width`) was
+    therefore correct **at rest**.
+  - **What was still wrong: the real `presentedView` genuinely narrows
+    during transitions.** Both captures show `presentedView.frame.width`
+    dropping to ~377–387pt (never wider, never near 528) during any
+    active detent transition — dragging between `.medium`/`.large`, or
+    the initial open animation — before settling back to exactly 393 at
+    rest. This is a normal iOS sheet-resize visual, not a bug. But a
+    width locked to a **constant** (correct at rest) is therefore
+    briefly WIDER than the real, transiently-narrower container during
+    every transition, clipping the content against it for those
+    frames — a much smaller version of the original symptom (6–16pt,
+    not 135pt), confined to the animation window instead of persisting.
+    This is likely what remained visible after builds 14/15.
+  - **Fix: track the live measurement instead of a computed constant.**
+    `PresentationProbeUIView` now reports `presentedView.frame.width`
+    (falling back to `view.bounds.width` when there's no presentation
+    controller) via a callback on every layout pass, and
+    `ContentSheetView`'s `lockedWidth` is driven continuously from that
+    feed instead of being computed once from `UIScreen.main.bounds`
+    (kept only as the initial value for the few milliseconds before the
+    first live measurement arrives). The content now always matches
+    whatever the real container width is at that exact instant, settled
+    or mid-transition, eliminating the mismatch rather than
+    approximating it with a single number.
+  - Compiles clean (`xcodebuild` Debug), no new warnings, uploaded as
+    build 17. Not yet re-verified on device.
+
   No changes to web-client runtime code beyond the manifest additions
   above. No WebXR work.
 
