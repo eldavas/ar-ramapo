@@ -2044,6 +2044,50 @@ schema above.
   - Compiles clean (`xcodebuild` Debug) and uploaded as build 11. Not yet
     re-verified on device.
 
+  **Progress (2026-09-04, build 12): build 11's physical test still showed
+  the content sheet clipped symmetrically on both left/right edges — "as
+  if padding were negative" — even with the header/grabber/white-background
+  fixes confirmed working. Before shipping another guess, this was
+  investigated as exhaustively as possible WITHOUT the physical device
+  first, per explicit direction ("no debes especular").**
+
+  A throwaway SwiftUI harness (`scratchpad/sheet-debug`, outside either
+  repo) reproduced the real `ContentSheetView`/`RootView` structure
+  exactly — same `EnvironmentObject`/computed-`Binding`/`onChange` pattern
+  — and ran it across the full available local matrix: iPhone 16 Pro and
+  17 Pro, iOS 18.2 and 26.5, both a plain `application` and an actual
+  `application.on-demand-install-capable` (App Clip) target type, and both
+  a static background and a 60fps-`Timer`-driven `@Published` counter
+  behind the sheet (mirroring `HotspotOverlayModel`'s real per-AR-frame
+  publishing). Every combination rendered correctly — proper padding,
+  full title, close button, no clipping. The reporter's device (iOS
+  26.6.1) is newer than everything tested, and confirmed no Bold
+  Text/Display Zoom accessibility settings were active, and a full
+  force-quit-and-relaunch did not change the symptom. That rules out the
+  SwiftUI code itself, this specific class of accessibility setting, OS
+  version regression, and session staleness as explanations with
+  reasonable confidence — the remaining unknown is the actual on-device
+  geometry, which no amount of local reasoning can substitute for.
+
+  - **Added `GeometryLogger`, diagnostic-only:** a `ViewModifier` wrapping
+    `GeometryReader` in a `.background()` (same technique
+    `HotspotOverlayView`/`RiveCardView` already use for measurement),
+    logging measured size + safe-area insets via `os.Logger` (`.notice()`,
+    subsystem `com.ramapo.arclip`, category `ContentSheetLayout`) on
+    appear and on any size change. Applied at the sheet's root (after
+    `.background(Color.white)`), the header, the inner scrollable
+    text+image `VStack`, and the title/body `Text` views individually —
+    enough to tell whether an ancestor container is sized wrong, or a
+    `Text` element specifically is refusing to wrap/constrain, once real
+    numbers come back from Console.app (subsystem filter
+    `com.ramapo.arclip`, same three-attempt lesson from build 7's own
+    diagnostics saga: `.notice()` persists post-hoc, `.info`/`.debug` do
+    not).
+  - Compiles clean (`xcodebuild` Debug) and uploaded as build 12. This
+    build makes NO visual/layout change — it is purely instrumentation,
+    shipped specifically to get real device data before attempting
+    another fix.
+
   No changes to web-client runtime code beyond the manifest additions
   above. No WebXR work.
 
