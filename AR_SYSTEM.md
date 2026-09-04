@@ -2088,6 +2088,38 @@ schema above.
     shipped specifically to get real device data before attempting
     another fix.
 
+  **Progress (2026-09-04, build 13): build 12's Console.app capture (iOS
+  26.6.1) found the exact bug, and it was never in this file's own
+  layout.** Every single content-sheet presentation logged the same
+  pattern: `root appeared: size=393.0x...` (correct — matches the
+  device's actual point width) immediately followed, ~100-150ms later,
+  by `root size changed: size=528.0x...` — 135pt too wide — which then
+  held for the rest of that presentation while HEIGHT kept tracking the
+  active detent correctly the whole time (140 / 425 / 759 as the person
+  dragged between peek/medium/large). Confirmed present across every
+  tap in the capture, not an intermittent glitch. That is a real
+  `presentationDetents(_:selection:)` + custom `.height()` detent
+  regression in this specific iOS point release, external to
+  `ContentSheetView`'s own layout — the exhaustive build-12 local
+  verification never turned it up because no locally-installed simulator
+  runtime (18.2, 26.5) carries this exact regression; the first
+  measurement, before it fires, is always correct.
+
+  - **Fix: pin the width to that first correct measurement.**
+    `ContentSheetView` now captures `proxy.size.width` once, from the
+    first `GeometryReader` pass (before the bug has a chance to fire),
+    into `@State private var lockedWidth`, and reapplies it via
+    `.frame(width: lockedWidth)` — every later (buggy) proposal from the
+    presentation controller is simply overridden. Not a hardcoded
+    constant: the locked value is the device's own first-pass
+    measurement, read live each session. Only width is locked; height is
+    deliberately left unconstrained since it legitimately needs to keep
+    tracking the detent. The diagnostic `GeometryLogger` from build 12
+    stays in place (harmless, `.notice()`-only) specifically so the next
+    capture can confirm `root` now holds steady instead of jumping to 528.
+  - Compiles clean (`xcodebuild` Debug) and uploaded as build 13. Not yet
+    re-verified on device.
+
   No changes to web-client runtime code beyond the manifest additions
   above. No WebXR work.
 
