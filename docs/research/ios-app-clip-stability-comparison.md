@@ -237,10 +237,83 @@ export for the same `.info`-persistence reason, so it should actually show
 up on the next capture.
 
 Shipped as build 6 (`a0bcfb1` code, `3fb3e33` build-number bump);
-archive/export/upload all succeeded. **Next physical test is the one that
-should finally produce usable numbers** for the tilt and, hopefully, the
-card/tap symptom — same untethered walkaround, log pulled from Console.app
-afterward exactly as before.
+archive/export/upload all succeeded.
+
+**Update (2026-09-03, same day): build 6's capture STILL came back with
+zero of our own log lines, for a completely different reason than
+before — a Console.app search filter, not a build or log-level issue.**
+Console.app's search bar had an active `PROCESS: ARRamapo` token left over
+from browsing, silently excluding every line from our own code (which,
+whether via the host app or the App Clip, still executes under whatever
+process is actually foregrounded — the filter just happened to exclude
+it). Confirmed by screen-sharing the actual Console.app window. Fixed by
+searching `subsystem:com.ramapo.arclip` instead of filtering by process
+name — subsystem is a property of the `Logger` call itself, immune to
+whichever process ends up hosting it. The resulting export (`logs/4.txt`)
+was the first of five captures across two days to actually contain any of
+our own data — 995/995 lines matched.
+
+**That data immediately exposed two severe, previously-invisible bugs and
+resolved the tilt question:**
+
+1. **"Re-grounded" fired 336 times in one session, ~50ms apart, each move
+   3+ meters.** Not occasional correction — a tight, continuous loop. Root
+   cause: `ARSessionManager` called `session.remove(anchor: imageAnchor)`
+   right after every capture, reasoning that removal "re-arms `didAdd` for
+   a future re-scan." While the plaque stayed continuously visible, that
+   removal made ARKit notice on the very next frame that the reference
+   image had no anchor and immediately create a fresh one — racing itself
+   dozens of times a second, which is exactly what "renders a couple
+   meters off the table, at a smaller scale" (the person testing's most
+   recent report) turned out to be: the position never got a chance to
+   settle. ARKit doesn't need the manual nudge — while an image keeps
+   tracking, it keeps the SAME `ARImageAnchor` alive and updates it in
+   place; `didAdd` naturally fires again, on its own, only after a genuine
+   loss-then-refind cycle. Fixed by deleting the manual removal entirely
+   and adding `didRemove` purely to log when ARKit itself (not us) decides
+   tracking was lost.
+
+2. **Every hotspot logged `occluded=true` 100% of the time (131/131
+   samples, zero exceptions)** — directly explaining the reported
+   "ghost cards floating over their markers with unwanted transparency."
+   A universal, viewing-angle-independent occlusion result is the signature
+   of a structural raycast bug, not real geometry. Root cause, confirmed
+   against the actual shipped `site-scene.usdz` (the same structure §38's
+   USDA-parser investigation already dumped): Blender's export shape is
+   `Xform "building_X" { ... Mesh "building_X" {...} }` — the collision
+   geometry lives on the **Mesh child**, while each hotspot is parented to
+   the **Xform** — siblings, not ancestor/descendant. The occlusion check
+   only tested the raycast hit's own identity against the hotspot's
+   recorded ancestor set (which only contains the Xform), so a ray to any
+   hotspot always hit its own building's mesh first and never recognized
+   it as excludable. Fixed by walking the HIT entity's own ancestor chain
+   instead of just checking its bare identity.
+
+3. **The tilt is very likely NOT a bug.** The same log's raw ARKit-detected
+   Euler angles (pitch ≈ -3°, roll ≈ 6°) were small and — since
+   `site-tracking-front`'s glue and yaw correction are both identity —
+   identical to the composed values. Both numbers sit comfortably inside
+   the range every "good" 8th Wall capture this project has ever logged.
+   The severe position instability from bug 1 almost certainly compounded
+   the visual impression of a worse tilt than actually exists; worth
+   re-checking once 1 and 2 are confirmed fixed, but not chased further on
+   its own.
+
+**Also added, per an explicit UX request:** `SearchingHintView` — a
+non-blocking coaching overlay ("Point your camera at one of the site's
+tracking plaques — get close, they're small.") shown from AR-session-start
+until first lock. The AR phase previously had zero on-screen guidance
+between "camera is live" and "something appeared" — the same
+unexplained-blank-state problem `LoadingStateView`'s own doc comment
+already treats as a bug for the pre-AR phases, just never covered once the
+AR view itself took over. Mirrors the web's `arStatusStore` 'searching'
+phase copy in `main.ts`, adapted for four plaques instead of one.
+
+Shipped as build 7 (`6c7bbd3` code, `bde2390` build-number bump);
+archive/export/upload all succeeded. **Next physical test** should show:
+a stable anchor with realistic re-ground counts (single digits per
+session, not hundreds), hotspot cards at full opacity when nothing is
+actually blocking them, and the new search-phase hint on cold start.
 
 The rest of this document is the original pre-implementation analysis,
 kept as-is for the reasoning trail.
