@@ -2002,6 +2002,48 @@ schema above.
   - Compiles clean (`xcodebuild` Debug) and uploaded as build 10. Not yet
     re-verified on device.
 
+  **Progress (2026-09-03, build 11): build 10's physical test surfaced a
+  real structural layout bug — the same symptom, in fact, that build 9's
+  screenshot had already shown without being correctly root-caused at the
+  time: at the small `.height(140)` peek detent, the header/close
+  button/system grabber read as entirely missing, with only a mid-scroll
+  slice of body text visible; the whole card also looked dark rather than
+  white in both peek and open, which read as the presentation dimming
+  overlay bleeding onto the sheet itself.**
+
+  - **Root cause, not a guess:** `ContentSheetView`'s `body` was
+    `VStack { header; ScrollView { … } }`. A bare `ScrollView` has no
+    "fill remaining space" request of its own inside a `VStack` — it sizes
+    to its CONTENT's natural height. At `.medium`/`.large` that natural
+    height happens to exceed the detent anyway so the bug never showed;
+    at the small peek detent, the oversized combined `VStack` got
+    centered/clipped by the presentation controller instead of
+    top-anchored, pushing the header off the top of the visible frame
+    while a middle slice of body text remained on screen — exactly the
+    reported symptom, and exactly why it reproduced identically across
+    two independent content rewrites (build 9 and build 10) despite
+    neither pass touching this structural issue.
+  - **Fix:** rebuilt around `.safeAreaInset(edge: .top)` instead of a
+    `VStack` sibling — the header is now carved out of the `ScrollView`'s
+    own safe area rather than competing with it for space. `ScrollView`
+    is the sole root view, so it unambiguously receives 100% of whatever
+    height the current detent provides, at every detent, by construction
+    — not a size that needs reconciling. This is `safeAreaInset`'s
+    documented purpose (a fixed accessory pinned to an edge of scrollable
+    content), not a workaround layered on top of the previous structure.
+  - **White background, at the correct layer:** neither `ContentSheetView`
+    nor the call site had ever set an explicit background, so the
+    system's light/dark-following default sheet material was showing
+    through — dark, since the device/app runs in dark appearance. Fixed
+    with `.presentationBackground(.white)` on the sheet content
+    (ARClipApp.swift) — the API Apple provides specifically for a sheet's
+    own backing material, including the rounded-corner chrome around the
+    content, not left to a content-view `.background()` that only covers
+    its own bounds. `ContentSheetView` also sets `.background(Color.white)`
+    on itself for the same reason, defense in depth at the content layer.
+  - Compiles clean (`xcodebuild` Debug) and uploaded as build 11. Not yet
+    re-verified on device.
+
   No changes to web-client runtime code beyond the manifest additions
   above. No WebXR work.
 
