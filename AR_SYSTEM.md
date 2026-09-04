@@ -1961,6 +1961,47 @@ schema above.
     build 9 via `scripts/deploy-testflight.sh`. Not yet re-verified on
     device.
 
+  **Progress (2026-09-03, build 10): build 9's content-sheet padding fix
+  was directionally right but not numerically exact — the physical test
+  flagged it as still off, and pointed at the actual Figma source
+  (`https://www.figma.com/design/satgYmG6U1hvSxDqp332VE/AR-app`, nodes
+  6:40 and 6:287, the "Simple" card variant) as ground truth rather than
+  the `CardPanel.ts` CSS the previous pass had approximated from.** Pulled
+  via the Figma MCP's `get_design_context` (per its own mandatory
+  `figma-design-to-code` skill gate) — the two disagree in one real way:
+  `CardPanel.ts`'s `imageEl` has no fixed height (natural aspect ratio,
+  never cropped), but the Figma node specifies a fixed 240pt image box
+  with the photo CROPPED to fill it. Since the user pointed at Figma
+  specifically as "el diseño exacto," Figma wins here.
+
+  - **`ContentSheetView` rewritten to the Figma node's literal values:**
+    24pt side padding (was 20), 18pt bold black title (was 24pt), 14pt
+    semibold `#3c3c43` subtitle/body (was 15pt/16pt with a different
+    color), a 30×30 close button at a 16pt-top/14pt-trailing inset
+    (absolutely positioned, independent of the title column's width,
+    matching Figma's own layering), and the image switched from
+    `aspectRatio(.fit)` to a fixed-240pt `.fill` + `.clipped()` box with
+    an 8pt corner radius (was 12pt, uncropped). Header/body split (header
+    fixed, only image+body scrolls) is unchanged — that's an
+    architectural decision from `CardPanel.ts`'s own doc comment, not
+    something a static Figma frame could confirm or contradict either
+    way.
+  - **Peek redefined as drag-only, per explicit native-specific
+    direction:** the web's `card.open()` always lands on `'peek'`, but the
+    user was explicit that the native sheet should NOT copy that — the
+    first tap on a hotspot (and every later tap on a different hotspot
+    while the sheet is already open) must land directly on `open`
+    (`.medium`); the `.height(140)` peek detent stays reachable only by
+    the person dragging the sheet down from there. This needs
+    `presentationDetents(_:selection:)` to force the landing detent
+    programmatically — the array-only overload has no way to express
+    "always land here, including on a same-`isPresented`-value content
+    swap." That overload is iOS 16.4+, so `deploymentTarget` moved
+    16.0 → 16.4 in `project.yml` (the `#available`-gated fallback from
+    build 9 was removed — one code path now, not two).
+  - Compiles clean (`xcodebuild` Debug) and uploaded as build 10. Not yet
+    re-verified on device.
+
   No changes to web-client runtime code beyond the manifest additions
   above. No WebXR work.
 
