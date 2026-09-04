@@ -2120,6 +2120,40 @@ schema above.
   - Compiles clean (`xcodebuild` Debug) and uploaded as build 13. Not yet
     re-verified on device.
 
+  **Progress (2026-09-04, build 14): build 13's physical test showed
+  partial improvement ("se mejoró mucho") but the sheet still read as
+  unpadded, and the App Clip crashed once during the same session** (the
+  pasted Console.app capture ends mid-stream with no error line — this
+  repo's own `.notice()` logs have no reason to record a fatal
+  termination; a real crash needs the OS-generated crash report, which
+  wasn't captured this round — the user is retrieving it via Settings →
+  Privacy & Security → Analytics & Improvements → Analytics Data on the
+  device itself, still pending as of this entry).
+
+  - **Build 13's width-lock diagnosis gap:** the fix captured
+    `lockedWidth` from the SAME `GeometryReader` proxy the `GeometryLogger`
+    reads for its "root" log line — meaning that log point sits UPSTREAM
+    of the `.frame(width:)` override, so it was always going to keep
+    showing the presentation controller's buggy 528pt proposal whether or
+    not the override downstream was actually taking hold. The recapture
+    showing an unchanged "root … 528" log therefore couldn't distinguish
+    "the fix isn't working" from "the fix is working exactly as designed
+    and this log point was simply never going to reflect it" — an
+    undiagnosable measurement, not evidence either way.
+  - **Fix: stop depending on the buggy pipeline for the locked value at
+    all.** `lockedWidth` now comes from `UIScreen.main.bounds.width` —
+    the device's physical point width, reported independently of
+    whatever this specific `presentationDetents(_:selection:)` +
+    `.height()` combination is proposing to this view. On a
+    portrait-locked, iPhone-only app (`TARGETED_DEVICE_FAMILY: "1"`,
+    portrait-only orientation, no iPad/multitasking surface) there is no
+    legitimate scenario where the sheet's content should ever need to be
+    wider than that value, so pinning to it is unconditionally correct,
+    not merely "probably fine."
+  - Compiles clean (`xcodebuild` Debug) and uploaded as build 14. Not yet
+    re-verified on device — waiting on both a fresh visual check and the
+    actual crash report before drawing further conclusions.
+
   No changes to web-client runtime code beyond the manifest additions
   above. No WebXR work.
 
