@@ -1903,6 +1903,64 @@ schema above.
     warnings and was uploaded to TestFlight via the existing
     `scripts/deploy-testflight.sh` flow.
 
+  **Progress (2026-09-03, build 9): build 8 confirmed on physical
+  hardware (`logs/6.txt`) — stable while walking, zero anchor loss, and
+  the content sheet opened with the correct sheet-sourced title/body on
+  every marker tap. Coaching never re-appeared after the initial hint in
+  this run, consistent with `tickCoaching`'s design: tracking stayed
+  `.normal` the whole session, so the sustained-loss branch simply never
+  had a reason to fire.** Two real UX defects surfaced from that same
+  capture, both fixed in build 9:
+
+  - **Marker background hid the scene:** each `RiveCardView`'s
+    `Color.black.opacity(0.45)` pill was visible and, with ten hotspots
+    on screen at once (`Residence 01`–`10` plus the parking garage), the
+    overlapping dark boxes read as clutter rather than floating labels.
+    Fixed by swapping the fill to `Color.clear` while leaving the
+    `.contentShape(Rectangle())`/padding/gesture stack completely
+    unchanged — the tap-target rect is identical, only its fill stopped
+    being drawn. The label `Text` gained a black drop shadow (two
+    layered `.shadow` passes) so white text stays legible floating
+    directly over an unpredictable camera feed, the same legibility job
+    the pill used to do incidentally.
+  - **Content sheet had no padding and no third "peek" state:** the
+    `.presentationDetents([.medium, .large])` from build 8 always opened
+    directly to `.medium`, and `ContentSheetView`'s image/title/body ran
+    edge-to-edge inside the sheet. `ContentSheetView` is now a precise
+    point-for-point port of `CardPanel.ts`'s header/content-wrapper
+    spacing (header `padding:10px 20px 16px`, content
+    `padding:16px 20px 24px`, image `aspectRatio(.fit)` instead of a
+    cropped fixed height, body text color `#3c3c43`), with a fixed
+    header (title/subtitle/close button) that never scrolls above an
+    independently-scrolling image+body area — matching the web's
+    fixed-header/scrolling-body split exactly. A `.height(140)` detent
+    was added ahead of `.medium`/`.large`, reproducing `CardPanel.ts`'s
+    three-state `'closed' | 'peek' | 'open'` model (the "additional view
+    beyond open/close" the physical test flagged as missing) with
+    SwiftUI's native drag-between-detents interaction, not a
+    reimplementation of the web's hand-rolled drag gesture. On iOS 16.4+
+    a `selection:` binding resets the detent to peek whenever
+    `presentedContent` changes while the sheet stays open (mirrors
+    `card.open()`'s unconditional `setState('peek')` even when swapping
+    content) — deployment target is 16.0, so this is gated behind
+    `#available(iOS 16.4, *)`; below that, only the "reset on swap"
+    refinement is unavailable, first presentation still opens at peek via
+    SwiftUI's own smallest-detent default.
+  - Also asked and answered this round, no code involved: whether the
+    App Clip Card confirmation screen (the "Open" banner Safari shows
+    before an App Clip launches from a web link) can be skipped for a
+    fully silent launch. It cannot — Apple requires that tap for every
+    link-triggered invocation, independent of hosting provider; migrating
+    off `onrender.com` later only changes which domain re-verifies the
+    Associated Domains entitlement and which URLs are registered in App
+    Store Connect's App Clip Experience metadata, not this behavior. A
+    real **App Clip Code** (Apple's dedicated scannable graphic, distinct
+    from a generic QR pointing at the same URL) is the closest lever
+    available for a smoother physical-plaque scan flow.
+  - Both fixes compile clean (`xcodebuild` Debug) and were uploaded as
+    build 9 via `scripts/deploy-testflight.sh`. Not yet re-verified on
+    device.
+
   No changes to web-client runtime code beyond the manifest additions
   above. No WebXR work.
 
