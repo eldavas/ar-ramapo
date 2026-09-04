@@ -1758,7 +1758,115 @@ schema above.
   criteria on the native stack (same plaque, same rig, same asymmetry
   tell), and the validated ARKit glue constants are recorded here.
 
-  No changes to web-client runtime code. No WebXR work.
+  **Progress (2026-09-03): a stability comparison against 8th Wall was
+  run, and it surfaced two real bugs, one non-issue, and a documentation-
+  process lesson — full evidence trail in `docs/research/
+  ios-app-clip-stability-comparison.md`; this is the summary.**
+
+  The App Clip had gone stale (~2 months, ~build 2 on TestFlight) since
+  Phase 4's initial build. Brought current with the web client's
+  production `'site'` experience (buildings + hotspot markers, not the
+  old dominos bench-test scene) and shipped seven TestFlight builds in
+  one session (builds 3-7 landed real fixes; 3/4 chased a false-positive
+  parser bug, see below):
+
+  - **Manifest parity, multi-target:** `Manifest.swift`/`ManifestResolver`
+    now decode the same `targets[]` shape as the web (`manifest.ts`'s
+    `PlaqueTarget`), collapsing a flat single-target entry into a
+    one-element array with an identity offset/rotation so
+    `ARSessionManager` only ever handles the multi-target shape. All four
+    physical plaques are armed simultaneously via one `ARReferenceImage`
+    per target; whichever one fires, the content composes to the same
+    shared world position via a direct Swift port of
+    `ImageTargetAnchorSource.applyPose()`'s math (rotation × per-plaque
+    yaw correction, position offset by `originOffsetMeters` rotated into
+    world space). `AppConfig.fallbackTargetId` now points at `"site"`.
+  - **USDA parser false positive (builds 3-4):** the on-device metadata
+    reader threw "two prims named building_15" on every single building —
+    not a content bug. Blender's routine `Xform "X" { Mesh "X" {...} }`
+    export nesting was being flagged as an ambiguous duplicate name; fixed
+    by only treating a reopened name as ambiguous when it tries to write a
+    second REAL (non-Blender-bookkeeping) property, not merely on reopen.
+  - **Continuous re-grounding loop (found in build 6, fixed in build 7):**
+    `ARSessionManager` used to call `session.remove(anchor:)` right after
+    every capture, reasoning that removal "re-arms `didAdd` for a future
+    re-scan." While a plaque stayed continuously visible, that removal
+    made ARKit recreate a fresh anchor on the very next frame — a real
+    capture showed 336 re-grounds in one session, ~50ms apart, each
+    jumping 3+ meters, which is exactly what "renders a couple meters off
+    the table, at a smaller scale" turned out to be. ARKit doesn't need
+    the nudge: while an image keeps tracking it keeps the same anchor
+    alive and updates it in place; `didAdd` naturally refires only after a
+    genuine loss-then-refind cycle. Fixed by deleting the manual removal.
+    Confirmed fixed in the very next capture: 1 lock, 0 re-grounds, for
+    the whole session.
+  - **Hotspot occlusion always true (same build 6→7 fix):** every hotspot
+    logged `occluded=true` 100% of the time (131/131 samples) — the
+    signature of a structural bug, not real geometry. Root cause: the
+    collision geometry from Blender's Xform/Mesh export nesting lives on
+    the Mesh child, a SIBLING of the hotspot (parented to the Xform), not
+    an ancestor — so the occlusion raycast's ancestor-exclusion check
+    (which only tested the hit entity's bare identity) never recognized a
+    hotspot's own building mesh as excludable, and every ray "hit" it.
+    Fixed by walking the hit entity's own ancestor chain. Confirmed fixed:
+    0/218 false-positive occlusions in the next capture.
+  - **The reported "tilt" is very likely not a bug.** Once the anchor was
+    stable, real raw-ARKit Euler angles logged in at pitch ≈ -3° to -4°,
+    roll ≈ 6°, both essentially identical to the composed (post-glue)
+    values for `site-tracking-front` (whose glue and yaw correction are
+    both identity) — comfortably inside the range every "good" 8th Wall
+    capture this project has ever logged. The severe position instability
+    from the re-grounding bug almost certainly compounded the visual
+    impression of a worse tilt than actually existed.
+  - **Real-time diagnostics added:** structured `os.Logger` output
+    (subsystem `com.ramapo.arclip`) at every anchor lifecycle event (with
+    a raw-ARKit-vs-composed rotation comparison), a periodic
+    camera-vs-anchor diagnostic mirroring the web's `EightWallSession`
+    camera-position log, and every hotspot visible/occluded transition.
+    Getting this to actually show up in a post-hoc Console.app review (the
+    workflow this comparison needs, since physical testing requires
+    walking around untethered) took three separate fixes across five
+    capture attempts: `.info`/`.debug` `os_log` levels never persist to a
+    post-hoc export (bumped everything to `.notice`, which does); a stale
+    Console.app `PROCESS:ARRamapo` search-bar filter was silently
+    excluding the App Clip's own log lines regardless of build (fixed by
+    filtering on `subsystem:` instead, which is immune to whichever
+    process ends up hosting the code); and a resumed-not-relaunched app
+    instance (SwiftUI's `.onAppear` doesn't refire on a simple foreground,
+    so `ExperienceCoordinator.start()`'s own re-entry guard silently no-ops)
+    can also produce an empty capture with no code bug involved.
+  - **Cold-start coaching added:** `SearchingHintView`, a non-blocking
+    overlay ("Point your camera at one of the site's tracking plaques —
+    get close, they're small.") shown from AR-session-start until first
+    lock — the AR phase previously had zero on-screen guidance between
+    "camera is live" and "something appeared," the same
+    unexplained-blank-state problem `LoadingStateView` already treats as a
+    bug for the pre-AR phases. Mirrors the web's `arStatusStore`
+    'searching' phase copy in `main.ts`.
+  - **Process note:** an App Clip is a native compiled app, not a browser
+    experience — scanning the invocation QR only tells iOS to download and
+    launch it; there is no WebView, no JavaScript engine, and no Zustand
+    anywhere in this codebase. `ObservableObject`/`@Published` in Swift
+    (already used by `ExperienceCoordinator`) is the native equivalent of
+    a JS state store for this codebase, not a gap needing a JS bridge.
+  - Also hit and resolved, unrelated to AR: an App Store Connect export-
+    compliance dashboard prompt (answered "none of the algorithms," and
+    `INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: false` added so it's
+    skipped on future uploads), and a mid-session build-machine disk-space
+    incident (repeated Xcode archives filled a 460 GB volume to 177 MB
+    free; `DerivedData` + the project's own `build/` output were the
+    disposable culprits).
+
+  Not yet re-verified after build 7: the hotspot content sheet (tapping a
+  marker should open a Card-panel-equivalent with the Google Sheet's
+  title/subtitle/body/image, mirroring `CardPanel.ts`/`ContentProvider.ts`
+  — not yet ported to the native side) and whether the searching hint's
+  copy/behavior should track 8th Wall's fuller coaching state machine
+  (`arStatusStore`'s stabilizing/loading-target phases) rather than just
+  the one cold-start message shipped so far.
+
+  No changes to web-client runtime code beyond the manifest additions
+  above. No WebXR work.
 
 - **Phase 5 — Rive Interaction Layer & Content Binding. (OPEN)**
   Goal: replace the bench-test per-hotspot label cards with the production
