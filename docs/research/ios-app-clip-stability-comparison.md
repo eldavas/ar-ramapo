@@ -185,12 +185,62 @@ clearing them recovered several GB. Worth keeping an eye on for future
 archive cycles on this same machine.
 
 Shipped as build 5 (`b463cb8` code, `ed7c536` build-number bump);
-archive/export/upload all succeeded. **Not yet verified against a real
-capture:** whether the world-lock fix actually stops the disappearing/
-camera-following symptoms, whether multi-target re-grounding behaves
-sensibly on a real re-scan, and whether the card/tap symptom persists or
-was in fact downstream of the anchor issue — next physical test should
-capture the log (cable or Console.app) alongside the visual result.
+archive/export/upload all succeeded.
+
+**Update (2026-09-03, same day): build 5 tested — world-lock fix confirmed
+working, tilt and card/tap symptoms persist, and the captured logs came
+back completely empty of our own data.**
+
+Reported from two real captures (`ar-appclip/logs/1.txt`, `2.txt`,
+Console.app exports): the anchor now genuinely holds — walked around the
+physical table, the model stayed put, no more camera-following drift. That
+directly confirms the world-lock rewrite fixed what it was built to fix.
+Still open: the model still doesn't sit flush on the table (visible tilt
+persists), and the hotspot cards still look like "ghosts" floating above
+their markers with unwanted transparency and no tap response.
+
+**But neither log file contained a single line from anything this project
+added** — none of the `ARSessionManager`/`HotspotProjector`/`RiveCard*`
+`os.Logger` output from the previous pass, only the OS's own
+`RFARSessionObserver`/`ARState`-style system noise. Root cause: Apple's
+unified logging system only persists `.notice`/`.error`/`.fault` levels to
+the store a post-hoc Console.app export or `log show` query can see;
+`.debug` is never persisted at all, and `.info` is memory-only unless a
+Mac is actively live-streaming the device's log with "Include Info
+Messages" on for that exact window. Every call this project added used
+`.info` or `.debug` — invisible by construction to the actual workflow
+here (walk the test untethered, review the log afterward). Bumped every
+one to `.notice` (`a0bcfb1`), which persists automatically with no change
+to how the logs get collected.
+
+**Also added, since the tilt persists even with a now-stable anchor:** a
+raw-ARKit-vs-composed-rotation Euler comparison logged at every lock/
+re-ground. For `site-tracking-front` specifically, `rotationYawDeg: 0` and
+`SceneGraphGlue.usdzToAnchorRotation` is identity, so today the composed
+rotation is a byte-for-byte copy of ARKit's own raw per-frame detected
+image rotation — meaning the persistent tilt is either (a) the physical
+plaque genuinely not mounted flat, (b) single-sample noise in ARKit's own
+detection with no cross-check applied (unlike the 8th Wall side's §38
+pitch/roll plausibility gate — deliberately not ported here yet, pending
+real evidence it's needed), or (c) `SceneGraphGlue`'s identity assumption
+itself being wrong despite its own "provisional, never validated on
+device" status since day one. The next capture's raw-Euler numbers (now
+actually persisted) distinguish between these directly instead of
+guessing: small raw angles despite a visible tilt points at (c); a large
+raw angle points at (a) or (b).
+
+**Card/tap symptom: still not independently root-caused** — no usable
+data existed to check the hypothesis from the previous pass against.
+Logging for it (per-hotspot visible/occluded transitions, every tap
+forwarded to Rive) was already in place; it just wasn't visible in the
+export for the same `.info`-persistence reason, so it should actually show
+up on the next capture.
+
+Shipped as build 6 (`a0bcfb1` code, `3fb3e33` build-number bump);
+archive/export/upload all succeeded. **Next physical test is the one that
+should finally produce usable numbers** for the tilt and, hopefully, the
+card/tap symptom — same untethered walkaround, log pulled from Console.app
+afterward exactly as before.
 
 The rest of this document is the original pre-implementation analysis,
 kept as-is for the reasoning trail.
