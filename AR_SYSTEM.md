@@ -2177,6 +2177,56 @@ schema above.
   reference images armed, since that's the one variable in this project's
   control that plausibly stresses this exact Apple code path.
 
+  **Progress (2026-09-04, build 15): the content-sheet width corruption is
+  a confirmed, still-open Apple platform bug, not something fixable by
+  further guessing at this project's own layout code — root-caused via
+  web research after build 14's UIScreen-based fix (the more robust of
+  the two width-lock attempts) still failed on-device, identically to
+  build 13.**
+
+  - **What the research found:** [Apple Developer Forums thread
+  772799](https://developer.apple.com/forums/thread/772799) documents a
+  `presentationDetents` sheet-sizing bug with the explicit, load-bearing
+  detail that **it only reproduces on real devices, never in
+  Simulator** — which is exactly why the exhaustive build-12 local matrix
+  (2 device models × 2 iOS versions × app/App-Clip target types ×
+  static/60fps-churning background) never caught it, and an Apple DTS
+  engineer in that same thread could not reproduce it either, with no
+  workaround ever posted. [Thread
+  742830](https://developer.apple.com/forums/thread/742830) documents the
+  specific trigger combination: `.presentationDetents([...], selection:)`
+  together with `.presentationBackground(_:)` causes a sheet-sizing
+  animation glitch when the selected detent changes — the "sheet
+  momentarily turns into a square" — the same failure class (not
+  necessarily the identical numeric symptom) as this project's own
+  393→528pt width corruption, and both of ARClip's two matching
+  ingredients (`selection:` binding, `presentationBackground`) were
+  present. [Thread 743274](https://developer.apple.com/forums/thread/743274)
+  independently found that inlining sheet content directly in the
+  `.sheet { }` closure (rather than passing a separate reusable view
+  struct) avoids a related class of sheet-corruption bug — offered to the
+  user as the alternative path, not taken this round.
+  - **Fix: remove `selection:` entirely**, per explicit user direction
+    after weighing the trade-off (two already-failed fix attempts against
+    a bug Apple's own engineers couldn't reliably reproduce, versus a
+    UX nicety). `RootView` no longer binds a `PresentationDetent`
+    selection — `.presentationDetents([peekDetent, .medium, .large])` is
+    now the plain, non-selection array overload, available since iOS
+    16.0. This trades away the "every tap opens straight to `open`"
+    requirement (build 10) — the sheet now opens at whichever detent is
+    smallest (`peekDetent`, `.height(140)`), the same behavior as before
+    that feature existed — for actually avoiding the confirmed corruption
+    trigger. `.presentationBackground(.white)` is kept (independently
+    still needed for the Figma-accurate white background, and only
+    confirmed buggy in combination with `selection:`, not on its own) —
+    deployment target stays at 16.4 for that reason alone now, not for
+    `selection:`. The `UIScreen.main.bounds`-based width lock from build
+    14 is also kept, harmless defense-in-depth regardless of whether the
+    corruption's root mechanism is fully gone.
+  - Compiles clean (`xcodebuild` Debug) and uploaded as build 15. Not yet
+    re-verified on device. Revisit `selection:` only with real evidence
+    Apple has shipped a fix for this specific bug — not before.
+
   No changes to web-client runtime code beyond the manifest additions
   above. No WebXR work.
 
