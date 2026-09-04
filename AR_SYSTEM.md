@@ -2154,6 +2154,29 @@ schema above.
     re-verified on device — waiting on both a fresh visual check and the
     actual crash report before drawing further conclusions.
 
+  **The build-13 crash, root-caused: an Apple ARKit engine bug, not this
+  project's code.** The actual OS crash report (`ARRamapo-2026-09-03-
+  230529.ips`, committed under `logs/` in ar-appclip) shows `EXC_CRASH`/
+  `SIGABRT` — an uncaught C++ exception hitting
+  `std::terminate()`/`_objc_terminate()`/`abort()`. The crashing (and
+  triggering) thread is on queue `ObjTrkQueue1`, entirely inside
+  `AppleCV3D.framework` (Apple's internal computer-vision engine that
+  ARKit's image-tracking technique is built on) — zero `ARClip`/
+  `ARRamapo` frames appear anywhere in that thread's stack, and both
+  involved threads (`ObjTrkQueue1` and
+  `com.apple.arkit.technique.imageDetection`, the latter mid-
+  `CV3DODTTrackInWorld`/`CV3DODTTrack`) are attributed to the system's
+  `cameracaptured` work context in `voucherInfos`, not this app's own
+  code. This happened while ARKit was actively evaluating the 4
+  simultaneous `site-tracking-*` reference images already armed via
+  `ARSessionManager`'s `Set<ARReferenceImage>`. There is no code fix
+  available here — there is no app-level stack frame to change. Decision
+  (explicit, this round): document and keep testing rather than degrade
+  the real feature (4 physical plaques) on a hypothesis; if it recurs,
+  check whether it specifically correlates with multiple simultaneous
+  reference images armed, since that's the one variable in this project's
+  control that plausibly stresses this exact Apple code path.
+
   No changes to web-client runtime code beyond the manifest additions
   above. No WebXR work.
 
