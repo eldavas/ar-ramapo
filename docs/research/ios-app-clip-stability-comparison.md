@@ -88,6 +88,110 @@ premature open-time throw and keeping only the property-assignment-time
 check (`3b530fe`) — verified compiling, then archived and uploaded as build
 4 (`2c7a3c4`), export/upload both succeeded.
 
+**Update (2026-09-03, same day): build 4 ran cleanly and produced real,
+usable findings — first-lock speed and 3D render quality both a clear step
+up over 8th Wall (visible terrain elevation detail the web GLB path
+doesn't show), plus three real problems, all traced to one root cause.**
+
+Reported: (1) the model disappears the instant the plaque leaves the
+camera's frustum while walking around; (2) the model renders tilted, and
+— more strikingly — appears to MOVE WITH the phone when tilting to view it
+from another angle, as if still anchored to the camera rather than the
+world; (3) hotspot cards show unwanted transparency, appear to float
+disconnected from their markers, and don't respond to taps.
+
+**Root cause for (1) and (2), confirmed by re-reading
+`docs/research/ios-app-clip-research.md`'s own pre-implementation notes**
+(written before `ARSessionManager` was first built): `AnchorEntity(anchor:
+imageAnchor)` — the way content was mounted — is a LIVE binding to ARKit's
+own per-frame `ARImageAnchor`. That research document already named this
+"the wrong tool" for exactly this reason, before the class existed:
+*"`AnchorEntity(.image(...))` hides content whenever the image isn't
+actively tracked... Use a manual `ARSessionDelegate`... capture
+`imageAnchor.transform` → `AnchorEntity(world:)` → remove the image anchor
+(permits re-scan)."* The shipped code never did this — it stayed on the
+live binding through the "build 1" world-tracking fix, which addressed a
+different symptom (flicker) without changing the anchor's fundamental
+shape. A live ARImageAnchor binding degrading toward a camera-relative
+pose once `isTracked` goes false explains both symptoms as one bug, not
+two.
+
+**Fixed in `ARSessionManager.swift`**, implementing what the research
+always prescribed: on first detection, capture `imageAnchor.transform`
+into a plain `simd_float4x4`, mount content on a fully detached
+`AnchorEntity(world:)`, and remove the raw `ARImageAnchor` immediately —
+RealityKit now renders at that fixed world transform regardless of
+anything ARKit's per-frame image tracking does afterward, and removing the
+anchor re-arms `didAdd` for a later re-scan, which is now treated as a
+re-ground opportunity (recompute and reapply the composed transform) — the
+same "occasional discrete correction, never continuous re-snapping"
+strategy the whole 8th Wall investigation (§25/§26 in
+`8th-wall-troubleshooting.md`) took weeks to arrive at, reused here since
+there's no reason to assume ARKit's own tracking is drift-free either,
+just far less studied on this project so far. `isTrackingActive` no longer
+reads `ARImageAnchor.isTracked` at all — content visibility now depends
+only on whether something has ever been mounted plus current camera
+tracking health, decoupling it from the per-frame image-tracking flicker
+entirely.
+
+**(3) was not independently root-caused** — the hypothesis is that it's
+downstream of the same anchor instability (a card's screen position and
+the occlusion raycast both depend on the anchored geometry's world
+position being stable frame to frame), but this wasn't confirmed against
+real data before shipping the fix. Instead of guessing further, added
+structured logging (see below) at exactly the points needed to confirm or
+rule this out on the next capture.
+
+**Multi-target, in the same pass** (the person testing asked explicitly:
+"habilita los 4 placas, no solo front"): extended `manifest.ts`'s `'site'`
+entry with a `trackingImageUrl`/`imageTargetName` per nested target
+(`59f7dec`, web) and rewrote `Manifest.swift`/`ManifestResolver` to decode
+the same `targets[]` shape, collapsing a flat single-target entry into a
+one-element array with an identity offset/rotation so `ARSessionManager`
+only ever handles the multi-target shape. `ARSessionManager` now builds
+one `ARReferenceImage` per plaque and composes each detection through the
+same math as `ImageTargetAnchorSource.applyPose()` on the web (rotation ×
+per-plaque yaw correction, position offset by the plaque's own
+`originOffsetMeters` rotated into world space) — a direct Swift port,
+using `SceneGraphGlue.usdzToAnchorRotation` (identity) as this pipeline's
+equivalent of the web's `TARGET_FRAME_TO_WORLD_FIX`. `AppConfig
+.fallbackTargetId` now points at `"site"` instead of the single-plaque
+`"site-tracking-front"`.
+
+**Real-time logging added** (the person testing asked for this
+explicitly, to stop working from descriptions alone): structured
+`os.Logger` output under subsystem `com.ramapo.arclip`, covering every
+anchor lifecycle event (first lock / re-ground, with the distance moved),
+a periodic camera-vs-anchor diagnostic mirroring the web's
+`EightWallSession` camera-position log (position, tracking state,
+distance, Euler yaw/pitch/roll — same "does this look tilted" reasoning
+as the web's `cameraDiagnosticLine()`), every hotspot's visible/occluded
+state transition (not per-frame — only on change, with screen/world
+position), and every tap forwarded into a Rive state machine. Viewable
+live in Xcode's console over a USB cable (`xcodebuild` + a debug scheme),
+or afterward with no cable and no debugger at all via macOS Console.app →
+select the connected iPhone → filter by subsystem `com.ramapo.arclip` —
+`os_log` persists to the unified logging system and syncs on reconnect,
+so a fully untethered walkaround (needed here, since the person testing
+has to walk around the physical table) can still be inspected afterward.
+
+**Also hit mid-session, unrelated to AR: the build's own disk footprint.**
+Four archive/upload cycles plus repeated Debug builds filled the build
+machine's disk to 177 MB free (from a 460 GB volume) before this pass
+could even compile — `xcodebuild`'s own DerivedData, the project's local
+`build/` output directory, and a temporary file-inspection extraction were
+the three disposable, safely-deletable culprits (~2.2 GB combined);
+clearing them recovered several GB. Worth keeping an eye on for future
+archive cycles on this same machine.
+
+Shipped as build 5 (`b463cb8` code, `ed7c536` build-number bump);
+archive/export/upload all succeeded. **Not yet verified against a real
+capture:** whether the world-lock fix actually stops the disappearing/
+camera-following symptoms, whether multi-target re-grounding behaves
+sensibly on a real re-scan, and whether the card/tap symptom persists or
+was in fact downstream of the anchor issue — next physical test should
+capture the log (cable or Console.app) alongside the visual result.
+
 The rest of this document is the original pre-implementation analysis,
 kept as-is for the reasoning trail.
 
