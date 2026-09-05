@@ -9,6 +9,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>AR Prototype</title>
   <link rel="icon" href="data:,">
+  <!-- Apple's Smart App Banner mechanism for App Clips (not a custom
+       card imitation — this is what makes Safari present the real system
+       App Clip Card). Requires the associated-domains entitlement + AASA
+       (server/appleAppSiteAssociation.ts) to validate, and a Default App
+       Clip Experience configured in App Store Connect for this bundle ID
+       to actually render a card; harmless no-op otherwise. Bundle ID must
+       match ARClip.entitlements / AASA exactly. app-id is the numeric
+       App Store Connect app ID (Ramapo AR, ASC app 6787276375) — Apple's
+       documented format pairs it with app-clip-bundle-id/app-clip-display
+       so Safari can resolve both the Clip and its parent app listing. -->
+  <meta name="apple-itunes-app" content="app-id=6787276375, app-clip-bundle-id=com.daniels.arengine.Clip, app-clip-display=card">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     /* touch-action/overscroll: an AR viewport owns every touch. Without
